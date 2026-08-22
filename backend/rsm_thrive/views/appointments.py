@@ -4,6 +4,9 @@ from django.views.decorators.http import require_http_methods
 from rsm_thrive.http import BadRequest, api_login_required, json_error, json_ok, parse_body
 from rsm_thrive.models import Appointment, AppointmentSlot
 from rsm_thrive.serializers.appointments import appointment_payload
+from rsm_thrive.services.notifications import (
+    dispatch_booking_side_effects, dispatch_cancel_side_effects,
+)
 
 REASON_MAX = 500
 
@@ -36,6 +39,7 @@ def book_appointment(request):
     except IntegrityError:
         return json_error("slot_unavailable",
                           "That time was just taken. Pick another.", 409)
+    dispatch_booking_side_effects(appointment)
     return json_ok(appointment_payload(appointment), status=201)
 
 
@@ -63,7 +67,9 @@ def cancel_appointment(request, appointment_id):
     appointment = _own_appointment(request.user, appointment_id)
     if appointment is None:
         return json_error("unknown_appointment", f"No appointment {appointment_id}.", 404)
-    if appointment.status != "cancelled":
+    flipped = Appointment.objects.filter(pk=appointment.pk, status="confirmed") \
+        .update(status="cancelled")
+    if flipped:
         appointment.status = "cancelled"
-        appointment.save(update_fields=["status"])
+        dispatch_cancel_side_effects(appointment)
     return json_ok(appointment_payload(appointment))
