@@ -29,10 +29,10 @@ urlpatterns = [
     path("resume/versions", resume.resume_versions_dispatch, name="resume-versions"),
     path("resume/versions/<str:version_id>/current", resume.set_current_version, name="resume-set-current"),
     path("syllabi", courses.syllabi, name="syllabi"),
-    path("tss", requests.tss, name="tss"),
-    path("tss/connect", requests.tss_connect, name="tss-connect"),
     path("tasks", tasks.tasks_dispatch, name="tasks"),
     path("tasks/<str:task_id>", tasks.delete_task, name="task-delete"),
     path("tasks/<str:task_id>/note", overlay.task_note, name="task-note"),
     path("tasks/<str:task_id>/override", tasks.override, name="task-override"),
+    path("tss", requests.tss, name="tss"),
+    path("tss/connect", requests.tss_connect, name="tss-connect"),
 ]

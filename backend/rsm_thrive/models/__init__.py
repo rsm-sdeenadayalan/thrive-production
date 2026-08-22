@@ -13,8 +13,8 @@ from .overlay import (  # noqa: F401
     TaskOverride,
 )
 from .requests import CourseRequest  # noqa: F401
+from .resources import ResourceLink  # noqa: F401
 from .resume import (  # noqa: F401
     ResumeCourseHighlight, ResumeVersion, Skill,
 )
-from .resources import ResourceLink  # noqa: F401
 from .students import StudentProfile  # noqa: F401

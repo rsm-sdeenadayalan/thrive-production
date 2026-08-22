@@ -59,3 +59,12 @@ USE_TZ = True
 STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 DEFAULT_FROM_EMAIL = os.environ.get("THRIVE_FROM_EMAIL", "thrive-noreply@rady.ucsd.edu")
+
+# No EMAIL_BACKEND was configured before Django's MAILERS setting existed, so
+# email implicitly used the SMTP backend. MAILERS makes that explicit (Django
+# test runner overrides "default" to locmem for the test suite regardless).
+MAILERS = {
+    "default": {
+        "BACKEND": "django.core.mail.backends.smtp.EmailBackend",
+    },
+}

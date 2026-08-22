@@ -44,6 +44,5 @@ def test_tss_connect_roundtrip(client):
     assert client.get("/api/thrive/tss").json() == {"connected": False}
     assert client.post("/api/thrive/tss/connect").json() == {"connected": True}
     assert client.get("/api/thrive/tss").json() == {"connected": True}
-    assert profile.user.thrive_profile.tss_connected or True  # persisted below
     from rsm_thrive.models import StudentProfile
     assert StudentProfile.objects.get(user=profile.user).tss_connected is True

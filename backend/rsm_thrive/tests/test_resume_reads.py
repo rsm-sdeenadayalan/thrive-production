@@ -36,3 +36,12 @@ def test_current_404_when_none(client):
     resp = client.get("/api/thrive/resume/current")
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "no_resume"
+
+
+def test_versions_405_for_other_methods(client):
+    profile = make_student()
+    client.force_login(profile.user)
+    resp = client.put("/api/thrive/resume/versions", data="{}",
+                      content_type="application/json")
+    assert resp.status_code == 405
+    assert resp.json()["error"]["code"] == "method_not_allowed"

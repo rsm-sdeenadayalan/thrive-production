@@ -56,6 +56,14 @@ def test_list_drafts_first_then_newest_submitted(client):
     assert ids == [f"req-{d1.pk}", f"req-{d2.pk}", f"req-{new.pk}", f"req-{old.pk}"]
 
 
+def test_create_request_503_when_not_configured(client):
+    profile = make_student()
+    client.force_login(profile.user)
+    resp = _post(client, {"type": "drop", "course": "MGTA 453", "reason": "health"})
+    assert resp.status_code == 503
+    assert resp.json()["error"]["code"] == "not_configured"
+
+
 def test_requests_405_for_other_methods(client):
     profile = make_student()
     client.force_login(profile.user)
