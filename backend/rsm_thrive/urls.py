@@ -6,6 +6,7 @@ app_name = "rsm_thrive"
 
 urlpatterns = [
     path("appointments", appointments.appointments_dispatch, name="appointments"),
+    path("appointments/<str:appointment_id>/cancel", appointments.cancel_appointment, name="appointment-cancel"),
     path("advisors", advisors.advisors, name="advisors"),
     path("advisors/<str:advisor_id>/slots", advisors.advisor_slots, name="advisor-slots"),
     path("assignments", assignments.assignments, name="assignments"),

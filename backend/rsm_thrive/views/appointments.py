@@ -1,4 +1,5 @@
 from django.db import IntegrityError, transaction
+from django.views.decorators.http import require_http_methods
 
 from rsm_thrive.http import BadRequest, api_login_required, json_error, json_ok, parse_body
 from rsm_thrive.models import Appointment, AppointmentSlot
@@ -44,3 +45,25 @@ def appointments_dispatch(request):
     if request.method == "POST":
         return book_appointment(request)
     return json_error("method_not_allowed", "Use GET or POST.", 405)
+
+
+def _own_appointment(user, appointment_id):
+    if not appointment_id.startswith("appt-"):
+        return None
+    pk = appointment_id.removeprefix("appt-")
+    if not pk.isdigit():
+        return None
+    return (Appointment.objects.select_related("slot", "student")
+            .filter(pk=pk, student=user).first())
+
+
+@api_login_required
+@require_http_methods(["POST"])
+def cancel_appointment(request, appointment_id):
+    appointment = _own_appointment(request.user, appointment_id)
+    if appointment is None:
+        return json_error("unknown_appointment", f"No appointment {appointment_id}.", 404)
+    if appointment.status != "cancelled":
+        appointment.status = "cancelled"
+        appointment.save(update_fields=["status"])
+    return json_ok(appointment_payload(appointment))
