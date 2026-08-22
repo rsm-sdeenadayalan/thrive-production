@@ -36,7 +36,7 @@ def create_request(request):
     req_type = body.get("type")
     course = body.get("course")
     reason = body.get("reason")
-    if req_type not in VALID_REQUEST_TYPES:
+    if not isinstance(req_type, str) or req_type not in VALID_REQUEST_TYPES:
         return json_error("bad_request", "type must be a known request type.", 400)
     if not isinstance(course, str) or not course.strip():
         return json_error("bad_request", "course is required.", 400)

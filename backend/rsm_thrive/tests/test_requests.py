@@ -36,6 +36,7 @@ def test_create_request_validation(client):
     assert _post(client, {"type": "audit", "course": "x", "reason": "y"}).status_code == 400
     assert _post(client, {"type": "drop", "course": "  ", "reason": "y"}).status_code == 400
     assert _post(client, {"type": "drop", "course": "x", "reason": None}).status_code == 400
+    assert _post(client, {"type": ["enroll"], "course": "x", "reason": "y"}).status_code == 400
 
 
 def test_list_drafts_first_then_newest_submitted(client):
@@ -53,3 +54,15 @@ def test_list_drafts_first_then_newest_submitted(client):
     client.force_login(profile.user)
     ids = [r["id"] for r in client.get("/api/thrive/requests").json()]
     assert ids == [f"req-{d1.pk}", f"req-{d2.pk}", f"req-{new.pk}", f"req-{old.pk}"]
+
+
+def test_requests_405_for_other_methods(client):
+    profile = make_student()
+    client.force_login(profile.user)
+    resp = client.put("/api/thrive/requests", data="{}",
+                      content_type="application/json")
+    assert resp.status_code == 405
+    assert resp.json()["error"]["code"] == "method_not_allowed"
+    resp = client.delete("/api/thrive/requests")
+    assert resp.status_code == 405
+    assert resp.json()["error"]["code"] == "method_not_allowed"
