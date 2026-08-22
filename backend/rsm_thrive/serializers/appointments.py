@@ -25,3 +25,18 @@ def slot_payload(slot, available: bool) -> dict:
         "mode": slot.mode,
         "available": available,
     }
+
+
+def appointment_payload(appointment) -> dict:
+    slot = appointment.slot
+    return {
+        "id": f"appt-{appointment.pk}",
+        "advisorId": slot.advisor_id,
+        "studentId": appointment.student.username,
+        "slotId": slot.id,
+        "start": iso_instant(slot.start),
+        "end": iso_instant(slot.end),
+        "mode": slot.mode,
+        "reason": appointment.reason,
+        "status": appointment.status,
+    }

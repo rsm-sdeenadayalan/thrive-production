@@ -1,10 +1,11 @@
 from django.urls import path
 
-from .views import advisors, assignments, courses, degree, events, health, overlay, resources, students, tasks
+from .views import appointments, advisors, assignments, courses, degree, events, health, overlay, resources, students, tasks
 
 app_name = "rsm_thrive"
 
 urlpatterns = [
+    path("appointments", appointments.appointments_dispatch, name="appointments"),
     path("advisors", advisors.advisors, name="advisors"),
     path("advisors/<str:advisor_id>/slots", advisors.advisor_slots, name="advisor-slots"),
     path("assignments", assignments.assignments, name="assignments"),
