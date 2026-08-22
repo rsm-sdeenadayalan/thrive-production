@@ -21,6 +21,7 @@ urlpatterns = [
     path("me", students.me, name="me"),
     path("overlay", overlay.overlay, name="overlay"),
     path("requests/prefill", requests.prefill, name="request-prefill"),
+    path("requests", requests.requests_dispatch, name="requests"),
     path("resources", resources.resources, name="resources"),
     path("syllabi", courses.syllabi, name="syllabi"),
     path("tasks", tasks.tasks_dispatch, name="tasks"),
