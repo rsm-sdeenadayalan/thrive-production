@@ -1,4 +1,4 @@
-from rsm_thrive.serialize import iso_instant
+from rsm_thrive.serialize import iso_date, iso_instant
 
 
 def assignment_payload(assignment, student_assignment=None) -> dict:
@@ -14,4 +14,52 @@ def assignment_payload(assignment, student_assignment=None) -> dict:
         payload["grade"] = student_assignment.grade
     if assignment.description:
         payload["description"] = assignment.description
+    return payload
+
+
+def next_assignment_for(course, now) -> dict:
+    upcoming = course.assignments.filter(due_date__gte=now).order_by("due_date").first()
+    chosen = upcoming or course.assignments.order_by("-due_date").first()
+    if chosen is None:
+        return {"title": "Nothing scheduled yet", "due": iso_instant(now)}
+    return {"title": chosen.title, "due": iso_instant(chosen.due_date)}
+
+
+def course_payload(course, enrollment, now) -> dict:
+    payload = {
+        "id": course.id,
+        "code": course.code,
+        "title": course.title,
+        "instructor": course.instructor,
+        "schedule": [
+            {"dayOfWeek": m.day_of_week, "startTime": m.start_time,
+             "endTime": m.end_time, "location": m.location}
+            for m in course.meetings.all()
+        ],
+        "term": course.term,
+        "progress": enrollment.progress,
+        "standing": enrollment.standing,
+        "nextAssignment": next_assignment_for(course, now),
+        "syllabusId": course.syllabus.id,
+        "units": course.units,
+    }
+    if enrollment.nudge:
+        payload["nudge"] = enrollment.nudge
+    if enrollment.current_grade:
+        payload["currentGrade"] = enrollment.current_grade
+    return payload
+
+
+def syllabus_payload(syllabus) -> dict:
+    payload = {
+        "id": syllabus.id,
+        "courseId": syllabus.course_id,
+        "description": syllabus.description,
+        "gradeBreakdown": syllabus.grade_breakdown,
+        "policies": syllabus.policies,
+        "officeHours": syllabus.office_hours,
+        "lastUpdated": iso_date(syllabus.last_updated),
+    }
+    if syllabus.source_url:
+        payload["sourceUrl"] = syllabus.source_url
     return payload
