@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from rsm_thrive.models import (
-    Assignment, Course, CourseMeeting, Enrollment, StudentAssignment, StudentProfile, Syllabus,
+    Assignment, Course, CourseMeeting, Enrollment, Event, StudentAssignment, StudentProfile, Syllabus,
 )
 
 
@@ -77,3 +77,15 @@ def set_assignment_status(profile, assignment, status, grade="") -> StudentAssig
     return StudentAssignment.objects.create(
         user=profile.user, assignment=assignment, status=status, grade=grade
     )
+
+
+def make_event(id=None, start=None, **overrides) -> Event:
+    n = next(_counter)
+    fields = {
+        "id": id or f"evt-{n}",
+        "title": f"Event {n}",
+        "start": start or (timezone.now() + timezone.timedelta(days=2)),
+        "location": "Rady Courtyard",
+    }
+    fields.update(overrides)
+    return Event.objects.create(**fields)
