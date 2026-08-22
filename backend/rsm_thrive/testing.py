@@ -6,7 +6,8 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from rsm_thrive.models import (
-    Assignment, Course, CourseMeeting, Enrollment, Event, ResourceLink, StudentAssignment, StudentProfile, Syllabus,
+    Assignment, Course, CourseMeeting, Enrollment, Event, ResourceLink, SharedTask,
+    StudentAssignment, StudentProfile, StudentTask, Syllabus, TaskOverride,
 )
 
 
@@ -102,3 +103,31 @@ def make_resource(id=None, **overrides) -> ResourceLink:
     }
     fields.update(overrides)
     return ResourceLink.objects.create(**fields)
+
+
+def make_shared_task(**overrides) -> SharedTask:
+    n = next(_counter)
+    fields = {"title": f"Shared task {n}",
+              "due_date": timezone.now() + timezone.timedelta(days=4)}
+    fields.update(overrides)
+    return SharedTask.objects.create(**fields)
+
+
+def make_student_task(profile, due=None, **overrides) -> StudentTask:
+    n = next(_counter)
+    fields = {"title": f"My task {n}",
+              "due_date": due or (timezone.now() + timezone.timedelta(days=4))}
+    if "due" in overrides:
+        fields["due_date"] = overrides.pop("due")
+    fields.update(overrides)
+    return StudentTask.objects.create(user=profile.user, **fields)
+
+
+def set_override(profile, task_key, **facets) -> TaskOverride:
+    field_map = {"dueDate": "due_date", "order": "sort_order",
+                 "subtaskDone": "subtask_done"}
+    row, _ = TaskOverride.objects.get_or_create(user=profile.user, task_key=task_key)
+    for key, value in facets.items():
+        setattr(row, field_map.get(key, key), value)
+    row.save()
+    return row
