@@ -1,0 +1,1399 @@
+@import 'tailwindcss';
+
+/* Fonts, self-hosted via @fontsource. Latin subset and weight-pinned to match
+   what the Next app loaded through next/font:
+     DM Sans        400 prose, 500 row titles and emphasis, 700 headings
+     JetBrains Mono 400, 500 -- mono marks machine truth and never carries a
+                    heading, so it has no use for 700.
+   @fontsource ships `font-display: swap` in each of these files already.
+   Self-hosted on purpose: no Google Fonts link anywhere. */
+@import '@fontsource/dm-sans/latin-400.css';
+@import '@fontsource/dm-sans/latin-500.css';
+@import '@fontsource/dm-sans/latin-700.css';
+@import '@fontsource/jetbrains-mono/latin-400.css';
+@import '@fontsource/jetbrains-mono/latin-500.css';
+
+/* THRIVE is light-only by decision. Left undefined, Tailwind v4 would fall
+   back to its stock `dark:` variant (prefers-color-scheme). Pinning the variant
+   to a class nothing ever applies keeps any vendored `dark:` rules inert
+   without editing vendored files. Kept from the Next app: shadcn-svelte lands
+   in a later phase and will bring `dark:` rules with it. */
+@custom-variant dark (&:is(.dark *));
+
+/* ==========================================================================
+   THRIVE DESIGN TOKENS
+   --------------------------------------------------------------------------
+   Single source of truth. Never hardcode a color, size, radius, or duration
+   in a component -- reach for a Tailwind utility backed by one of these.
+
+   Layer 1  :root            raw THRIVE tokens (--thrive-*)
+   Layer 2  :root            shadcn semantic vars mapped onto layer 1
+   Layer 3  @theme inline    exposes both as Tailwind utilities
+
+   DIRECTION -- soft cream, hairline, Rady navy with a yellow accent.
+   Adopted 2026-08-15 as a deliberate reversal of the bordered direction of
+   2026-08-12; repaletted to the campus brand on 2026-08-22.
+
+   The 2026-08-22 pass changed TWO things and nothing else: the accent moved
+   from forest green to UC San Diego navy with a yellow accent, and the two-face
+   type rule was tightened to "sans for words, mono for numbers". Cream,
+   spacing, radii, motion, layout constants, the panel treatment, and the 1px
+   hairline vs 1.5px control boundary distinction are all untouched.
+
+   The previous direction made the border the structural device: 2px strokes at
+   3.88:1, hard offset shadows, tight radii. This one takes the structure out of
+   the ink entirely. Panels are white on cream, separated by a 1px hairline that
+   is frankly decorative. What holds the layout together is whitespace, type
+   hierarchy, and a row that fills on hover.
+
+   The new rule, replacing "a border below ~3:1 is not a border":
+
+       Hairlines are decorative. If removing a border would make the layout
+       ambiguous, the layout is wrong, not the border.
+
+   ONE EXCEPTION, and it is not negotiable: interactive control boundaries --
+   checkbox, radio, input, select, the resize grips -- still owe 3:1 under WCAG
+   1.4.11, because they are the only thing marking where the control is. Those
+   draw in --thrive-control-line at 1.5px, never in --thrive-hairline.
+
+   All contrast pairs below were computed before being written, not after.
+   Verified by scripts/check-contrast.py, which as of 2026-08-22 PARSES THIS
+   FILE rather than mirroring it by hand -- so a token edited here is checked
+   here, and the two cannot drift.
+   ========================================================================== */
+
+:root {
+  /* --- Layer 1: raw palette ------------------------------------------- */
+
+  /* Surfaces. Cream rather than off-white: with the borders gone, the page has
+     to do the separating, and a warmer ground makes a plain white card read as
+     raised without any shadow under it.
+     `sunken` is no longer just a recessed well -- it is now the row hover fill,
+     which is the main way a list signals that a row is interactive. */
+  --thrive-bg: #faf9f5;
+  --thrive-surface: #ffffff;
+  --thrive-sunken: #f1efea;
+
+  /* Ink. Four steps, and only the first three may carry text. */
+  --thrive-ink: #17181c; /* headings          16.8:1 on cream */
+  --thrive-body: #3a3b42; /* body copy         10.6:1 on cream */
+  --thrive-muted: #6b6c72; /* ALL secondary and metadata text
+                                                 4.97:1 on cream
+                                                 4.55:1 on sunken (the floor) */
+  --thrive-faint: #85868c; /* DECORATIVE TEXT AND CONTROL BOUNDARIES ONLY.
+                              Enforced by value: it clears 3:1 and stops well
+                              short of 4.5, so words placed in it fail a check
+                              rather than quietly shipping.
+                              3.45 cream / 3.63 card / 3.16 sunken.
+                              Spec'd as #8a8b91; that lands at 2.96 on sunken,
+                              which fails the 3:1 a control boundary owes, and
+                              sunken is now the row hover fill -- so a checkbox
+                              on a hovered row sat under the bar. Darkened one
+                              step. See CHANGELOG. */
+
+  /* Lines. Decorative, and that is the point. Two tiers:
+       hairline       1.22:1  panel edges and dividers
+       hairline-soft  1.12:1  inner dividers inside an already-hairlined panel
+     Neither is a meaningful graphic under WCAG, and neither needs to be --
+     nothing in this direction depends on a line to be legible. */
+  --thrive-hairline: #e6e3dc;
+  --thrive-hairline-soft: #efece6;
+
+  /* Control boundaries are the exception. A checkbox edge is the only thing
+     saying where the checkbox is, so it owes 3:1 and draws in faint.
+     TWO SEPARATE CONCEPTS, deliberately never merged into one token: the
+     colour (--thrive-control-line) and the width (--thrive-control-stroke).
+     A 1px decorative hairline and a 1.5px control boundary are different
+     things; collapsing them is silent -- the layout looks fine and the
+     accessibility guarantee is gone. */
+  --thrive-control-line: var(--thrive-faint);
+  --thrive-control-stroke: 1.5px;
+
+  /* The checkbox's box, as a token rather than as 17px in two places.
+     `.thrive-checkbox` sets its own width and height from this, and any row that
+     renders a SPACER where a checkbox would go reaches for the same value --
+     `calendar/ItemRow` does, so a list of classes and tickable tasks aligns in
+     one column instead of two ragged ones. Two literals would drift the moment
+     the control was resized, and the drift is a 1px misalignment nobody files. */
+  --thrive-checkbox-size: 17px;
+
+  /* The month grid's category dot. 8px, up from 6px on 2026-08-21.
+
+     A TOKEN rather than two Tailwind utilities, because the dot and the row that
+     reserves space for it have to agree: the wrapper sets its height so the cell
+     does not reflow between a day with dots and a day without, and a `size-2`
+     paired with an `h-1.5` would clip silently.
+
+     8px, measured rather than guessed. Three dots plus two 2px gaps is 28px
+     inside a 44px cell at every width the grid is drawn at, and the "+n"
+     overflow case shows two dots and a count in 30px. It is 1.8x the area of the
+     6px dot, which is most of the legibility this pass bought — more than the
+     saturation did. */
+  --thrive-cal-dot: 8px;
+
+  /* Action accent. UC SAN DIEGO NAVY, replacing the forest green (2026-08-22).
+     Official brand value, PMS 2767, from brand.ucsd.edu/visual-brand/color.
+     Not an approximation.
+
+       primary       14.18:1 on white -- safe for text and for solid fills,
+                     with more than twice the headroom the green had (6.13)
+       primary-soft  the partial-progress fill, navy-tinted
+       primary-fill  the light fill; 1.97:1 on card, so it CANNOT hold its own
+                     edge and stays ringed. That is a property of the fill, not
+                     an oversight -- see the alias note in layer 3.
+
+     The hover/active ramp INVERTS the green's direction, deliberately. Green
+     sat mid-range at 6.13:1, so both states went darker. Navy starts at
+     14.18:1; darkening it twice heads to black and throws the brand away. So
+     hover LIFTS (11.57:1) and active PRESSES darker (16.86:1), which is also
+     the more conventional read of the two gestures. Both keep white text far
+     clear of 4.5:1.
+
+     Keeping the text-safe value on `primary` is why every existing
+     `text-primary` / `bg-primary` / `bg-primary-soft` retunes for free. */
+  --thrive-primary: #182b49;
+  --thrive-primary-hover: #22395e;
+  --thrive-primary-active: #101d33;
+  --thrive-on-primary: #ffffff;
+  --thrive-primary-soft: #e9edf3;
+  --thrive-primary-fill: #9dbcdb;
+  --thrive-on-primary-fill: #0d1b2e;
+
+  /* RESERVED, and reserved by ratio rather than by convention:
+     UC SAN DIEGO YELLOW, PMS 116, official value from the same brand page.
+
+     ACCENT ONLY -- thin rules, small highlights, a marker on a navy ground.
+     Never a panel fill, never a button background, never a large area.
+
+     The constraint is not taste, it is measurement. Yellow is 1.50:1 on card,
+     1.43:1 on cream and 1.31:1 on the sunken hover fill. WCAG 1.4.11 asks 3:1
+     of any graphic that carries meaning, so on every light surface in this
+     system yellow is DECORATION and cannot be the only thing saying something.
+     Same standing as the hairline: if removing it makes the layout ambiguous,
+     the layout is wrong.
+
+     Its one legible home is against navy, at 9.45:1 -- which is the classic
+     campus pairing anyway. A yellow rule or marker on a navy ground is a real
+     graphic; the same rule on cream is a flourish.
+
+     Enforced by a CEILING in scripts/check-contrast.py, exactly as `faint` is:
+     if yellow ever clears 3:1 on a light surface, someone will promote it to
+     an indicator and get away with it. The gate fails instead.
+
+     UC San Diego also publishes Gold #C69214 (PMS 1245). Not adopted: it is
+     2.79:1 on card, so it fails the same bar while adding a second warm token
+     to reason about. Where a warm accent must be legible, `watch` (#8f6220,
+     5.34:1) already exists and already means something. */
+  --thrive-yellow: #ffcd00;
+
+  /* RESERVED: indigo marks "this is where you are now" and nothing else.
+     Not a status, not an action colour. Current phase on the timeline, today
+     on the calendar, the next thing up in a list. If it starts decorating,
+     it stops locating.
+
+     KEPT UNCHANGED through the navy repalette, considered and decided rather
+     than overlooked. Indigo and navy are both blue, which is a fair worry, but
+     they separate on two axes at once: lightness (5.59:1 vs 14.18:1 on card)
+     and saturation (indigo is vivid, navy is nearly desaturated). They also
+     never take the same form -- navy is a solid fill with white on it, indigo
+     is a marker, a rule, or a word. Retuning the single most-reserved token in
+     the system to fix a collision that measurement does not show would cost
+     more than it buys.
+
+     Note what indigo did NOT give up: "an active indicator" stays indigo's
+     job. Yellow is an accent, not a locator. Two colours both meaning "here"
+     is how a reservation dies. */
+  --thrive-indigo: #4c5bd4;
+  --thrive-indigo-soft: color-mix(in oklab, var(--thrive-indigo) 8%, white);
+
+  /* Status. RESERVED: signals status, never decoration.
+
+     on-track moved off green on 2026-08-15, because green had become "an
+     action you can take" and a green status chip beside a green button read as
+     the same signal. It moved to a calm blue.
+
+     THAT EXACT ARGUMENT NOW APPLIES TO THE BLUE. Primary is navy as of
+     2026-08-22, so a blue status chip beside a navy button repeats the
+     collision the last move was made to avoid -- same hue family, and
+     `on-track` is the one status that sits closest to a primary action in the
+     UI. So it moves once more, to a deep teal: still cool, still reads as
+     "steady", 5.90:1 on card, and 2.40:1 against navy, which is far enough
+     apart to be a different statement rather than a lighter navy.
+
+     Teal was rejected on 2026-08-15 for sitting between the sage and the blue.
+     Both of those are gone, so the slot is free again.
+
+     This is the ONLY reserved colour this repalette touched. Every other one
+     keeps its value as well as its meaning. */
+
+  /* ── Chroma pass, 2026-08-21 ────────────────────────────────────────────
+     Five status hues gained saturation and NOT lightness.
+
+     THE PROBLEM: the month grid's category dots read muted and muddy. They are
+     the only thing on that grid carrying stream identity, and eleven categories
+     share eight colours, so the set was competing with itself.
+
+     THE CONSTRAINT: every one of these must still clear 4.5:1 on card, because
+     each is used as TEXT somewhere as well as as a fill (see `tones.ts`). So
+     vibrance could not come from lightening them.
+
+     WHAT WAS DONE: each was converted to oklch, its chroma raised to the most
+     the sRGB gamut allows AT ITS OWN LIGHTNESS AND HUE, capped at a deliberate
+     target below that where the maximum was garish. L and H are untouched, so
+     every measured ratio moved by at most 0.19 and none moved down past its
+     floor. A stream that was teal is still teal; it is a better teal.
+
+     WHAT IT BOUGHT, honestly: very little for teal and amber, which were
+     already at the gamut boundary for their lightness (1.07x and 1.15x). A lot
+     for slate, plum and violet, which had room (2.46x, 1.70x, 1.41x). The slate
+     is the one that mattered most — see the note on `--thrive-later`. */
+  /* was #14706b · C 0.0803 -> 0.0856, the gamut maximum at this L and H */
+  --thrive-on-track: #00716c;
+  /* was #8f6220 · C 0.0988 -> 0.1136, likewise the maximum */
+  --thrive-watch: #946000;
+  /* was #6a5fb0 · C 0.1240 -> 0.1697, and the ONE hue that also moved: 287.7 ->
+     296. The shift is what pays for the chroma.
+
+     Violet is boxed in. Indigo sits at H 273 and is RESERVED for "you are here";
+     civic plum sits at H 323. `needs-help` sat at 288, nearer indigo than plum,
+     and was already only dE 0.072 from it — so raising chroma along its own hue
+     walked it straight into the reserved colour (dE 0.047 at C 0.175, worse than
+     the worst pair on the grid before this pass). Both appear on the month grid
+     at once: indigo is the today ring, `needs-help` is the Rady dot.
+
+     Re-centring the hue in the corridor between its two neighbours buys the
+     saturation for nothing: separation from indigo is 0.0723 -> 0.0727 and from
+     civic 0.0744 -> 0.0777, both marginally BETTER, at 1.37x the chroma. Still a
+     violet, and still the same violet meaning. Capped well under the 0.28 the
+     gamut allows, where it is a neon that would shout in a chip. */
+  --thrive-needs-help: #7851c2;
+
+  /* Urgency. RESERVED harder than the rest: overdue and genuinely urgent
+     only. If coral shows up for anything else it stops meaning "act now". */
+  --thrive-urgent: #b8462f;
+
+  /* Priority ramp, straight from the reference's urgent / soon / later.
+     `soon` aliases watch and `later` is a neutral slate, so a low-priority
+     row is tinted without being colored. */
+  --thrive-soon: var(--thrive-watch);
+  /* was #64748b · C 0.0407 -> 0.1000, the biggest single gain in the pass.
+
+     THE COLLISION THIS FIXES. `later` and `muted` were the two least
+     distinguishable dots on the grid by a wide margin — OKLab dE 0.039, about
+     half the next-closest pair — and between them they carried FOUR of the
+     eleven categories (to-do and San Diego on `later`, custom and UCSD on
+     `muted`). Two indistinguishable greys, four streams.
+
+     `muted` cannot move: it is the colour of all secondary text in the app and
+     must stay neutral. `later` can, because it was already a blue-ish slate and
+     nothing about "later" requires it to be grey. Pushing its chroma makes it
+     read as BLUE rather than as grey, which separates the pair by hue instead of
+     by a lightness difference too small to see at 8px. dE 0.039 -> 0.094. */
+  --thrive-later: #4c74ad;
+
+  /* Categorical only, never status. Plum rather than the old teal: teal sat
+     between the new sage and the on-track blue and stopped reading apart.
+     was #8a5f8f · C 0.0884 -> 0.1500, which also pulls it away from
+     `needs-help` — the second-closest pair, dE 0.074 -> 0.102. */
+  --thrive-civic: #994ea3;
+
+  /* Soft tints, derived so they can never drift from the base hue. */
+  --thrive-on-track-soft: color-mix(in oklab, var(--thrive-on-track) 9%, white);
+  --thrive-watch-soft: color-mix(in oklab, var(--thrive-watch) 10%, white);
+  --thrive-needs-help-soft: color-mix(
+    in oklab,
+    var(--thrive-needs-help) 9%,
+    white
+  );
+  --thrive-urgent-soft: color-mix(in oklab, var(--thrive-urgent) 9%, white);
+  --thrive-civic-soft: color-mix(in oklab, var(--thrive-civic) 9%, white);
+  --thrive-later-soft: color-mix(in oklab, var(--thrive-later) 9%, white);
+
+  /* Elevation: none. Deleted 2026-08-15 along with the borders.
+     There is no drop shadow anywhere in THRIVE and no blurred replacement for
+     the old hard offsets. A white card on cream paper with a hairline is the
+     entire elevation system. Nothing floats.
+
+     DROPPED IN THE SVELTEKIT PORT: --thrive-shadow-card and
+     --thrive-shadow-lifted, plus their `--shadow-card` / `--shadow-lifted`
+     @theme entries. Both resolved to `none` and the Next comment claimed six
+     components still referenced them -- a grep of the Next tree at 4e0a65b
+     found ZERO `shadow-card` / `shadow-lifted` call sites in any .tsx. The
+     sweep had already removed them, so the names were carrying nothing.
+     See MIGRATION.md section 5, "Dead or unused". */
+
+  /* Motion. Quick and settled, matching the reference's 120-260ms band. The
+     standard curve decelerates and never overshoots; `pop` is the single
+     exception, used only for the tick landing in a checkbox. */
+  --thrive-motion-fast: 120ms;
+  --thrive-motion-base: 160ms;
+  --thrive-motion-slow: 260ms;
+  --thrive-ease-standard: cubic-bezier(0.2, 0.8, 0.3, 1);
+  --thrive-ease-pop: cubic-bezier(0.2, 1.4, 0.4, 1);
+
+  /* Layout constants for the app shell */
+  --thrive-rail-width: 15rem;
+
+  /* The header's height, and the one shell token that CHANGES BY BREAKPOINT.
+     See the media override below layer 3.
+
+     56px on mobile because the bar holds two 44px touch targets and a 44px
+     target in a 48px bar is 2px of padding. 48px above `lg`, where the same
+     controls drop to 36px because a pointer does not need 44 -- 6px of
+     breathing above and below a 36px control, which is the smallest step that
+     still reads as a deliberate bar rather than a squeezed one. 44px was
+     measured too and leaves 4px, which reads as squeezed.
+
+     `SideRail` draws its brand band at `h-topbar` so the rail's edge and the
+     bar's edge continue one line across the shell. Because that is the same
+     token, the two cannot fall out of step at the breakpoint. */
+  --thrive-topbar-height: 3.5rem;
+
+  --thrive-bottomnav-height: 3.75rem;
+
+  /* The page's bottom breathing room, below the content and above the fold.
+     Used twice: on mobile it is added to the bottom nav's height, because that
+     bar is fixed OVER the page and the content has to clear it; above `lg`
+     there is no bar and this is the whole padding.
+     Was a bare `pb-8` (32px) on desktop, which was buying nothing on a page
+     whose last element is already a bordered panel. */
+  --thrive-page-gutter-bottom: 1rem;
+
+  /* The page's SIDE gutter above `lg`, so content sits on the page rather than
+     against its edges.
+
+     Below `lg` the gutter stays `px-3 sm:px-5` -- 12px and 20px -- because a
+     phone has no width to give away and mobile is deliberately unchanged.
+
+     40px is measured rather than picked. At 1512 with the 240px rail, 20px of
+     padding left the content 1232px wide with a 20px margin on the right, which
+     reads as edge-to-edge; 40px brings it to 1192px with a gutter you can see.
+     It is also the point where the gutter matches the gap between the two
+     columns most of these pages are built from, so the page's outer rhythm and
+     its inner rhythm are the same number. */
+  --thrive-page-gutter-x: 2.5rem;
+
+  /* The top four type steps, as raw tokens because they are RESPONSIVE.
+
+     These are the PHONE values -- the ones that were the only values until
+     2026-08-21 -- and the media query further down shrinks them above 40rem.
+     Declared here rather than inline in `@theme` so a utility compiles to
+     `var(--thrive-text-3xl)` and the override can reach it. */
+  --thrive-text-lg: 1.375rem; /* 22 */
+  --thrive-text-lg-lh: 1.75rem; /* 28 */
+  --thrive-text-xl: 1.6875rem; /* 27 */
+  --thrive-text-xl-lh: 2.0625rem; /* 33 */
+  --thrive-text-2xl: 2.125rem; /* 34 */
+  --thrive-text-2xl-lh: 2.4375rem; /* 39 */
+  --thrive-text-3xl: 2.5rem; /* 40 */
+  --thrive-text-3xl-lh: 2.75rem; /* 44 -- 1.10 */
+
+  /* The dashboard card body height, desktop only. See `.thrive-card-body`.
+
+     MEASURED, NOT GUESSED. Driven in a real browser against the built page;
+     every number came off `getBoundingClientRect`.
+
+     Re-derived 2026-08-21 after the header density pass, which cut the block
+     above the grid from 375px to 274px and so changed the budget. The cap is
+     the TIGHTEST value at which no card overflows at rest, found by sweeping:
+
+       18.50rem -> Tasks overflows by 3px
+       18.625rem -> 1px of overflow, too close to call
+       18.75rem = 300px -> nothing overflows        <- chosen
+       19.00rem -> works, but 8px of dead space per row
+
+     Collapsed content at that cap: Tasks 299px, My Classes 294px, today's
+     classes 55px. Upcoming Events is 449px and DOES scroll at rest, on purpose
+     -- its four rows are load-bearing behaviour rather than layout, see
+     VISIBLE_EVENTS in $lib/cardLayout.
+
+     WHAT THIS CAP DOES NOT ACHIEVE. The whole page is 1275px, so it fits a
+     1330px viewport with room and does NOT fit 1052px. Closing that last 235px
+     is not a layout problem: the header is at 194px with every piece of content
+     still in it, and the remaining height is card rows. Reaching 1052 needs the
+     collapsed counts cut to roughly 2 task rows and 1 course card, which is a
+     content decision rather than a density one. Recorded in HANDOFF rather than
+     decided here.
+
+     The matching collapsed ROW COUNTS live in `$lib/cardLayout` -- they are
+     integers JavaScript slices with, so they cannot be CSS. */
+  --thrive-card-body-cap: 18.75rem;
+
+  /* Ask THRIVE's chat window, above `xl` only.
+
+     A definite height is what makes the LOG the scroller instead of the
+     document. Without it the log's `flex-1 min-h-0` resolves to its own content
+     -- there is no height to divide up -- so the page grows, the composer walks
+     off the bottom of the screen as the conversation gets longer, and the log's
+     `tabindex` guards an overflow that never happens.
+
+     34rem, not a viewport calculation. `calc(100dvh - topbar - gutters -
+     header)` was the first shape and it is brittle in two directions: the header
+     above it wraps to two lines at some widths, and `dvh` moves under a mobile
+     browser's collapsing chrome. A fixed panel that always fits the shortest
+     desktop viewport this app targets (1052px) is the calmer answer, and the
+     document is allowed to scroll past it the way it does past any other panel.
+
+     Below `xl` this is deliberately NOT applied: on a phone the whole page
+     scrolling is the right behaviour, and a 544px box inside a 812px screen
+     would give a student two nested scrollbars to fight. */
+  --thrive-chat-height: 34rem;
+
+  /* The chat log's LINE LENGTH, which is a different thing from its width.
+
+     A message bubble in a 90rem panel would run to about 140 characters a line,
+     which is roughly twice the 45-75 a reader can track without losing the
+     start of the next line. So the panel fills the page and the TEXT does not:
+     each bubble is `min(85%, this)`.
+
+     The percentage still matters at the narrow end — 65ch is wider than a phone,
+     so `min()` picks the percentage there and the bubble keeps its inset from
+     the opposite edge, which is what makes a conversation read as two columns of
+     speech rather than as full-width blocks.
+
+     `ch` rather than `rem` on purpose: the constraint is characters per line,
+     and `ch` tracks the font. A rem value would drift the moment the type scale
+     moved. */
+  --thrive-chat-measure: 65ch;
+
+  /* The stat pill popover. See `.thrive-popover`.
+
+     17rem holds a two-line task title without wrapping it to four, and is
+     narrower than the smallest viewport the app targets, so the clamp below is
+     insurance against a pill's position rather than the normal case.
+
+     The inset is the page's own side gutter, doubled: a clamped panel should
+     stop where the page's content stops, not at the very edge of the glass. */
+  --thrive-popover-width: 17rem;
+  --thrive-popover-viewport-inset: 1rem;
+
+  /* The arrival mark. See `.thrive-arrived`.
+
+     HOW LONG A ROW SAYS "HERE IT IS". Long enough that an eye arriving from the
+     popover it was just reading catches it, short enough that it is plainly a
+     cue and not a selection. 1200ms holds solid for most of that and then fades,
+     which is why it is one duration rather than a hold plus a fade.
+
+     Deliberately NOT one of the three motion tokens. 120/160/260ms are
+     TRANSITION lengths -- how fast a thing changes -- and this is a DWELL, how
+     long a state persists. The nearest existing sibling is the toast's 3000ms,
+     which is the same kind of number and also not a motion token. Reusing
+     `--thrive-motion-slow` here would have tied the fade's speed to how long the
+     mark lasts, and the next person to tune one would silently retune the other.
+
+     Read by `reveal.svelte.ts`, which clears the class on this beat, so the
+     stylesheet and the timer cannot disagree. */
+  --thrive-arrival-duration: 1200ms;
+
+  /* 2px, matching the focus ring in the base layer, because both are rings drawn
+     around something you have just arrived at and two ring weights would read as
+     two different kinds of thing.
+
+     This is NOT the 1.5px control stroke. That one exists because a control's
+     boundary is the only thing saying where the control is, and it owes 3:1 under
+     WCAG 1.4.11. This is a transient cue on a row that is not a control. The two
+     must not collapse into each other -- see the note on --thrive-control-stroke. */
+  --thrive-arrival-ring: 2px;
+
+  /* Typography stack. Both faces are self-hosted via @fontsource above; these
+     two variables are what the Next app's next/font call produced, kept under
+     the same names so the --font-sans / --font-mono chains below are unchanged.
+
+     THE TWO-FACE RULE, tightened 2026-08-22:
+
+         DM Sans for everything. JetBrains Mono for NUMBERS ONLY.
+
+     The previous wording ended "...compact dates, status eyebrows, and any
+     label that is a system value rather than something a person wrote", and
+     that last clause is what went wrong. Almost any label can be argued into
+     being "a system value", so mono spread to eyebrows, view switchers, filter
+     chips, stream names and tags. The app has two faces and read as though it
+     had more than two, because mono had stopped marking anything -- a face
+     used for a third of the interface is not an accent, it is a second body
+     font.
+
+     Mono KEEPS: clock times, counts, unit totals, percentages, fractions,
+     IDs -- values a person SCANS or compares, where a digit lining up under
+     another digit is the point.
+
+     Mono LOSES: anything made of words. Eyebrows ("CALENDAR · FALL 2026"),
+     view switchers, chips, tags, "next up", stream and filter names. Dates
+     written out in prose ("Thursday, August 20") are words and take DM Sans;
+     the time inside one ("11:00 AM") is a value and stays mono.
+
+     The test, when it is genuinely unclear: would you ever want this to line
+     up in a column with the thing above it? Column -> mono. Sentence -> sans.
+
+     Components ask for the treatment, not the face: `.thrive-numeric` and
+     `.thrive-eyebrow` in @layer components. A component that writes
+     `font-mono` directly is asserting a font, which is the design system's
+     call and not its own. */
+  --font-dm-sans: 'DM Sans';
+  --font-jetbrains-mono: 'JetBrains Mono';
+
+  --font-sans:
+    var(--font-dm-sans), ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
+    sans-serif;
+  --font-mono:
+    var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* --- Layer 2: shadcn semantic vars -> THRIVE tokens ------------------
+     Kept even though shadcn-svelte is a later phase. Two reasons: the
+     @layer base `body` rule below resolves through --background and
+     --foreground, and remapping these here is what will make stock
+     shadcn-svelte primitives come out in THRIVE's palette with no patching. */
+  --background: var(--thrive-bg);
+  --foreground: var(--thrive-body);
+
+  --card: var(--thrive-surface);
+  --card-foreground: var(--thrive-body);
+  --popover: var(--thrive-surface);
+  --popover-foreground: var(--thrive-body);
+
+  --primary: var(--thrive-primary);
+  --primary-foreground: var(--thrive-on-primary);
+
+  --secondary: var(--thrive-bg);
+  --secondary-foreground: var(--thrive-ink);
+
+  --muted: var(--thrive-bg);
+  --muted-foreground: var(--thrive-muted);
+
+  --accent: var(--thrive-primary-soft);
+  --accent-foreground: var(--thrive-primary-hover);
+
+  --destructive: var(--thrive-urgent);
+
+  /* Panel edges are decorative, so they take the hairline. `--input` is a
+     control boundary and takes faint instead -- shadcn uses it for the edge of
+     inputs and selects, which is exactly the WCAG 1.4.11 case. */
+  --border: var(--thrive-hairline);
+  --input: var(--thrive-control-line);
+  --ring: var(--thrive-primary);
+
+  --radius: 1rem;
+
+  --sidebar: var(--thrive-surface);
+  --sidebar-foreground: var(--thrive-body);
+  --sidebar-primary: var(--thrive-primary);
+  --sidebar-primary-foreground: var(--thrive-on-primary);
+  --sidebar-accent: var(--thrive-primary-soft);
+  --sidebar-accent-foreground: var(--thrive-primary-hover);
+  --sidebar-border: var(--thrive-hairline);
+  --sidebar-ring: var(--thrive-primary);
+
+  --chart-1: var(--thrive-primary);
+  --chart-2: var(--thrive-on-track);
+  --chart-3: var(--thrive-watch);
+  --chart-4: var(--thrive-needs-help);
+  --chart-5: var(--thrive-muted);
+}
+
+/* --- Layer 3: expose tokens as Tailwind utilities ---------------------- */
+@theme inline {
+  /* Color utilities: bg-surface, text-ink, text-on-track, ... */
+  --color-bg: var(--thrive-bg);
+  --color-surface: var(--thrive-surface);
+  --color-sunken: var(--thrive-sunken);
+  --color-ink: var(--thrive-ink);
+  --color-body: var(--thrive-body);
+  --color-muted-ink: var(--thrive-muted);
+  --color-faint: var(--thrive-faint);
+  /* `line` and `line-strong` are kept as names because 123 call sites in the
+     Next app use them. They are repointed rather than deleted: `line` is the
+     decorative hairline, and `line-strong` is the control boundary. What they
+     do NOT carry is stroke width -- a call site written `border-2 border-line`
+     still draws 2px, just in a much lighter colour. The Next tree still has
+     ~20 such call sites; they are a component-sweep concern, not a token one. */
+  --color-line: var(--thrive-hairline);
+  --color-line-strong: var(--thrive-control-line);
+  --color-hairline-soft: var(--thrive-hairline-soft);
+
+  --color-indigo: var(--thrive-indigo);
+  --color-indigo-soft: var(--thrive-indigo-soft);
+
+  --color-primary: var(--thrive-primary);
+  --color-primary-hover: var(--thrive-primary-hover);
+  --color-primary-active: var(--thrive-primary-active);
+  --color-primary-soft: var(--thrive-primary-soft);
+  --color-on-primary: var(--thrive-on-primary);
+  --color-primary-fill: var(--thrive-primary-fill);
+  --color-on-primary-fill: var(--thrive-on-primary-fill);
+
+  /* Yellow accent. `border-yellow` for a thin rule, `text-yellow` only ever on
+     a navy ground. Not `bg-yellow` across an area -- see layer 1. */
+  --color-yellow: var(--thrive-yellow);
+
+  /* DEPRECATED ALIASES, kept on purpose for one phase.
+     `mint` / `on-mint` were the green light-fill pair. The fill is navy-family
+     now, and a blue token called "mint" is a lie that would survive in the
+     codebase far longer than the rename would take. Renamed to
+     `primary-fill` / `on-primary-fill`.
+
+     The aliases stay because the frozen Next tree has 13 `bg-mint` /
+     `text-on-mint` call sites (TaskRow, ProgramTimeline, QuickListWidget) and
+     the component sweep that ports them has not happened yet. Whoever does
+     that sweep should write `bg-primary-fill` and delete these two lines. */
+  --color-mint: var(--thrive-primary-fill);
+  --color-on-mint: var(--thrive-on-primary-fill);
+
+  --color-on-track: var(--thrive-on-track);
+  --color-on-track-soft: var(--thrive-on-track-soft);
+  --color-watch: var(--thrive-watch);
+  --color-watch-soft: var(--thrive-watch-soft);
+  --color-needs-help: var(--thrive-needs-help);
+  --color-needs-help-soft: var(--thrive-needs-help-soft);
+  --color-urgent: var(--thrive-urgent);
+  --color-urgent-soft: var(--thrive-urgent-soft);
+  --color-civic: var(--thrive-civic);
+  --color-civic-soft: var(--thrive-civic-soft);
+  --color-later: var(--thrive-later);
+  --color-later-soft: var(--thrive-later-soft);
+
+  /* shadcn semantic colors */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Type scale. Sizes unchanged; WEIGHT IS NOT BAKED IN.
+     Every step used to carry its own 500-700 font-weight, which made
+     `font-semibold` on a 700 step actively *lighten* it. That worked under a
+     two-weight rule. Under the three-weight rule it fights, so weight is set
+     independently at the call site and the scale only sets size, leading, and
+     tracking.
+
+       400  body prose
+       500  row titles and emphasis inside a list
+       700  page titles and section headings, used sparingly
+
+     Consequence, deliberate: a call site that sets no weight renders 400.
+     Only 400/500/700 load, so `font-semibold` (600) synthesises -- do not
+     use it. */
+  --text-3xs: 0.75rem; /* 12 -- meta, counts, timers */
+  --text-3xs--line-height: 1rem; /* 16 */
+
+  --text-2xs: 0.8125rem; /* 13 -- section labels, chips */
+  --text-2xs--line-height: 1.125rem; /* 18 */
+
+  --text-xs: 0.875rem; /* 14 -- secondary copy */
+  --text-xs--line-height: 1.25rem; /* 20 */
+
+  --text-sm: 1rem; /* 16 -- body default */
+  --text-sm--line-height: 1.4375rem; /* 23 -- 1.44 */
+
+  --text-base: 1.125rem; /* 18 -- task titles, lead copy */
+  --text-base--line-height: 1.5625rem; /* 25 -- 1.39 */
+
+  /* THE TOP FOUR STEPS ARE RESPONSIVE, so they reference raw tokens instead of
+     carrying literals. See `--thrive-text-*` in layer 1 and the override below
+     40rem.
+
+     This matters because of how `@theme inline` compiles: a literal value is
+     BAKED into the utility (`.text-3xl{font-size:2.5rem}`), so overriding the
+     theme variable in a media query does nothing at all. A value that is itself a
+     `var()` is inlined AS the reference (`.text-3xl{font-size:var(--thrive-text-3xl)}`),
+     which is what makes the raw token overridable. `--thrive-topbar-height` works
+     the same way, and this was verified by reading the compiled CSS rather than
+     assumed -- the first attempt overrode `--text-3xl` directly and changed
+     nothing measurable. */
+  --text-lg: var(--thrive-text-lg);
+  --text-lg--line-height: var(--thrive-text-lg-lh);
+
+  --text-xl: var(--thrive-text-xl);
+  --text-xl--line-height: var(--thrive-text-xl-lh);
+
+  --text-2xl: var(--thrive-text-2xl);
+  --text-2xl--line-height: var(--thrive-text-2xl-lh);
+
+  --text-3xl: var(--thrive-text-3xl); /* page titles only */
+  --text-3xl--line-height: var(--thrive-text-3xl-lh);
+
+  /* Tracking on the top three steps only. Large type at default tracking is
+     the single most common tell of an unconsidered interface; body sizes are
+     left alone, where negative tracking costs readability rather than buying
+     polish. `lg` (22) lost its tracking this pass -- it is a section heading,
+     not display type. */
+  --text-xl--letter-spacing: -0.025em;
+  --text-2xl--letter-spacing: -0.03em;
+  --text-3xl--letter-spacing: -0.035em;
+
+  /* Spacing: 4px base step -> p-1 = 4, p-2 = 8, p-4 = 16, p-6 = 24 ... */
+  --spacing: 0.25rem;
+
+  /* Radii, softened. The old 2/4/6/8/10 was sized so a 2px stroke could state
+     an edge without the corner fighting it. With the stroke gone, tight
+     corners just read as unfinished, so every step moves up and the top step
+     moves a long way up: a 16px corner is most of what separates "soft
+     product" from "admin form" once there is no border doing the work. */
+  --radius-xs: 0.25rem; /* 4  -- small chips */
+  --radius-sm: 0.375rem; /* 6  -- controls, tiny glyph buttons */
+  --radius-md: 0.5rem; /* 8  -- inline elements */
+  --radius-lg: 0.625rem; /* 10 -- rows */
+  --radius-xl: 1rem; /* 16 -- cards and panels */
+  --radius-pill: 999px;
+
+  /* Elevation: intentionally absent. See the note in layer 1 -- the
+     `--shadow-card` / `--shadow-lifted` entries that used to sit here were
+     dropped in this port because nothing referenced them. */
+
+  /* Hairline exposed as a colour, for divide-* and every panel edge. */
+  --color-hairline: var(--thrive-hairline);
+
+  /* THREE measures: the page, the wide page, and prose.
+
+     `--container-*` is Tailwind v4's own namespace for max-width utilities, so
+     all three are real tokens rather than arbitrary values, and none of them is a
+     number typed into a component.
+
+     ## The history, because both directions were wrong
+
+     It started at 72rem (`max-w-6xl`, inherited from the scaffold). At 1512px
+     that left the content 1152px inside 1232px of available room, so ~120px sat
+     empty either side while `/calendar`'s month grid was squeezed to 672px --
+     the wrong way round, since the grid is the one thing that benefits from
+     width.
+
+     96rem overcorrected: the cap stopped biting at 1512 entirely, so the gutter
+     collapsed to the shell's 20px of padding and the content ran to the edge.
+
+     The fix is two knobs rather than one. The GUTTER
+     (`--thrive-page-gutter-x`) is what keeps content off the edges at any width;
+     the CAPS are what stop it stretching on a large monitor. A gutter alone does
+     not solve a 2560px display and a cap alone does not solve a 1512px one.
+
+     ## One cap, after a second one was tried and dropped
+
+     `page` (80rem / 1280px) is the cap for EVERY route. Home's 2x2 grid and a
+     panel holding a greeting, three pills and four chips in one row both stop
+     reading as a layout and start reading as a stretched line somewhere past
+     this.
+
+     There was briefly a second, `wide` (96rem), for `/calendar` alone, on the
+     reasoning that the month grid, the week's seven columns and the agenda all
+     take as much width as they are given, and the Key column beside them wanted
+     18rem of it. It was removed, along with the token, once the Key stopped being
+     a column: on a 1920px screen the calendar was 1440px wide with a 127px gutter
+     while every other route had 248px, so the one page with the most furniture
+     was also the one with the least breathing room. The grid got its width back
+     from the chrome instead -- the Key is a disclosure now -- which is 271px more
+     than the two-column arrangement ever gave it.
+
+     A route that genuinely needs more than 80rem should re-add its own token
+     rather than reach for a general-purpose "wide".
+
+     ## And why the prose cap is separate from all of it
+
+     A paragraph at 1500px is not readable -- the eye loses the start of the next
+     line. So containers fill their allowance and TEXT does not: page intros and
+     standing notes take `max-w-measure`.
+
+     `ch` rather than `rem`, because the constraint is characters per line and
+     `ch` tracks the font. A rem value would drift the moment the type scale
+     moved. 68ch sits inside the 45-75 usually quoted. */
+  --container-page: 80rem;
+  --container-measure: 68ch;
+
+  /* Motion. Use as: duration-(--motion-base) ease-standard */
+  --motion-fast: var(--thrive-motion-fast);
+  --motion-base: var(--thrive-motion-base);
+  --motion-slow: var(--thrive-motion-slow);
+  --ease-standard: var(--thrive-ease-standard);
+  --ease-pop: var(--thrive-ease-pop);
+
+  /* Layout. `inline` matters for `topbar`: the utility inlines the var()
+     expression rather than resolving it once, which is what lets the media
+     override below change `h-topbar` everywhere it is used. */
+  --spacing-rail: var(--thrive-rail-width);
+  --spacing-topbar: var(--thrive-topbar-height);
+  --spacing-bottomnav: var(--thrive-bottomnav-height);
+  --spacing-page-bottom: var(--thrive-page-gutter-bottom);
+  --spacing-page-x: var(--thrive-page-gutter-x);
+  /* So a row can write `size-checkbox` for the spacer that stands in for one,
+     instead of repeating the literal. See the token in layer 1. */
+  --spacing-checkbox: var(--thrive-checkbox-size);
+  --spacing-cal-dot: var(--thrive-cal-dot);
+
+  /* Fonts */
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-heading: var(--font-sans);
+}
+
+/* The one responsive token in the system.
+   Above `lg` the header's controls become pointer-sized, so the bar can be
+   shorter. Overriding the RAW token rather than the utility means every call
+   site follows -- the bar itself, the rail's brand band, and the sticky offset
+   of anything that ever pins below the header.
+   64rem matches the breakpoint the rail and the bottom bar swap at, so the bar
+   changes height on the same line the navigation changes shape. */
+@media (width >= 64rem) {
+  :root {
+    --thrive-topbar-height: 3rem;
+  }
+}
+
+/* THE TOP FOUR TYPE STEPS SHRINK ABOVE 40REM. (2026-08-21)
+
+   The scale below was drawn for a 72rem page. It renders IDENTICALLY at 1512 and
+   1920 -- there is no viewport scaling above 40rem -- so nothing was growing; the
+   top steps were simply drawn large, and a wider container gave them more room to
+   look it. Measured before this rule: a page heading at 40px, the greeting at
+   27px, a card heading at 22px.
+
+   ## What is NOT responsible, checked rather than assumed
+
+   The 106.25% root bump is `@media (width < 40rem)`. It is a MOBILE bump -- it
+   raises a 15px body to 16px on a handset -- and it does not apply at any width
+   this rule is about. Shrinking or delaying it would have changed phones, which is
+   the one thing this change must not do.
+
+   ## Why an override rather than editing the tokens
+
+   Editing them would shrink the phone too, because the root bump multiplies
+   whatever it is given. Mobile is deliberately unchanged, so the small sizes have
+   to be the wide-screen ones. Same mechanism as `--thrive-topbar-height` above:
+   override the RAW token in a media query so every call site follows and no
+   component needs a breakpoint.
+
+   ## Why 40rem, and only the top four
+
+   40rem because it is the boundary the root bump already uses, so the system has
+   one type breakpoint rather than two.
+
+   Only `lg` and up, because `base` (18) and below are body copy, row titles and
+   metadata, and 16px body is the readability floor -- there is nothing to give
+   back down there. The steps that move are the ones used once or twice per screen.
+
+   The ratios tighten at the top, which is what a display scale wants: 40/34/27/22
+   was ~1.24 between each of the big steps, and 32/28/24/20 is ~1.16. Hierarchy is
+   preserved -- a page title is still 2x body -- while the largest step stops
+   shouting. */
+@media (width >= 40rem) {
+  :root {
+    --thrive-text-lg: 1.25rem; /* 22 -> 20 */
+    --thrive-text-lg-lh: 1.625rem; /* 26 -- 1.30 */
+
+    --thrive-text-xl: 1.5rem; /* 27 -> 24 */
+    --thrive-text-xl-lh: 1.875rem; /* 30 -- 1.25 */
+
+    --thrive-text-2xl: 1.75rem; /* 34 -> 28 */
+    --thrive-text-2xl-lh: 2.125rem; /* 34 -- 1.21 */
+
+    --thrive-text-3xl: 2rem; /* 40 -> 32 */
+    --thrive-text-3xl-lh: 2.25rem; /* 36 -- 1.13 */
+  }
+}
+
+@layer base {
+  /* Any border that does get drawn is a hairline by default. Components opt
+     into the stronger --border only where a line has to hold its own. */
+  * {
+    @apply border-hairline;
+  }
+
+  html {
+    @apply font-sans;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    /* Light-only by decision. Without this, a machine set to dark gets
+       auto-darkened scrollbars and native form widgets on a warm-white page. */
+    color-scheme: light;
+  }
+
+  /* THE ROOT SIZE, and the bug that made the whole app render one notch large.
+     Rewritten 2026-08-21.
+
+     The rule that used to live here bumped phones to 106.25% and explained
+     itself as: "A 15px body is comfortable at desk distance and marginal on a
+     handset, where the readability floor is 16px."
+
+     That is the right design intent and it was never actually implemented.
+     `--text-sm` -- the body default -- is `1rem`, so at a 16px root the desk
+     body was **16px, not 15**, and the phone bump then stacked on top of an
+     already-correct-for-mobile base and produced **17px**. Every rem in the app
+     inherited the error: type, spacing, control heights, the rail's width. That
+     is what "the whole site renders too large" was.
+
+     Fixed at the root rather than by editing tokens, for exactly the reason the
+     old comment gave: it moves type, spacing and the shell's rem-based heights
+     by one factor, so every proportion in the system is untouched.
+
+       below 64rem   100%     -> 16px body. Phone and tablet, unchanged in
+                                spirit: the handset floor the old comment named,
+                                now reached by not bumping rather than by
+                                bumping past it.
+       64rem and up  93.75%   -> 15px body. The size the design was drawn for.
+
+     64rem, not 40rem, because that is where the desktop shell appears -- the
+     rail replaces the bottom bar, and it is the same breakpoint
+     `--thrive-topbar-height` already switches on. It also keeps every touch
+     target at a full 44px on every width that has a bottom bar, which a 40rem
+     boundary would not: `min-h-11` is 2.75rem, and 2.75 x 15 is 41.25px.
+
+     On desktop `min-h-11` does land at 41.25px, which is fine -- WCAG 2.5.8
+     asks 24px of a pointer target and this repo's own floor for one is 36px.
+
+     THE ONE STEP TO WATCH: `--text-3xs` (0.75rem) lands at 11.25px on desktop.
+     It is used for meta, counts, timers and `.thrive-eyebrow`, which is uppercase
+     and tracked and so reads larger than its measurement. If it turns out too
+     small, raise that single token -- do not undo this rule, because doing so
+     brings back the 6.25% error on everything. */
+  @media (width >= 64rem) {
+    html {
+      font-size: 93.75%;
+    }
+  }
+
+  /* Kills the 300ms double-tap-zoom delay on touch, and replaces the default
+     grey flash with a tint drawn from the palette. */
+  button,
+  a,
+  label,
+  [role='button'],
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: color-mix(
+      in oklab,
+      var(--thrive-primary) 12%,
+      transparent
+    );
+  }
+
+  body {
+    @apply bg-background text-foreground text-sm;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply text-ink;
+    text-wrap: balance;
+  }
+
+  /* Counts, timers, and anything that ticks holds its width, so a row does
+     not reflow as "in 3 days" becomes "in 10 days". */
+  time,
+  [data-tabular] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* One visible focus treatment for the whole app. Keyboard users always get
+     a ring; pointer users don't see it on click. */
+  :focus-visible {
+    outline: 2px solid var(--thrive-primary);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+}
+
+@layer components {
+  /* ── The two type treatments ────────────────────────────────────────────
+     The whole of the two-face rule, as two classes. A component asks for a
+     TREATMENT and the system decides the face; see the rule in layer 1.
+
+     Why classes rather than `font-mono` at the call site: the old rule was
+     stated only in a comment, so every call site re-decided it and mono drifted
+     onto eyebrows, chips and switchers. A name that means "this is a value"
+     cannot drift the same way -- putting `.thrive-numeric` on the word
+     "agenda" reads as obviously wrong in review, where `font-mono` on it read
+     as a style choice. */
+
+  /* MACHINE TRUTH. Clock times, counts, unit totals, percentages, fractions,
+     IDs -- values a person scans or compares.
+     Tabular by construction: the reason these are mono is that digits line up,
+     and a proportional-figure mono defeats the point. This is also why a row
+     does not reflow as "in 3 days" becomes "in 10 days". */
+  .thrive-numeric {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* The small label above a heading. WORDS, therefore DM Sans.
+     The uppercase-and-tracked treatment is what was actually doing the work
+     here; mono was along for the ride. Bundling size, tracking, case and weight
+     into one class is also what stops the next eyebrow being assembled from
+     four utilities and coming out slightly different.
+     Tracking is wide because uppercase at 12px needs the air -- this is the one
+     place in the system that tracks a small size, and it is why the type scale
+     leaves tracking to the top three steps and to here. */
+  .thrive-eyebrow {
+    font-family: var(--font-sans);
+    font-size: var(--text-3xs);
+    line-height: var(--text-3xs--line-height);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--thrive-muted);
+  }
+
+  /* ── The panel ──────────────────────────────────────────────────────────
+     Every card, section, and box in THRIVE. One class so the treatment is a
+     system decision made once, not a Tailwind string copied into 30 files.
+
+     A white surface on cream, a 1px decorative hairline, a 16px corner, and
+     no shadow at all. Separation comes from the fill difference and the
+     corner; the hairline just tidies the edge.
+
+     Padding is set here, because whitespace is the structural device and it
+     should not be a per-component guess. NOTE: a Tailwind utility on the
+     element still wins (utilities layer beats components layer), so a panel
+     that carries an explicit `p-3` keeps its tighter padding. */
+  .thrive-panel {
+    border: 1px solid var(--thrive-hairline);
+    border-radius: var(--radius-xl);
+    background-color: var(--thrive-surface);
+    padding: 1.25rem;
+  }
+
+  .thrive-panel[data-tone='sunken'] {
+    background-color: var(--thrive-sunken);
+  }
+  .thrive-panel[data-tone='paper'] {
+    background-color: var(--thrive-bg);
+  }
+
+  /* Emphasis. There is no heavier stroke to reach for any more, so the
+     containers that lead a page take the control-boundary grey instead -- the
+     one line in the system that is actually visible at 3.45:1. Used sparingly;
+     if every panel is emphasised, none is. Note this is the control-boundary
+     COLOUR at 1px, not the 1.5px control stroke: it is decorative here. */
+  .thrive-panel[data-emphasis='strong'] {
+    border-color: var(--thrive-control-line);
+  }
+
+  /* A panel inside a panel does not need an edge at all. */
+  .thrive-panel[data-flush='true'] {
+    border-color: transparent;
+  }
+
+  /* ── The popover ────────────────────────────────────────────────────────
+     The floating list a stat pill opens. Only its WIDTH is here; the surface,
+     the hairline and the radius are ordinary utilities at the call site,
+     because Tailwind can express those and this is the one thing it cannot.
+
+     The clamp is what stops it leaving the screen. A pill sits in a wrapping
+     row inside the header panel, so at 375px the third pill can start well
+     across the page and a fixed 17rem panel anchored to its left edge would
+     hang off the side. `min()` against the viewport means the panel narrows
+     instead of overflowing, and the inset leaves the page's own gutter intact
+     on both sides.
+
+     Not a `max-width`: the panel would then be as wide as its widest task
+     title, and three pills would open three different-width lists. */
+  .thrive-popover {
+    width: min(
+      var(--thrive-popover-width),
+      calc(100vw - 2 * var(--thrive-popover-viewport-inset))
+    );
+  }
+
+  /* ── The arrival mark ───────────────────────────────────────────────────
+     "Here it is." Put on a row that a stat pill's popover has just jumped to,
+     and taken off again one beat later by `reveal.svelte.ts`.
+
+     THE PROBLEM: the jump moved focus and scrolled the row into view, which is
+     correct and completely invisible. Everything is on one page, so a student
+     choosing "Submit peer review" saw nothing change and concluded the click had
+     failed. The focus ring is not the answer -- a pointer user does not get one.
+
+     INDIGO, because indigo is the reserved "this is where you are now" colour
+     and an arrival cue is that sentence exactly. Not urgent coral: this is
+     wayfinding, and nothing has gone wrong. Not yellow: at 1.43:1 on cream it
+     cannot carry a signal by itself, and this signal has to survive on its own
+     for about a second.
+
+     AN OUTLINE, for three reasons that are all about not fighting anything:
+
+       - It cannot move the layout. No border box to grow, no element inserted,
+         no neighbour displaced, so the grid is as immovable as it was.
+       - It does not collide with what the rows already use. A task row carries
+         its priority in a background wash and a left border; an event row is a
+         panel with its own edge. An animated background here would either lose
+         the cascade to `bg-urgent-soft` or paint over the priority that wash is
+         there to state.
+       - It follows the element's own `border-radius`, so one rule fits a task
+         row at `radius-lg` and an event row at `radius-xl` with nothing per-shape.
+
+     Inset by its own width, so it draws just inside the row rather than outside
+     it -- which keeps it clear of the focus ring's `outline-offset: 2px` on the
+     rare occasion both are visible, and stops it overlapping the neighbouring
+     row on a tight list.
+
+     THE MARK IS THE STATIC DECLARATION; THE ANIMATION ONLY TAKES IT AWAY. That
+     is the wrong way round until you read the reduced-motion block at the foot of
+     this file: it forces `animation-duration: 0.01ms !important` on everything, so
+     a mark PAINTED by a keyframe would appear and vanish within a hundredth of a
+     millisecond. Declaring the ring normally and using the animation for the fade
+     means turning the animation off leaves the ring on -- still visibly marked,
+     still cleared on the beat by the timer, which is what
+     prefers-reduced-motion should get. */
+  .thrive-arrived {
+    outline: var(--thrive-arrival-ring) solid var(--thrive-indigo);
+    outline-offset: calc(-1 * var(--thrive-arrival-ring));
+    animation: thrive-arrive var(--thrive-arrival-duration) var(--thrive-ease-standard)
+      forwards;
+  }
+
+  /* Solid for most of the beat, then out. Holding first is what makes it read as
+     an answer to a question rather than as a flash. */
+  @keyframes thrive-arrive {
+    0%,
+    60% {
+      outline-color: var(--thrive-indigo);
+    }
+    100% {
+      outline-color: transparent;
+    }
+  }
+
+  /* `animation: none` rather than a shorter duration: it clears the NAME, so the
+     global `animation-duration: 0.01ms !important` below has nothing to apply to
+     and the ring simply stays until the timer removes the class. */
+  @media (prefers-reduced-motion: reduce) {
+    .thrive-arrived {
+      animation: none;
+    }
+  }
+
+  /* ── The dashboard card body ────────────────────────────────────────────
+     The fit-on-one-screen mechanism, as one class.
+
+     THE PROBLEM: Home rendered fourteen task rows beside a card showing one
+     class. The tallest card decided the height of the page, the grid's second
+     row started below the fold, and two of the four cards may as well not have
+     existed.
+
+     DESKTOP -- a FIXED height, and scroll inside.
+     Fixed, not `max-height`, and that is the whole point. With `max-height` a
+     card that is short at rest still GROWS when expanded, which moves its grid
+     row and shoves the cards below it down -- recreating the problem in a
+     smaller form. A fixed height means expanding can only ever scroll, so the
+     grid is immovable by construction rather than by luck.
+
+     The cost, stated rather than discovered later: a card with little content
+     shows empty space up to the cap. That is the trade for a grid that never
+     moves, and bounded empty space in a card you can see beats unbounded empty
+     space beside a card you cannot.
+
+     MOBILE -- no cap at all.
+     Cards stack in one column and expand normally, pushing content down. A
+     nested scroll area inside a page that already scrolls is fiddly on a phone:
+     the inner region eats the swipe that was meant for the page. The breakpoint
+     is 64rem, matching the `lg:grid-cols-2` the grid switches at, so one column
+     and no cap always arrive together. */
+  .thrive-card-body {
+    min-height: 0;
+  }
+
+  @media (width >= 64rem) {
+    .thrive-card-body {
+      height: var(--thrive-card-body-cap);
+      overflow-y: auto;
+      /* Stops a flick at the end of the list scrolling the page behind it. */
+      overscroll-behavior: contain;
+      /*
+       * Containment, and it is load-bearing rather than an optimisation.
+       *
+       * Without it the page carried 37px of scrollable EMPTY space: every
+       * element rendered at or above the shell's bottom edge, `body.scrollHeight`
+       * agreed at 1238px, and yet `window.scrollTo(0, 1e6)` still moved 37px.
+       * A capped card whose content overflows was leaking its scrollable overflow
+       * out to the document, so Home could not fit any viewport shorter than
+       * 1275px however tightly the header was packed.
+       *
+       * Measured the fix rather than guessed it: `overflow: hidden`, `clip`, and
+       * `overflow-x: hidden` all left the 37px in place; `contain: paint` took it
+       * to zero.
+       *
+       * Safe here, and not a visual change. Paint containment clips at the box
+       * edge, which `overflow-y: auto` already does vertically -- and horizontally
+       * too, since a `visible` axis paired with a non-`visible` one computes to
+       * `auto`. Nothing inside a card body positions itself against an outer
+       * ancestor: the one absolutely-positioned thing in a row,
+       * `.thrive-strike::after`, is contained by its own `position: relative`
+       * parent.
+       */
+      contain: paint;
+    }
+  }
+
+  /* ── The row ────────────────────────────────────────────────────────────
+     Transparent at rest, filling with `sunken` on hover. No border, no wash,
+     no coloured left edge.
+
+     PRIORITY IS NOT CARRIED BY COLOUR. The `data-priority` hook exists in the
+     Next markup but draws nothing. This is not an information loss: every row
+     states its own priority and due state in text -- taskView.ts builds up to
+     two labels per row, state first ("Urgent", "Due soon", "Done"). The colour
+     was the redundant channel, not the only one.
+
+     DROPPED IN THE SVELTEKIT PORT: `.thrive-priority-label`, the mono eyebrow
+     that was defined as the replacement carrier. A grep of the Next tree at
+     4e0a65b found ZERO usages in any .tsx -- it was written for a sweep that
+     never adopted it. See MIGRATION.md section 5, "Dead or unused". */
+  .thrive-row {
+    border-radius: var(--radius-lg);
+    background-color: transparent;
+    transition:
+      background-color var(--thrive-motion-base) var(--thrive-ease-standard),
+      opacity var(--thrive-motion-base) var(--thrive-ease-standard);
+  }
+
+  .thrive-row:hover {
+    background-color: var(--thrive-sunken);
+  }
+
+  /* Done recedes rather than disappears. */
+  .thrive-row[data-done='true'] {
+    opacity: 0.62;
+  }
+
+  /* ── The checkbox ───────────────────────────────────────────────────────
+     The one control whose boundary is load-bearing: nothing else says where
+     it is. 1.5px of faint, which clears the 3:1 WCAG 1.4.11 asks of a control
+     boundary on all three surfaces including the sunken hover fill.
+
+     This and `--input` in layer 2 are the only consumers of the 1.5px stroke.
+
+     `ease-pop` on the tick is the single sanctioned overshoot in the system. */
+  .thrive-checkbox {
+    appearance: none;
+    flex-shrink: 0;
+    width: var(--thrive-checkbox-size);
+    height: var(--thrive-checkbox-size);
+    border: var(--thrive-control-stroke) solid var(--thrive-control-line);
+    border-radius: 5px;
+    background-color: var(--thrive-surface);
+    display: inline-grid;
+    place-content: center;
+    cursor: pointer;
+    transition:
+      background-color var(--thrive-motion-fast) var(--thrive-ease-standard),
+      border-color var(--thrive-motion-fast) var(--thrive-ease-standard);
+  }
+
+  .thrive-checkbox::after {
+    content: '';
+    width: 9px;
+    height: 5px;
+    border-left: 2px solid var(--thrive-on-primary);
+    border-bottom: 2px solid var(--thrive-on-primary);
+    transform: rotate(-45deg) scale(0);
+    transform-origin: center;
+    transition: transform var(--thrive-motion-base) var(--thrive-ease-pop);
+  }
+
+  .thrive-checkbox:checked {
+    background-color: var(--thrive-primary);
+    border-color: var(--thrive-primary);
+  }
+
+  .thrive-checkbox:checked::after {
+    transform: rotate(-45deg) scale(1);
+  }
+
+  /* ── Strike-through ─────────────────────────────────────────────────────
+     Drawn as a growing pseudo-element rather than `line-through`, so
+     completing a task reads as an action rather than a re-render. */
+  .thrive-strike {
+    position: relative;
+    transition: color var(--thrive-motion-slow) var(--thrive-ease-standard);
+  }
+  /* Scaled, not widened. Animating `width` forces layout on every frame of a
+     260ms transition; a transform runs on the compositor and looks identical.
+     1.5px, back from 2px -- the heavier rule was sized against the bordered
+     direction's heavier type. */
+  .thrive-strike::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    height: 1.5px;
+    width: 100%;
+    background: currentColor;
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform var(--thrive-motion-slow) var(--thrive-ease-standard);
+  }
+  .thrive-strike[data-done='true'] {
+    color: var(--thrive-faint);
+  }
+  .thrive-strike[data-done='true']::after {
+    transform: scaleX(1);
+  }
+}
+
+@layer utilities {
+  /* Day and month changes swap content in place. A short fade-and-rise makes
+     that read as a transition rather than a flicker. Keyed on the selection,
+     so it replays each time the day changes. */
+  @keyframes thrive-rise {
+    from {
+      opacity: 0;
+      transform: translateY(3px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .animate-rise {
+    animation: thrive-rise var(--motion-base) var(--ease-standard) both;
+  }
+
+  /* Skip link: offscreen until focused. */
+  .skip-link:not(:focus-visible) {
+    @apply sr-only;
+  }
+  /* The skip link used to rely on `shadow-card` to separate from the page.
+     That shadow is gone, which would have left a white box on cream with no
+     edge at all -- so it takes an explicit control-weight border instead.
+     It is a focused control; it owes a visible boundary. */
+  .skip-link:focus-visible {
+    @apply fixed top-4 left-4 z-50 rounded-md border border-line-strong bg-surface px-4 py-2 text-sm font-medium text-ink;
+  }
+}
+
+/* Honor the OS setting. The reference strips animation and transition
+   outright; state changes still land, they just land instantly. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
