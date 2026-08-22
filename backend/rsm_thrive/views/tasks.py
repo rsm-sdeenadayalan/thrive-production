@@ -17,7 +17,9 @@ def tasks(request):
 def tasks_dispatch(request):
     if request.method == "POST":
         return create_task(request)
-    return tasks(request)
+    if request.method == "GET":
+        return tasks(request)
+    return json_error("method_not_allowed", "Use GET or POST.", 405)
 
 
 OVERRIDE_FACETS = {
@@ -41,15 +43,18 @@ def override(request, task_id):
         return json_error("unknown_task", f"No task {task_id}.", 404)
     try:
         body = parse_body(request)
-        row, _ = TaskOverride.objects.get_or_create(user=request.user, task_key=task_id)
+        updates = {}
         for key, value in body.items():
             if key not in OVERRIDE_FACETS:
                 raise BadRequest(f"Unknown facet {key}.")
             if key == "dueDate" and value is not None:
                 value = _parse_instant(value)
-            setattr(row, OVERRIDE_FACETS[key], value)
+            updates[OVERRIDE_FACETS[key]] = value
     except BadRequest as exc:
         return json_error("bad_request", str(exc), 400)
+    row, _ = TaskOverride.objects.get_or_create(user=request.user, task_key=task_id)
+    for field, value in updates.items():
+        setattr(row, field, value)
     if all(getattr(row, f) is None for f in OVERRIDE_FACETS.values()):
         row.delete()
     else:

@@ -59,3 +59,44 @@ def test_create_and_delete_student_task(client):
 
     assert client.delete(f"/api/thrive/tasks/{task_id}").status_code == 204
     assert client.delete("/api/thrive/tasks/asg:a1").status_code == 400
+
+
+def test_override_unknown_facet_leaves_no_row(client):
+    _setup(client)
+    resp = _patch(client, "asg:a1", {"bogus": True})
+    assert resp.status_code == 400
+    assert TaskOverride.objects.count() == 0
+
+
+def test_override_naive_due_date_400(client):
+    _setup(client)
+    resp = _patch(client, "asg:a1", {"dueDate": "2026-09-01T12:00:00"})
+    assert resp.status_code == 400
+    assert TaskOverride.objects.count() == 0
+
+
+def test_create_task_missing_title_400(client):
+    _setup(client)
+    resp = client.post(
+        "/api/thrive/tasks",
+        data=json.dumps({"title": "  ", "dueDate": "2026-09-01T12:00:00-07:00"}),
+        content_type="application/json",
+    )
+    assert resp.status_code == 400
+
+    resp = client.post(
+        "/api/thrive/tasks",
+        data=json.dumps({"dueDate": "2026-09-01T12:00:00-07:00"}),
+        content_type="application/json",
+    )
+    assert resp.status_code == 400
+
+
+def test_delete_nonexistent_student_task_404(client):
+    _setup(client)
+    assert client.delete("/api/thrive/tasks/stu:99999").status_code == 404
+
+
+def test_tasks_put_method_not_allowed(client):
+    _setup(client)
+    assert client.put("/api/thrive/tasks").status_code == 405
