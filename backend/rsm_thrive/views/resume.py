@@ -1,6 +1,7 @@
 from rsm_thrive.http import api_login_required, json_error, json_ok
 from rsm_thrive.models import ResumeVersion, Skill
 from rsm_thrive.serializers.resume import skill_payload, version_payload
+from rsm_thrive.services.resume import generate_version
 
 
 @api_login_required
@@ -24,9 +25,15 @@ def resume_current(request):
     return json_ok(version_payload(row))
 
 
+@api_login_required
+def generate_version_view(request):
+    version, diff = generate_version(request.user.thrive_profile)
+    return json_ok({"version": version_payload(version), "diff": diff}, status=201)
+
+
 def resume_versions_dispatch(request):
     if request.method == "GET":
         return resume_versions(request)
     if request.method == "POST":
-        return json_error("method_not_allowed", "Use GET or POST.", 405)  # replaced by generate in the next task
+        return generate_version_view(request)
     return json_error("method_not_allowed", "Use GET or POST.", 405)
