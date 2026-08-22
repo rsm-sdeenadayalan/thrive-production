@@ -56,3 +56,25 @@ def test_degree_progress_counts(client):
     assert body["electiveDone"] == 1 and body["electiveRequired"] == 4
     assert body["gaps"][0]["label"] == "Capstone not scheduled"
     assert body["track"] == "11 month"
+
+
+def test_progress_missing_requirement_returns_503(client):
+    profile = make_student()
+    # No DegreeRequirement row created for track
+    client.force_login(profile.user)
+    response = client.get("/api/thrive/degree/progress")
+    assert response.status_code == 503
+    body = response.json()
+    assert body["error"]["code"] == "not_configured"
+    assert "degree requirements" in body["error"]["message"]
+
+
+def test_timeline_missing_phases_returns_503(client):
+    profile = make_student()
+    # No ProgramPhaseRow rows created for track
+    client.force_login(profile.user)
+    response = client.get("/api/thrive/degree/timeline")
+    assert response.status_code == 503
+    body = response.json()
+    assert body["error"]["code"] == "not_configured"
+    assert "program phases" in body["error"]["message"]

@@ -2,6 +2,11 @@ from rsm_thrive.models import DegreeGap, DegreeRequirement, Enrollment, ProgramP
 from rsm_thrive.serialize import iso_date
 
 
+class NotConfigured(Exception):
+    """Raised when required seed data is missing for a student's track."""
+    pass
+
+
 def _phase_status(phase, today):
     if phase.end < today:
         return "complete"
@@ -13,6 +18,8 @@ def _phase_status(phase, today):
 def program_timeline(profile, today) -> dict:
     rows = list(ProgramPhaseRow.objects.filter(track=profile.track))
     required = [p for p in rows if not p.optional]
+    if not required:
+        raise NotConfigured(f"No program phases configured for track {profile.track!r}.")
     program_end = max(p.end for p in required)
     finish_term = max(required, key=lambda p: p.end).term
     span = (program_end - profile.program_start).days or 1
@@ -34,7 +41,10 @@ def program_timeline(profile, today) -> dict:
 
 
 def degree_progress(profile) -> dict:
-    req = DegreeRequirement.objects.get(track=profile.track)
+    try:
+        req = DegreeRequirement.objects.get(track=profile.track)
+    except DegreeRequirement.DoesNotExist:
+        raise NotConfigured(f"No degree requirements configured for track {profile.track!r}.")
     completed = (Enrollment.objects.filter(user=profile.user, completed=True)
                  .select_related("course"))
     return {
