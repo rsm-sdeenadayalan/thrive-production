@@ -78,7 +78,7 @@ def _apply_override(task: dict, ov: TaskOverride) -> None:
         task["_due"] = ov.due_date
     if ov.sort_order is not None:
         task["_order"] = ov.sort_order
-    if ov.subtask_done:
+    if ov.subtask_done is not None:
         for st in task["subtasks"]:
             if st["id"] in ov.subtask_done:
                 st["done"] = ov.subtask_done[st["id"]]

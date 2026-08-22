@@ -37,10 +37,10 @@ def test_sort_done_last_then_due(client):
     profile, course = _setup(client)
     a = make_assignment(course, id="a1", due=timezone.now() + 1 * DAY)
     make_assignment(course, id="a2", due=timezone.now() + 2 * DAY)
-    make_student_task(profile, title="Print resume", due=timezone.now() + 3 * DAY)
+    stu = make_student_task(profile, title="Print resume", due=timezone.now() + 3 * DAY)
     set_assignment_status(profile, a, "submitted")  # a1 becomes done -> sinks
     ids = [t["id"] for t in client.get("/api/thrive/tasks").json()]
-    assert ids[:2] == ["asg:a2", ids[1]] and ids[-1] == "asg:a1"
+    assert ids == ["asg:a2", f"stu:{stu.pk}", "asg:a1"]
 
 
 def test_override_can_untick_a_shipped_done_task(client):
@@ -59,3 +59,28 @@ def test_override_title_and_priority_absent_means_source(client):
     [task] = client.get("/api/thrive/tasks").json()
     assert task["title"] == "Renamed"
     assert task["priority"] == "medium"  # untouched facet: source value (weight 10)
+
+
+def test_shared_tasks_and_subtask_override(client):
+    profile, course = _setup(client)
+    active = make_shared_task(
+        course=course, source="career",
+        subtasks=[{"id": "s1", "title": "Draft", "done": False},
+                  {"id": "s2", "title": "Send", "done": False}],
+    )
+    make_shared_task(active=False)  # must not appear
+
+    body = client.get("/api/thrive/tasks").json()
+    [task] = body
+    assert task["id"] == f"shared:{active.pk}"
+    assert task["source"] == "career"
+    assert task["courseId"] == course.id
+    assert task["courseCode"] == course.code
+
+    set_override(profile, f"shared:{active.pk}", subtaskDone={"s1": True})
+    [task] = client.get("/api/thrive/tasks").json()
+    subtasks = {st["id"]: st["done"] for st in task["subtasks"]}
+    assert subtasks == {"s1": True, "s2": False}
+
+    active.refresh_from_db()
+    assert all(st["done"] is False for st in active.subtasks)  # source unmutated
