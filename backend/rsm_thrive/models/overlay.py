@@ -43,3 +43,36 @@ class TaskOverride(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["user", "task_key"], name="uniq_task_override"),
         ]
+
+
+class IgnoredEvent(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    event_id = models.CharField(max_length=64)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["user", "event_id"],
+                                               name="uniq_ignored_event")]
+
+
+class EventJoin(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    event_id = models.CharField(max_length=64)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["user", "event_id"],
+                                               name="uniq_event_join")]
+
+
+class CalendarPrefs(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    prefs = models.JSONField(default=dict)
+
+
+class TaskNote(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    task_key = models.CharField(max_length=80)
+    note = models.TextField()
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["user", "task_key"],
+                                               name="uniq_task_note")]
