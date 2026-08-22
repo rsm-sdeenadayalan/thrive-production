@@ -8,11 +8,14 @@ from rsm_thrive.services.zoom import (
 def test_fake_client_is_deterministic_and_records():
     fake = FakeZoomClient()
     url1 = fake.create_meeting("Advising", dt.datetime(2026, 9, 1, 16,
-                                                       tzinfo=dt.timezone.utc), 30)
+                                                       tzinfo=dt.timezone.utc), 30,
+                               "casey@ucsd.edu")
     url2 = fake.create_meeting("Advising", dt.datetime(2026, 9, 2, 16,
-                                                       tzinfo=dt.timezone.utc), 30)
+                                                       tzinfo=dt.timezone.utc), 30,
+                               "casey@ucsd.edu")
     assert url1 == url2 and url1.startswith("https://ucsd.zoom.us/j/fake-")
     assert len(fake.calls) == 2
+    assert fake.calls[0][3] == "casey@ucsd.edu"
 
 
 def test_get_zoom_client_env_selection(monkeypatch):
@@ -37,4 +40,5 @@ def test_real_client_wraps_failures(monkeypatch):
     from rsm_thrive.services.zoom import ZoomError
     with pytest.raises(ZoomError):
         client.create_meeting("t", __import__("datetime").datetime(
-            2026, 9, 1, tzinfo=__import__("datetime").timezone.utc), 30)
+            2026, 9, 1, tzinfo=__import__("datetime").timezone.utc), 30,
+            "casey@ucsd.edu")

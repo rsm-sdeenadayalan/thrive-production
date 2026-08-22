@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 import pytest
 from django.core import mail
+from django.core.mail import EmailMessage
 
 from rsm_thrive.models import Appointment, AppointmentNotification
 from rsm_thrive.services.zoom import FakeZoomClient, ZoomError
@@ -92,6 +93,18 @@ def test_in_person_booking_skips_zoom_entirely(client):
     appt = Appointment.objects.get()
     assert not appt.notifications.filter(kind="zoom").exists()
     assert appt.notifications.get(kind="email_request").status == "sent"
+
+
+def test_email_send_failure_recorded_booking_survives(client):
+    me = make_student()
+    slot = make_slot(make_advisor(), mode="in person")
+    client.force_login(me.user)
+    with patch.object(EmailMessage, "send", side_effect=RuntimeError("smtp down")):
+        assert _book(client, slot).status_code == 201
+    appt = Appointment.objects.get()
+    row = appt.notifications.get(kind="email_request")
+    assert row.status == "failed" and "smtp down" in row.detail
+    assert len(mail.outbox) == 0
 
 
 def test_cancel_fires_cancel_email_once(client):

@@ -15,8 +15,8 @@ class FakeZoomClient:
         self.calls = []
 
     def create_meeting(self, topic: str, start: dt.datetime,
-                       duration_minutes: int) -> str:
-        self.calls.append((topic, start, duration_minutes))
+                       duration_minutes: int, host_email: str) -> str:
+        self.calls.append((topic, start, duration_minutes, host_email))
         return f"https://ucsd.zoom.us/j/fake-{abs(hash(topic)) % 10**9}"
 
 
@@ -38,11 +38,11 @@ class ServerToServerZoomClient:
         return resp.json()["access_token"]
 
     def create_meeting(self, topic: str, start: dt.datetime,
-                       duration_minutes: int) -> str:
+                       duration_minutes: int, host_email: str) -> str:
         try:
             token = self._token()
             resp = requests.post(
-                "https://api.zoom.us/v2/users/me/meetings",
+                f"https://api.zoom.us/v2/users/{host_email}/meetings",
                 headers={"Authorization": f"Bearer {token}"},
                 json={
                     "topic": topic,

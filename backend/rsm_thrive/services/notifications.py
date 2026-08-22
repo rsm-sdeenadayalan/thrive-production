@@ -25,9 +25,9 @@ def _record(appointment, kind, status, detail=""):
 def _send_invite(appointment, method, kind):
     slot = appointment.slot
     advisor = slot.advisor
-    verb = "confirmed" if method == "REQUEST" else "cancelled"
-    local = timezone.localtime(slot.start).strftime("%A %b %-d, %-I:%M %p")
     try:
+        verb = "confirmed" if method == "REQUEST" else "cancelled"
+        local = timezone.localtime(slot.start).strftime("%A %b %-d, %-I:%M %p")
         message = EmailMessage(
             subject=f"THRIVE: appointment {verb} — {advisor.name}",
             body=(f"Your appointment with {advisor.name} on {local} is {verb}.\n"
@@ -38,10 +38,17 @@ def _send_invite(appointment, method, kind):
         message.attach("invite.ics", build_ics(appointment, method),
                        f"text/calendar; method={method}; charset=UTF-8")
         message.send()
-        _record(appointment, kind, "sent")
-    except Exception as exc:  # audited, never fatal
+    except Exception as exc:  # the email did NOT go out
         logger.exception("appointment email failed")
-        _record(appointment, kind, "failed", str(exc))
+        try:
+            _record(appointment, kind, "failed", str(exc))
+        except Exception:
+            logger.exception("could not record email failure")
+        return
+    try:  # the email DID go out — never record this as failed
+        _record(appointment, kind, "sent")
+    except Exception:
+        logger.exception("could not record email success")
 
 
 def _create_zoom(appointment):
@@ -53,7 +60,8 @@ def _create_zoom(appointment):
             return
         duration = max(1, int((slot.end - slot.start).total_seconds() // 60))
         url = client.create_meeting(
-            f"THRIVE advising: {slot.advisor.name}", slot.start, duration)
+            f"THRIVE advising: {slot.advisor.name}", slot.start, duration,
+            slot.advisor.email)
         appointment.zoom_join_url = url
         appointment.save(update_fields=["zoom_join_url"])
         _record(appointment, "zoom", "sent", url)
