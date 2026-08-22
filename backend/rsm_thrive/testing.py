@@ -6,14 +6,15 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from rsm_thrive.models import (
-    Assignment, Course, CourseMeeting, DegreeGap, DegreeRequirement, Enrollment,
-    Event, ProgramPhaseRow, ResourceLink, SharedTask, StudentAssignment,
-    StudentProfile, StudentTask, Syllabus, TaskOverride,
+    Advisor, AppointmentSlot, Assignment, Course, CourseMeeting, DegreeGap,
+    DegreeRequirement, Enrollment, Event, ProgramPhaseRow, ResourceLink,
+    SharedTask, StudentAssignment, StudentProfile, StudentTask, Syllabus,
+    TaskOverride,
 )
 
 
 def make_student(username="ada", **overrides) -> StudentProfile:
-    user = get_user_model().objects.create_user(username=username)
+    user = get_user_model().objects.create_user(username=username, email=f"{username}@ucsd.edu")
     fields = {
         "display_name": "Ada Lovelace",
         "program_start": dt.date(2026, 8, 1),
@@ -152,3 +153,30 @@ def make_gap(profile, **overrides) -> DegreeGap:
     fields = {"label": "Gap", "detail": "Why it matters.", "severity": "watch"}
     fields.update(overrides)
     return DegreeGap.objects.create(user=profile.user, **fields)
+
+
+def make_advisor(id=None, **overrides) -> Advisor:
+    n = next(_counter)
+    fields = {
+        "id": id or f"adv-{n}",
+        "name": f"Casey Advisor {n}",
+        "role": "Graduate Student Advisor",
+        "service": "advising",
+        "location": "Rady 2S111",
+        "email": f"advisor{n}@ucsd.edu",
+    }
+    fields.update(overrides)
+    return Advisor.objects.create(**fields)
+
+
+def make_slot(advisor, start=None, **overrides) -> AppointmentSlot:
+    n = next(_counter)
+    start = start or (timezone.now() + timezone.timedelta(days=2))
+    fields = {
+        "id": f"slot-{n}",
+        "start": start,
+        "end": start + timezone.timedelta(minutes=30),
+        "mode": "zoom",
+    }
+    fields.update(overrides)
+    return AppointmentSlot.objects.create(advisor=advisor, **fields)

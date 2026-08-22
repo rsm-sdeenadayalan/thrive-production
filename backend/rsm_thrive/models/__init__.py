@@ -1,6 +1,9 @@
 from .academic import (  # noqa: F401
     Assignment, Course, CourseMeeting, Enrollment, StudentAssignment, Syllabus,
 )
+from .appointments import (  # noqa: F401
+    Advisor, Appointment, AppointmentNotification, AppointmentSlot,
+)
 from .degree import (  # noqa: F401
     DegreeGap, DegreeRequirement, ProgramPhaseRow,
 )
