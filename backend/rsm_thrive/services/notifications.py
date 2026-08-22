@@ -11,7 +11,7 @@ from django.utils import timezone
 
 from rsm_thrive.models import AppointmentNotification
 from rsm_thrive.services.ics import build_ics
-from rsm_thrive.services.zoom import ZoomError, get_zoom_client
+from rsm_thrive.services.zoom import get_zoom_client
 
 logger = logging.getLogger(__name__)
 
@@ -46,19 +46,23 @@ def _send_invite(appointment, method, kind):
 
 def _create_zoom(appointment):
     slot = appointment.slot
-    client = get_zoom_client()
-    if client is None:
-        _record(appointment, "zoom", "skipped", "no zoom credentials configured")
-        return
-    duration = max(1, int((slot.end - slot.start).total_seconds() // 60))
     try:
+        client = get_zoom_client()
+        if client is None:
+            _record(appointment, "zoom", "skipped", "no zoom credentials configured")
+            return
+        duration = max(1, int((slot.end - slot.start).total_seconds() // 60))
         url = client.create_meeting(
             f"THRIVE advising: {slot.advisor.name}", slot.start, duration)
         appointment.zoom_join_url = url
         appointment.save(update_fields=["zoom_join_url"])
         _record(appointment, "zoom", "sent", url)
-    except ZoomError as exc:
-        _record(appointment, "zoom", "failed", str(exc))
+    except Exception as exc:  # audited, never fatal
+        logger.exception("zoom meeting creation failed")
+        try:
+            _record(appointment, "zoom", "failed", str(exc))
+        except Exception:
+            logger.exception("could not record zoom failure")
 
 
 def dispatch_booking_side_effects(appointment) -> None:

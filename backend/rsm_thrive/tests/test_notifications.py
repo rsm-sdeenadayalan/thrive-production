@@ -67,6 +67,23 @@ def test_zoom_failure_recorded_booking_survives(client):
     assert zoom_row.status == "failed" and "zoom down" in zoom_row.detail
 
 
+def test_zoom_non_zoom_error_still_never_fails_booking(client):
+    me = make_student()
+    slot = make_slot(make_advisor(), mode="zoom")
+    client.force_login(me.user)
+
+    class BoomClient:
+        def create_meeting(self, *a, **kw):
+            raise RuntimeError("boom")
+
+    with patch("rsm_thrive.services.notifications.get_zoom_client",
+               return_value=BoomClient()):
+        assert _book(client, slot).status_code == 201
+    appt = Appointment.objects.get()
+    zoom_row = appt.notifications.get(kind="zoom")
+    assert zoom_row.status == "failed" and "boom" in zoom_row.detail
+
+
 def test_in_person_booking_skips_zoom_entirely(client):
     me = make_student()
     slot = make_slot(make_advisor(), mode="in person")
