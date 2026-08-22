@@ -273,3 +273,107 @@ APPOINTMENT = {
         "status": {"enum": ["confirmed", "cancelled"]},
     },
 }
+
+# ---------------------------------------------------------------------------
+# Course action requests (TSS / EASy style)
+# ---------------------------------------------------------------------------
+
+COURSE_REQUEST_PREFILL = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["studentName", "program", "track", "term", "currentCourses",
+                 "currentUnits", "unitsCompleted", "unitsRequired"],
+    "properties": {
+        "studentName": {"type": "string"}, "program": {"type": "string"},
+        "track": TRACK, "term": {"type": "string"},
+        "currentCourses": {"type": "array", "items": {"type": "string"}},
+        "currentUnits": {"type": "number"},
+        "unitsCompleted": {"type": "number"},
+        "unitsRequired": {"type": "number"},
+    },
+}
+
+COURSE_REQUEST = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["id", "type", "course", "reason", "status", "submittedAt",
+                 "prefill"],
+    "properties": {
+        "id": {"type": "string"},
+        "type": {"enum": ["enroll", "drop", "reduced load", "out of major"]},
+        "course": {"type": "string"}, "reason": {"type": "string"},
+        "status": {"enum": ["draft", "submitted", "approved", "denied"]},
+        "submittedAt": {"anyOf": [ISO_INSTANT, {"type": "null"}]},
+        "prefill": COURSE_REQUEST_PREFILL,
+    },
+}
+
+# TSS connection status. Our own aggregate; not part of types.ts.
+TSS = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["connected"],
+    "properties": {"connected": {"type": "boolean"}},
+}
+
+# ---------------------------------------------------------------------------
+# Living resume
+# ---------------------------------------------------------------------------
+
+SKILL = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["id", "name", "source"],
+    "properties": {
+        "id": {"type": "string"}, "name": {"type": "string"},
+        "source": {"enum": ["course", "manual"]},
+        "courseId": {"type": "string"},
+    },
+}
+
+RESUME_COURSE = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["code", "title", "highlight"],
+    "properties": {
+        "code": {"type": "string"}, "title": {"type": "string"},
+        "highlight": {"type": "string"},
+    },
+}
+
+RESUME_EXPERIENCE = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["id", "title", "organization", "period", "bullets"],
+    "properties": {
+        "id": {"type": "string"}, "title": {"type": "string"},
+        "organization": {"type": "string"}, "period": {"type": "string"},
+        "bullets": {"type": "array", "items": {"type": "string"}},
+    },
+}
+
+RESUME_VERSION = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["id", "label", "createdAt", "summary", "skills", "courses",
+                 "experience", "isCurrent"],
+    "properties": {
+        "id": {"type": "string"}, "label": {"type": "string"},
+        "createdAt": ISO_INSTANT, "summary": {"type": "string"},
+        "skills": {"type": "array", "items": SKILL},
+        "courses": {"type": "array", "items": RESUME_COURSE},
+        "experience": {"type": "array", "items": RESUME_EXPERIENCE},
+        "isCurrent": {"type": "boolean"},
+    },
+}
+
+RESUME_DIFF = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["addedSkills", "addedCourses", "summaryChanged"],
+    "properties": {
+        "addedSkills": {"type": "array", "items": {"type": "string"}},
+        "addedCourses": {"type": "array", "items": {"type": "string"}},
+        "summaryChanged": {"type": "boolean"},
+    },
+}

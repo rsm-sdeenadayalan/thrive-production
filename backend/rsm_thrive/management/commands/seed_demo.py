@@ -6,6 +6,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from rsm_thrive import testing as t
+from rsm_thrive.services.resume import generate_version
 
 
 class Command(BaseCommand):
@@ -18,8 +19,10 @@ class Command(BaseCommand):
         with transaction.atomic():
             profile = t.make_student(username="demo", display_name="Demo Student",
                                      goal="Data Scientist")
+            demo_courses = []
             for i in (1, 2):
                 course = t.make_course(id=f"demo-c{i}")
+                demo_courses.append(course)
                 t.make_meeting(course, day_of_week=1 + i)
                 t.make_syllabus(course)
                 t.make_assignment(course, weight=30)
@@ -43,4 +46,12 @@ class Command(BaseCommand):
             for adv in (gsa, cmc):
                 for d in (3, 4, 5):
                     t.make_slot(adv, start=timezone.now() + dt.timedelta(days=d))
+            t.make_skill(profile, name="SQL", source="course", course=demo_courses[0])
+            t.make_skill(profile, name="Data storytelling", source="course",
+                         course=demo_courses[1])
+            t.make_skill(profile, name="Stakeholder communication", source="manual")
+            for course in demo_courses:
+                t.make_highlight(course.code, title=course.title,
+                                 highlight=f"Applied analytics from {course.code}")
+            generate_version(profile)
         self.stdout.write(self.style.SUCCESS("demo world seeded (user: demo)"))
