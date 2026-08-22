@@ -51,3 +51,47 @@ def test_syllabi_scoped_to_enrollments(client):
     assert body[0]["courseId"] == "c1"
     assert body[0]["gradeBreakdown"] == [{"label": "Final project", "weight": 40}]
     assert "sourceUrl" not in body[0]
+
+
+def test_courses_constant_queries_with_multiple_enrollments(client, django_assert_num_queries):
+    # Verify that next_assignment_for uses prefetch cache, not N+1 queries.
+    # Query count must be constant regardless of course count:
+    # 1 session, 1 auth_user, 1 enrollments (with select_related course/syllabus),
+    # 1 meetings prefetch, 1 assignments prefetch = 5 total, independent of course count
+    profile = make_student()
+
+    # Create two courses with meetings and assignments
+    course1 = make_course(id="c1", code="MGTA 451")
+    course2 = make_course(id="c2", code="MGTA 452")
+
+    make_meeting(course1, day_of_week=1, start_time="09:00", end_time="10:20")
+    make_meeting(course2, day_of_week=2, start_time="14:00", end_time="15:20")
+
+    make_syllabus(course1, id="syl-c1")
+    make_syllabus(course2, id="syl-c2")
+
+    make_assignment(course1, id="c1-past", title="Quiz 1",
+                    due=timezone.now() - timezone.timedelta(days=1))
+    make_assignment(course1, id="c1-next", title="Project 1",
+                    due=timezone.now() + timezone.timedelta(days=3))
+
+    make_assignment(course2, id="c2-past", title="Quiz 2",
+                    due=timezone.now() - timezone.timedelta(days=1))
+    make_assignment(course2, id="c2-next", title="Project 2",
+                    due=timezone.now() + timezone.timedelta(days=3))
+
+    enroll(profile, course1)
+    enroll(profile, course2)
+
+    client.force_login(profile.user)
+
+    # Assert query count is constant (5); scales linearly only with auth framework, not courses
+    with django_assert_num_queries(5):
+        rows = client.get("/api/thrive/courses").json()
+
+    # Verify both courses are returned with correct nextAssignment titles
+    assert len(rows) == 2
+    assert rows[0]["code"] == "MGTA 451"
+    assert rows[0]["nextAssignment"]["title"] == "Project 1"
+    assert rows[1]["code"] == "MGTA 452"
+    assert rows[1]["nextAssignment"]["title"] == "Project 2"

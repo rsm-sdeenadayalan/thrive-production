@@ -18,9 +18,13 @@ def assignment_payload(assignment, student_assignment=None) -> dict:
 
 
 def next_assignment_for(course, now) -> dict:
-    upcoming = course.assignments.filter(due_date__gte=now).order_by("due_date").first()
-    chosen = upcoming or course.assignments.order_by("-due_date").first()
-    if chosen is None:
+    rows = list(course.assignments.all())  # uses the prefetch cache
+    upcoming = [a for a in rows if a.due_date >= now]
+    if upcoming:
+        chosen = min(upcoming, key=lambda a: a.due_date)
+    elif rows:
+        chosen = max(rows, key=lambda a: a.due_date)
+    else:
         return {"title": "Nothing scheduled yet", "due": iso_instant(now)}
     return {"title": chosen.title, "due": iso_instant(chosen.due_date)}
 
