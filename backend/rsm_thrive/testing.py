@@ -6,8 +6,9 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from rsm_thrive.models import (
-    Assignment, Course, CourseMeeting, Enrollment, Event, ResourceLink, SharedTask,
-    StudentAssignment, StudentProfile, StudentTask, Syllabus, TaskOverride,
+    Assignment, Course, CourseMeeting, DegreeGap, DegreeRequirement, Enrollment,
+    Event, ProgramPhaseRow, ResourceLink, SharedTask, StudentAssignment,
+    StudentProfile, StudentTask, Syllabus, TaskOverride,
 )
 
 
@@ -131,3 +132,23 @@ def set_override(profile, task_key, **facets) -> TaskOverride:
         setattr(row, field_map.get(key, key), value)
     row.save()
     return row
+
+
+def make_phase(track, phase_id, start, end, **overrides) -> ProgramPhaseRow:
+    fields = {"label": phase_id.title(), "term": "Fall 2026", "optional": False}
+    fields.update(overrides)
+    return ProgramPhaseRow.objects.create(
+        track=track, phase_id=phase_id, start=start, end=end, **fields
+    )
+
+
+def make_requirement(track, **overrides) -> DegreeRequirement:
+    fields = {"units_required": 50, "core_required": 8, "elective_required": 4}
+    fields.update(overrides)
+    return DegreeRequirement.objects.create(track=track, **fields)
+
+
+def make_gap(profile, **overrides) -> DegreeGap:
+    fields = {"label": "Gap", "detail": "Why it matters.", "severity": "watch"}
+    fields.update(overrides)
+    return DegreeGap.objects.create(user=profile.user, **fields)
