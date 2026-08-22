@@ -232,3 +232,44 @@ OVERLAY = {
         "taskNotes": {"type": "object", "additionalProperties": {"type": "string"}},
     },
 }
+
+# ---------------------------------------------------------------------------
+# Appointments
+# ---------------------------------------------------------------------------
+
+SERVICE = {"enum": ["advising", "career"]}
+MEETING_MODE = {"enum": ["in person", "zoom"]}
+
+ADVISOR = {
+    "type": "object", "additionalProperties": False,
+    "required": ["id", "name", "role", "service", "location"],
+    "properties": {
+        "id": {"type": "string"}, "name": {"type": "string"},
+        "role": {"type": "string"}, "service": SERVICE,
+        "avatar": {"type": "string"}, "location": {"type": "string"},
+        "blurb": {"type": "string"},
+    },
+}
+
+APPOINTMENT_SLOT = {
+    "type": "object", "additionalProperties": False,
+    "required": ["id", "advisorId", "start", "end", "mode", "available"],
+    "properties": {
+        "id": {"type": "string"}, "advisorId": {"type": "string"},
+        "start": ISO_INSTANT, "end": ISO_INSTANT,
+        "mode": MEETING_MODE, "available": {"type": "boolean"},
+    },
+}
+
+APPOINTMENT = {
+    "type": "object", "additionalProperties": False,
+    "required": ["id", "advisorId", "studentId", "slotId", "start", "end",
+                 "mode", "reason", "status"],
+    "properties": {
+        "id": {"type": "string"}, "advisorId": {"type": "string"},
+        "studentId": {"type": "string"}, "slotId": {"type": "string"},
+        "start": ISO_INSTANT, "end": ISO_INSTANT, "mode": MEETING_MODE,
+        "reason": {"type": "string"},
+        "status": {"enum": ["confirmed", "cancelled"]},
+    },
+}

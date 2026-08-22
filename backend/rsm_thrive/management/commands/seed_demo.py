@@ -35,4 +35,12 @@ class Command(BaseCommand):
                 t.make_phase(track, "fall", today - dt.timedelta(days=10),
                              today + dt.timedelta(days=60), term="Fall 2026")
                 t.make_requirement(track)
+            gsa = t.make_advisor(id="demo-adv-gsa", name="Gail Advisor",
+                                 service="advising", email="gsa-demo@ucsd.edu")
+            cmc = t.make_advisor(id="demo-adv-cmc", name="Cam Coach", service="career",
+                                 role="Career Coach", location="CMC office / Zoom",
+                                 email="cmc-demo@ucsd.edu")
+            for adv in (gsa, cmc):
+                for d in (3, 4, 5):
+                    t.make_slot(adv, start=timezone.now() + dt.timedelta(days=d))
         self.stdout.write(self.style.SUCCESS("demo world seeded (user: demo)"))

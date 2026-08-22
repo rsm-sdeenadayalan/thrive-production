@@ -5,9 +5,10 @@ import pytest
 from django.utils import timezone
 
 from rsm_thrive.testing import (
-    enroll, make_assignment, make_course, make_event, make_gap, make_meeting,
-    make_phase, make_requirement, make_resource, make_shared_task, make_student,
-    make_student_task, make_syllabus, set_assignment_status, set_override,
+    enroll, make_advisor, make_assignment, make_course, make_event, make_gap,
+    make_meeting, make_phase, make_requirement, make_resource, make_shared_task,
+    make_slot, make_student, make_student_task, make_syllabus,
+    set_assignment_status, set_override,
 )
 from . import schemas
 
@@ -35,6 +36,12 @@ def world(client):
                today + dt.timedelta(days=60))
     make_requirement("11 month")
     make_gap(profile)
+    adv = make_advisor(id="adv-c1", blurb="Ask me anything",
+                       avatar_url="https://rady.ucsd.edu/a.png")
+    slot_a = make_slot(adv)
+    make_slot(adv, mode="in person")
+    from rsm_thrive.models import Appointment
+    Appointment.objects.create(slot=slot_a, student=profile.user, reason="contract")
     client.force_login(profile.user)
     return profile
 
@@ -50,6 +57,9 @@ CASES = [
     ("/api/thrive/degree/progress", schemas.DEGREE_PROGRESS, False),
     ("/api/thrive/degree/timeline", schemas.PROGRAM_TIMELINE, False),
     ("/api/thrive/overlay", schemas.OVERLAY, False),
+    ("/api/thrive/advisors", schemas.ADVISOR, True),
+    ("/api/thrive/advisors/adv-c1/slots", schemas.APPOINTMENT_SLOT, True),
+    ("/api/thrive/appointments", schemas.APPOINTMENT, True),
 ]
 
 
