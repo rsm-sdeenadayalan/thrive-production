@@ -1,7 +1,10 @@
+from django.utils import timezone
+from django.views.decorators.http import require_http_methods
+
 from rsm_thrive.http import api_login_required, json_error, json_ok, BadRequest, parse_body
 from rsm_thrive.services.degree import NotConfigured
 from rsm_thrive.services.requests import build_prefill
-from rsm_thrive.models import CourseRequest
+from rsm_thrive.models import CourseRequest, StudentProfile
 from rsm_thrive.serializers.requests import request_payload
 
 
@@ -59,3 +62,36 @@ def requests_dispatch(request):
     if request.method == "POST":
         return create_request(request)
     return json_error("method_not_allowed", "Use GET or POST.", 405)
+
+
+def _own_request(user, request_id):
+    if not request_id.startswith("req-"):
+        return None
+    pk = request_id.removeprefix("req-")
+    if not (pk.isascii() and pk.isdigit()):
+        return None
+    return CourseRequest.objects.filter(pk=pk, user=user).first()
+
+
+@api_login_required
+@require_http_methods(["POST"])
+def submit_request(request, request_id):
+    row = _own_request(request.user, request_id)
+    if row is None:
+        return json_error("unknown_request", f"No request {request_id}.", 404)
+    CourseRequest.objects.filter(pk=row.pk, status="draft").update(
+        status="submitted", submitted_at=timezone.now())
+    row.refresh_from_db()
+    return json_ok(request_payload(row))
+
+
+@api_login_required
+def tss(request):
+    return json_ok({"connected": request.user.thrive_profile.tss_connected})
+
+
+@api_login_required
+@require_http_methods(["POST"])
+def tss_connect(request):
+    StudentProfile.objects.filter(user=request.user).update(tss_connected=True)
+    return json_ok({"connected": True})
