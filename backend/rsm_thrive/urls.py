@@ -27,6 +27,7 @@ urlpatterns = [
     path("resume/current", resume.resume_current, name="resume-current"),
     path("resume/skills", resume.skills, name="resume-skills"),
     path("resume/versions", resume.resume_versions_dispatch, name="resume-versions"),
+    path("resume/versions/<str:version_id>/current", resume.set_current_version, name="resume-set-current"),
     path("syllabi", courses.syllabi, name="syllabi"),
     path("tss", requests.tss, name="tss"),
     path("tss/connect", requests.tss_connect, name="tss-connect"),
