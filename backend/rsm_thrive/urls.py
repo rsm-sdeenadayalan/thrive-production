@@ -12,5 +12,7 @@ urlpatterns = [
     path("me", students.me, name="me"),
     path("resources", resources.resources, name="resources"),
     path("syllabi", courses.syllabi, name="syllabi"),
-    path("tasks", tasks.tasks, name="tasks"),
+    path("tasks", tasks.tasks_dispatch, name="tasks"),
+    path("tasks/<str:task_id>", tasks.delete_task, name="task-delete"),
+    path("tasks/<str:task_id>/override", tasks.override, name="task-override"),
 ]
