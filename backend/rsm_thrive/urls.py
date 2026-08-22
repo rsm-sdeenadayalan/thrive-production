@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import advisors, appointments, assignments, courses, degree, events, health, overlay, resources, students, tasks
+from .views import advisors, appointments, assignments, courses, degree, events, health, overlay, requests, resources, students, tasks
 
 app_name = "rsm_thrive"
 
@@ -20,6 +20,7 @@ urlpatterns = [
     path("health", health.health, name="health"),
     path("me", students.me, name="me"),
     path("overlay", overlay.overlay, name="overlay"),
+    path("requests/prefill", requests.prefill, name="request-prefill"),
     path("resources", resources.resources, name="resources"),
     path("syllabi", courses.syllabi, name="syllabi"),
     path("tasks", tasks.tasks_dispatch, name="tasks"),
