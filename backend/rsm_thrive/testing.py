@@ -6,10 +6,10 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from rsm_thrive.models import (
-    Advisor, AppointmentSlot, Assignment, Course, CourseMeeting, DegreeGap,
-    DegreeRequirement, Enrollment, Event, ProgramPhaseRow, ResourceLink,
-    SharedTask, StudentAssignment, StudentProfile, StudentTask, Syllabus,
-    TaskOverride,
+    Advisor, AppointmentSlot, Assignment, Course, CourseMeeting, CourseRequest,
+    DegreeGap, DegreeRequirement, Enrollment, Event, ProgramPhaseRow,
+    ResumeCourseHighlight, ResourceLink, SharedTask, Skill, StudentAssignment,
+    StudentProfile, StudentTask, Syllabus, TaskOverride,
 )
 
 
@@ -180,3 +180,23 @@ def make_slot(advisor, start=None, **overrides) -> AppointmentSlot:
     }
     fields.update(overrides)
     return AppointmentSlot.objects.create(advisor=advisor, **fields)
+
+
+def make_skill(profile, **overrides) -> Skill:
+    n = next(_counter)
+    fields = {"name": f"Skill {n}", "source": "manual"}
+    fields.update(overrides)
+    return Skill.objects.create(user=profile.user, **fields)
+
+
+def make_highlight(code, **overrides) -> ResumeCourseHighlight:
+    fields = {"title": f"Course {code}", "highlight": "Can analyze data"}
+    fields.update(overrides)
+    return ResumeCourseHighlight.objects.create(code=code, **fields)
+
+
+def make_course_request(profile, **overrides) -> CourseRequest:
+    fields = {"type": "enroll", "course": "MGTA 999 · Test Course",
+              "reason": "why", "prefill": {}}
+    fields.update(overrides)
+    return CourseRequest.objects.create(user=profile.user, **fields)

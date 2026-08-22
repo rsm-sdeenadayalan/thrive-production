@@ -22,6 +22,7 @@ class StudentProfile(models.Model):
     consent_lms_read = models.BooleanField(default=False)
     consent_career_recommendations = models.BooleanField(default=False)
     consent_advisor_sharing = models.BooleanField(default=False)
+    tss_connected = models.BooleanField(default=False)
 
     def __str__(self):
         return self.user.username
