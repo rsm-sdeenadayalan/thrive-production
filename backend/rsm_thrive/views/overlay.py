@@ -6,6 +6,7 @@ from rsm_thrive.models import CalendarPrefs, EventJoin, IgnoredEvent, TaskNote
 
 
 @api_login_required
+@require_http_methods(["GET"])
 def overlay(request):
     prefs = CalendarPrefs.objects.filter(user=request.user).first()
     return json_ok({
@@ -49,9 +50,7 @@ def calendar_prefs(request):
         body = parse_body(request)
     except BadRequest as exc:
         return json_error("bad_request", str(exc), 400)
-    row, _ = CalendarPrefs.objects.get_or_create(user=request.user)
-    row.prefs = body
-    row.save()
+    CalendarPrefs.objects.update_or_create(user=request.user, defaults={"prefs": body})
     return HttpResponse(status=204)
 
 
