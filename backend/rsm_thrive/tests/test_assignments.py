@@ -13,7 +13,7 @@ def test_assignments_scoped_sorted_and_shaped(client):
     mine = make_course(id="c1")
     other = make_course(id="c2")
     enroll(profile, mine)
-    late = make_assignment(mine, id="a-late", due=timezone.now() + timezone.timedelta(days=9))
+    late = make_assignment(mine, id="a-late", due=timezone.now() + timezone.timedelta(days=9), description="Bring your laptop")
     soon = make_assignment(mine, id="a-soon", due=timezone.now() + timezone.timedelta(days=1))
     make_assignment(other, id="a-other")  # not enrolled: must not appear
     set_assignment_status(profile, soon, "graded", grade="A-")
@@ -28,9 +28,11 @@ def test_assignments_scoped_sorted_and_shaped(client):
     assert graded["grade"] == "A-"
     assert graded["weight"] == 10
     assert graded["dueDate"].endswith("-07:00") or graded["dueDate"].endswith("-08:00")
+    assert "description" not in graded
     unstarted = body[1]
     assert unstarted["status"] == "not-started"  # no StudentAssignment row yet
     assert "grade" not in unstarted
+    assert unstarted["description"] == "Bring your laptop"
 
 
 def test_assignments_requires_login(client):

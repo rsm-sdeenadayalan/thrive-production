@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import health, students, assignments
+from .views import assignments, health, students
 
 app_name = "rsm_thrive"
 
