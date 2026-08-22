@@ -100,3 +100,50 @@ def test_delete_nonexistent_student_task_404(client):
 def test_tasks_put_method_not_allowed(client):
     _setup(client)
     assert client.put("/api/thrive/tasks").status_code == 405
+
+
+def test_override_bad_order_value_400_and_tasks_still_readable(client):
+    _setup(client)
+    resp = _patch(client, "asg:a1", {"order": "top"})
+    assert resp.status_code == 400
+    assert TaskOverride.objects.count() == 0
+
+    # The bug this guards against: a bad sort_order write used to corrupt
+    # assemble_tasks for every subsequent call (str vs float comparison).
+    assert client.get("/api/thrive/tasks").status_code == 200
+
+
+def test_override_bad_due_date_type_400(client):
+    _setup(client)
+    resp = _patch(client, "asg:a1", {"dueDate": 123})
+    assert resp.status_code == 400
+    assert TaskOverride.objects.count() == 0
+
+
+def test_override_bad_subtask_done_value_400(client):
+    _setup(client)
+    resp = _patch(client, "asg:a1", {"subtaskDone": {"s1": "yes"}})
+    assert resp.status_code == 400
+    assert TaskOverride.objects.count() == 0
+
+
+def test_create_task_explicit_null_priority_400(client):
+    _setup(client)
+    resp = client.post(
+        "/api/thrive/tasks",
+        data=json.dumps({"title": "x", "dueDate": "2026-09-01T12:00:00-07:00",
+                         "priority": None}),
+        content_type="application/json",
+    )
+    assert resp.status_code == 400
+
+
+def test_create_task_invalid_priority_400(client):
+    _setup(client)
+    resp = client.post(
+        "/api/thrive/tasks",
+        data=json.dumps({"title": "x", "dueDate": "2026-09-01T12:00:00-07:00",
+                         "priority": "urgent"}),
+        content_type="application/json",
+    )
+    assert resp.status_code == 400

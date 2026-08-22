@@ -30,6 +30,7 @@ def next_assignment_for(course, now) -> dict:
 
 
 def course_payload(course, enrollment, now) -> dict:
+    syllabus = getattr(course, "syllabus", None)
     payload = {
         "id": course.id,
         "code": course.code,
@@ -44,7 +45,8 @@ def course_payload(course, enrollment, now) -> dict:
         "progress": enrollment.progress,
         "standing": enrollment.standing,
         "nextAssignment": next_assignment_for(course, now),
-        "syllabusId": course.syllabus.id,
+        # "" until ingestion guarantees a syllabus per course (F3 invariant)
+        "syllabusId": syllabus.id if syllabus else "",
         "units": course.units,
     }
     if enrollment.nudge:

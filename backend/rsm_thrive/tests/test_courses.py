@@ -37,6 +37,19 @@ def test_courses_shape_and_next_assignment(client):
     assert row["units"] == 4
 
 
+def test_course_without_syllabus_returns_empty_syllabus_id(client):
+    profile = make_student()
+    course = make_course(id="c1", code="MGTA 453")
+    # Deliberately no make_syllabus(course) call here.
+    enroll(profile, course)
+
+    client.force_login(profile.user)
+    resp = client.get("/api/thrive/courses")
+    assert resp.status_code == 200
+    [row] = resp.json()
+    assert row["syllabusId"] == ""
+
+
 def test_syllabi_scoped_to_enrollments(client):
     profile = make_student()
     mine = make_course(id="c1")

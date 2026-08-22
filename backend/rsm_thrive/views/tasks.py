@@ -27,12 +27,44 @@ OVERRIDE_FACETS = {
     "dueDate": "due_date", "order": "sort_order", "subtaskDone": "subtask_done",
 }
 
+VALID_PRIORITIES = {"low", "medium", "high"}
+VALID_TASK_SOURCES = {"class", "career", "admin", "event"}
 
-def _parse_instant(value: str) -> dt.datetime:
+
+def _parse_instant(value) -> dt.datetime:
+    if not isinstance(value, str):
+        raise BadRequest("dueDate must be an ISO-8601 instant with offset.")
     parsed = parse_datetime(value)
     if parsed is None or parsed.tzinfo is None:
         raise BadRequest("dueDate must be an ISO-8601 instant with offset.")
     return parsed
+
+
+def _validate_title(value) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise BadRequest("title must be a non-empty string.")
+    return value
+
+
+def _validate_override_value(key: str, value):
+    """Validate a non-null override facet value. Callers only invoke this
+    for values that are not None (None means "clear the facet")."""
+    if key == "done":
+        if not isinstance(value, bool):
+            raise BadRequest("done must be a boolean.")
+    elif key == "title":
+        _validate_title(value)
+    elif key == "priority":
+        if not isinstance(value, str) or value not in VALID_PRIORITIES:
+            raise BadRequest(f"priority must be one of {sorted(VALID_PRIORITIES)}.")
+    elif key == "order":
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise BadRequest("order must be an integer.")
+    elif key == "subtaskDone":
+        if not isinstance(value, dict) or not all(
+            isinstance(k, str) and isinstance(v, bool) for k, v in value.items()
+        ):
+            raise BadRequest("subtaskDone must be an object of string keys to booleans.")
 
 
 @api_login_required
@@ -47,8 +79,11 @@ def override(request, task_id):
         for key, value in body.items():
             if key not in OVERRIDE_FACETS:
                 raise BadRequest(f"Unknown facet {key}.")
-            if key == "dueDate" and value is not None:
-                value = _parse_instant(value)
+            if value is not None:
+                if key == "dueDate":
+                    value = _parse_instant(value)
+                else:
+                    _validate_override_value(key, value)
             updates[OVERRIDE_FACETS[key]] = value
     except BadRequest as exc:
         return json_error("bad_request", str(exc), 400)
@@ -68,15 +103,19 @@ def override(request, task_id):
 def create_task(request):
     try:
         body = parse_body(request)
-        title = body.get("title") or ""
-        if not title.strip():
-            raise BadRequest("title is required.")
+        title = _validate_title(body.get("title") or "")
         due = _parse_instant(body.get("dueDate") or "")
+        priority = body.get("priority", "medium")
+        if not isinstance(priority, str) or priority not in VALID_PRIORITIES:
+            raise BadRequest(f"priority must be one of {sorted(VALID_PRIORITIES)}.")
+        source = body.get("source", "admin")
+        if not isinstance(source, str) or source not in VALID_TASK_SOURCES:
+            raise BadRequest(f"source must be one of {sorted(VALID_TASK_SOURCES)}.")
     except BadRequest as exc:
         return json_error("bad_request", str(exc), 400)
     row = StudentTask.objects.create(
         user=request.user, title=title.strip(), due_date=due,
-        priority=body.get("priority", "medium"), source=body.get("source", "admin"),
+        priority=priority, source=source,
     )
     merged = {t["id"]: t for t in assemble_tasks(request.user)}
     return json_ok(merged[f"stu:{row.pk}"], status=201)

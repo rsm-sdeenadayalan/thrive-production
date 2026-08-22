@@ -10,6 +10,8 @@ __pycache__/
 *.pyc
 .venv/
 *.egg-info/
+*.sqlite3
+.pytest_cache/
 
 # Node (frontend/ has its own, this covers the root)
 node_modules/
