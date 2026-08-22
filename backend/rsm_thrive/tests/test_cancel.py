@@ -42,3 +42,4 @@ def test_cancel_not_yours_or_unknown_404(client):
     assert client.post(f"/api/thrive/appointments/appt-{theirs.pk}/cancel").status_code == 404
     assert client.post("/api/thrive/appointments/appt-99999/cancel").status_code == 404
     assert client.post("/api/thrive/appointments/banana/cancel").status_code == 404
+    assert client.post("/api/thrive/appointments/appt-²/cancel").status_code == 404

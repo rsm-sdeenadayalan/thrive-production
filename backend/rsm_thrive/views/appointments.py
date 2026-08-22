@@ -51,7 +51,7 @@ def _own_appointment(user, appointment_id):
     if not appointment_id.startswith("appt-"):
         return None
     pk = appointment_id.removeprefix("appt-")
-    if not pk.isdigit():
+    if not (pk.isascii() and pk.isdigit()):
         return None
     return (Appointment.objects.select_related("slot", "student")
             .filter(pk=pk, student=user).first())
