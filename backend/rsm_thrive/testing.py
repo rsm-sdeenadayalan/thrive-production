@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from rsm_thrive.models import (
-    Assignment, Course, CourseMeeting, Enrollment, Event, StudentAssignment, StudentProfile, Syllabus,
+    Assignment, Course, CourseMeeting, Enrollment, Event, ResourceLink, StudentAssignment, StudentProfile, Syllabus,
 )
 
 
@@ -89,3 +89,16 @@ def make_event(id=None, start=None, **overrides) -> Event:
     }
     fields.update(overrides)
     return Event.objects.create(**fields)
+
+
+def make_resource(id=None, **overrides) -> ResourceLink:
+    n = next(_counter)
+    fields = {
+        "id": id or f"res-{n}",
+        "title": f"Resource {n}",
+        "description": "What this is for.",
+        "url": "https://rady.ucsd.edu/",
+        "category": "academic",
+    }
+    fields.update(overrides)
+    return ResourceLink.objects.create(**fields)
