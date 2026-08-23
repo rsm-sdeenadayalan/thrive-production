@@ -7,8 +7,8 @@ from django.utils import timezone
 
 from rsm_thrive.models import (
     Advisor, AppointmentSlot, Assignment, ChatMessage, Conversation, Course,
-    CourseMeeting, CourseRequest, DegreeGap, DegreeRequirement, Enrollment,
-    Event, ProgramPhaseRow, ResumeCourseHighlight, ResourceLink, SharedTask,
+    CourseMeeting, CourseRequest, CustomCalendarEvent, DegreeGap, DegreeRequirement, Enrollment,
+    Event, ProgramPhaseRow, QuickListItem, ResumeCourseHighlight, ResourceLink, SharedTask,
     Skill, StudentAssignment, StudentProfile, StudentTask, Syllabus,
     TaskOverride,
 )
@@ -215,3 +215,16 @@ def make_message(conversation, **overrides) -> ChatMessage:
     fields = {"role": "student", "body": "hello", "sent_at": timezone.now()}
     fields.update(overrides)
     return ChatMessage.objects.create(conversation=conversation, **fields)
+
+
+def make_quick_item(profile, key, **overrides) -> QuickListItem:
+    fields = {"title": "Scratch item", "done": False, "created_at_ms": 1712000000000}
+    fields.update(overrides)
+    return QuickListItem.objects.create(user=profile.user, key=key, **fields)
+
+
+def make_custom_event(profile, key, **overrides) -> CustomCalendarEvent:
+    fields = {"title": "Custom thing", "day_key": "2026-09-01", "time": "18:00",
+              "created_at_ms": 1712000000000}
+    fields.update(overrides)
+    return CustomCalendarEvent.objects.create(user=profile.user, key=key, **fields)

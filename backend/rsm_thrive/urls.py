@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import advisors, appointments, assignments, auth, chat, courses, degree, events, health, overlay, requests, resources, resume, students, tasks
+from .views import advisors, appointments, assignments, auth, chat, courses, degree, events, health, overlay, personal, requests, resources, resume, students, tasks
 
 app_name = "rsm_thrive"
 
@@ -10,10 +10,13 @@ urlpatterns = [
     path("appointments", appointments.appointments_dispatch, name="appointments"),
     path("appointments/<str:appointment_id>/cancel", appointments.cancel_appointment, name="appointment-cancel"),
     path("assignments", assignments.assignments, name="assignments"),
+    path("calendar-items/<str:item_key>/label", personal.item_label, name="calendar-item-label"),
+    path("calendar-items/<str:item_key>/urgent", personal.item_urgent, name="calendar-item-urgent"),
     path("calendar-prefs", overlay.calendar_prefs, name="calendar-prefs"),
     path("conversations", chat.conversations, name="conversations"),
     path("conversations/<str:conversation_id>", chat.conversation, name="conversation"),
     path("courses", courses.courses, name="courses"),
+    path("custom-events/<str:key>", personal.custom_event, name="custom-event"),
     path("degree/progress", degree.progress, name="degree-progress"),
     path("degree/timeline", degree.timeline, name="degree-timeline"),
     path("dev-login", auth.dev_login, name="dev-login"),
@@ -26,6 +29,7 @@ urlpatterns = [
     path("requests/prefill", requests.prefill, name="request-prefill"),
     path("requests", requests.requests_dispatch, name="requests"),
     path("requests/<str:request_id>/submit", requests.submit_request, name="request-submit"),
+    path("quick-items/<str:key>", personal.quick_item, name="quick-item"),
     path("resources", resources.resources, name="resources"),
     path("resume/current", resume.resume_current, name="resume-current"),
     path("resume/skills", resume.skills, name="resume-skills"),
@@ -33,6 +37,7 @@ urlpatterns = [
     path("resume/versions/<str:version_id>/current", resume.set_current_version, name="resume-set-current"),
     path("syllabi", courses.syllabi, name="syllabi"),
     path("tasks", tasks.tasks_dispatch, name="tasks"),
+    path("tasks/order", tasks.bulk_order, name="tasks-order"),
     path("tasks/<str:task_id>", tasks.delete_task, name="task-delete"),
     path("tasks/<str:task_id>/note", overlay.task_note, name="task-note"),
     path("tasks/<str:task_id>/override", tasks.override, name="task-override"),

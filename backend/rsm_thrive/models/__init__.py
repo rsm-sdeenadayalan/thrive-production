@@ -13,6 +13,9 @@ from .overlay import (  # noqa: F401
     CalendarPrefs, EventJoin, IgnoredEvent, SharedTask, StudentTask, TaskNote,
     TaskOverride,
 )
+from .personal import (  # noqa: F401
+    CalendarItemLabel, CalendarItemUrgent, CustomCalendarEvent, QuickListItem,
+)
 from .requests import CourseRequest  # noqa: F401
 from .resources import ResourceLink  # noqa: F401
 from .resume import (  # noqa: F401

@@ -150,3 +150,35 @@ def delete_task(request, task_id):
         return json_error("unknown_task", f"No task {task_id}.", 404)
     TaskOverride.objects.filter(user=request.user, task_key=task_id).delete()
     return HttpResponse(status=204)
+
+
+@api_login_required
+@require_http_methods(["PATCH"])
+def bulk_order(request):
+    try:
+        body = parse_body(request)
+    except BadRequest as exc:
+        return json_error("bad_request", str(exc), 400)
+    orders = body.get("orders")
+    if not isinstance(orders, dict):
+        return json_error("bad_request", "orders must be an object.", 400)
+    for value in orders.values():
+        if value is not None and (isinstance(value, bool) or not isinstance(value, int)):
+            return json_error("bad_request", "order values must be integers or null.", 400)
+    known = {t["id"] for t in assemble_tasks(request.user)}
+    for key, value in orders.items():
+        if key not in known:
+            continue
+        if value is None:
+            row = TaskOverride.objects.filter(user=request.user, task_key=key).first()
+            if row:
+                row.sort_order = None
+                if all(getattr(row, f) is None for f in OVERRIDE_FACETS.values()):
+                    row.delete()
+                else:
+                    row.save(update_fields=["sort_order"])
+        else:
+            row, _ = TaskOverride.objects.get_or_create(user=request.user, task_key=key)
+            row.sort_order = value
+            row.save(update_fields=["sort_order"])
+    return HttpResponse(status=204)
