@@ -84,6 +84,10 @@ import { mockStudent } from "./mock/student";
 import { buildMockSyllabi } from "./mock/syllabi";
 import { buildMockTasks } from "./mock/tasks";
 
+import { SlotUnavailableError } from "./errors";
+
+export { SlotUnavailableError } from "./errors";
+
 // ---------------------------------------------------------------------------
 // Student, courses, coursework
 // ---------------------------------------------------------------------------
@@ -193,13 +197,6 @@ export function getMyAppointments(): Promise<Appointment[]> {
     .map((appointment) => ({ ...appointment }));
 
   return resolveAfterDelay(confirmed);
-}
-
-export class SlotUnavailableError extends Error {
-  constructor(message = "That time was just taken. Pick another.") {
-    super(message);
-    this.name = "SlotUnavailableError";
-  }
 }
 
 /**
