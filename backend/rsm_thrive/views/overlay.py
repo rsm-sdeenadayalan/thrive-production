@@ -1,4 +1,3 @@
-from django.contrib.auth.models import User
 from django.http import HttpResponse
 from django.views.decorators.http import require_http_methods
 
@@ -10,7 +9,7 @@ from rsm_thrive.models import (
 from rsm_thrive.serialize import iso_instant
 
 
-def _stores_payload(user: User) -> dict:
+def _stores_payload(user, prefs) -> dict:
     """Build the stores map mirroring localStorage shapes."""
     stores = {
         "thrive:task-done": {},
@@ -104,7 +103,6 @@ def _stores_payload(user: User) -> dict:
         stores["thrive:task-notes"][note.task_key] = note.note
 
     # CalendarPrefs - wrap as {"value": prefs.prefs} when present else {}
-    prefs = CalendarPrefs.objects.filter(user=user).first()
     if prefs:
         stores["thrive:calendar-prefs"] = {"value": prefs.prefs}
     else:
@@ -130,7 +128,7 @@ def overlay(request):
         "taskNotes": {
             n.task_key: n.note for n in TaskNote.objects.filter(user=request.user)
         },
-        "stores": _stores_payload(request.user),
+        "stores": _stores_payload(request.user, prefs),
     })
 
 

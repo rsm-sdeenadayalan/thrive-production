@@ -29,6 +29,8 @@ function enc(value: unknown): string {
 }
 
 function projectTaskAdd(task: unknown): Payload {
+	// Subtasks are deliberately not persisted: every addTask caller creates
+	// them empty, and the seed rebuilds added tasks with the stored [] anyway.
 	const source = (task ?? {}) as Payload;
 	return {
 		title: source.title,
