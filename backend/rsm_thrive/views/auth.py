@@ -9,6 +9,7 @@ from rsm_thrive.http import json_error
 
 
 def _safe_next(next_url: str) -> str:
+    next_url = next_url.replace("\\", "/")
     if next_url.startswith("/") and not next_url.startswith("//"):
         return next_url
     for origin in settings.THRIVE_FRONTEND_ORIGINS:

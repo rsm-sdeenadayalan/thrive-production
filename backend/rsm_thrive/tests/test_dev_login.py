@@ -35,6 +35,16 @@ def test_login_allows_frontend_origin_and_blocks_others(client):
     resp = client.post(LOGIN, {"username": "ada", "password": "pw", "next": evil})
     assert resp["Location"] == "/"
 
+    client.logout()
+    backslash_evil = "/\\evil.example"
+    resp = client.post(LOGIN, {"username": "ada", "password": "pw", "next": backslash_evil})
+    assert resp["Location"] == "/"
+
+    client.logout()
+    double_backslash_evil = "/\\/evil.example"
+    resp = client.post(LOGIN, {"username": "ada", "password": "pw", "next": double_backslash_evil})
+    assert resp["Location"] == "/"
+
 
 def test_bad_credentials_reshow_form(client):
     _student_with_password()
