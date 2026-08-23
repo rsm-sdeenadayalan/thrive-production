@@ -159,7 +159,7 @@
 					</p>
 
 					{#if row.item.description}
-						<p class="mt-1.5 text-xs text-body">{row.item.description}</p>
+						<p class="mt-1.5 max-w-measure text-xs text-body">{row.item.description}</p>
 					{/if}
 
 					<div class="mt-2.5 flex flex-wrap items-center gap-2">
