@@ -78,3 +78,7 @@ THRIVE_FRONTEND_ORIGINS = [
     ).split(",")
     if origin.strip()
 ]
+
+THRIVE_LLM = os.environ.get("THRIVE_LLM", "gemini")
+THRIVE_BOT_CONFIG = os.environ.get("THRIVE_BOT_CONFIG", "")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
