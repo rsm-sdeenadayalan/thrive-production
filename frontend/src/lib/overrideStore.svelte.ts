@@ -38,7 +38,12 @@
  * mid-render and diverge from the server's markup -- the exact mismatch this
  * ordering exists to avoid. It being a single named call is also what lets one
  * surface later choose to wait for it without any change down here.
+ *
+ * In API mode the same contract is served by the server seed primed from the
+ * root layout.
  */
+
+import { overlayEnabled, seedFor, syncOverlay } from "./overlaySync";
 
 /**
  * The browser's storage, or null when there is none.
@@ -122,6 +127,13 @@ export function createOverrideStore<T>(key: string): OverrideStore<T> {
 	function hydrate(): void {
 		if (hydrated) return;
 
+		const seeded = seedFor(key);
+		if (seeded) {
+			hydrated = true;
+			values = seeded as Values;
+			return;
+		}
+
 		const store = storage();
 		// No storage means the server. Leave `hydrated` false so a later call in
 		// a real browser still works.
@@ -147,6 +159,9 @@ export function createOverrideStore<T>(key: string): OverrideStore<T> {
 		}
 
 		values = next;
+
+		syncOverlay(key, id, value);
+		if (overlayEnabled()) return;
 
 		const store = storage();
 		if (!store) return;

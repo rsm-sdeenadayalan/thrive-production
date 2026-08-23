@@ -2,6 +2,7 @@
 	import '../app.css';
 
 	import AppShell from '$lib/components/shell/AppShell.svelte';
+	import { primeOverlay } from '$lib/overlaySync';
 	import { hydrateStores } from '$lib/overrideStore.svelte';
 	import { hydrateTaskNotes } from '$lib/taskNotes.svelte';
 	import { SITE_DESCRIPTION, pageTitle } from '$lib/title';
@@ -25,6 +26,7 @@
 	 * so are not in the registry -- see the note at the top of taskNotes.
 	 */
 	$effect(() => {
+		primeOverlay(data.overlay ?? null);
 		hydrateStores();
 		hydrateTaskNotes();
 	});

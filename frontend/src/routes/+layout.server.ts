@@ -1,4 +1,5 @@
 import { getStudent } from '$lib/data';
+import { apiEnabled, apiFetch } from '$lib/data/api/client';
 import type { LayoutServerLoad } from './$types';
 
 /**
@@ -18,5 +19,10 @@ import type { LayoutServerLoad } from './$types';
  * and it is the same non-event the switch to Django should be.
  */
 export const load: LayoutServerLoad = async () => {
-	return { student: await getStudent() };
+	const student = await getStudent();
+	if (!apiEnabled()) return { student };
+	const overlay = await apiFetch<{ stores: Record<string, Record<string, unknown>> }>(
+		'/overlay',
+	);
+	return { student, overlay: { stores: overlay.stores } };
 };

@@ -10,7 +10,12 @@
  * `localStorage` rather than anything server-side: a module-level store in a
  * node process is shared by every visitor, which is fine for seeded fixtures
  * and wrong for something described as "self notes".
+ *
+ * In API mode the same contract is served by the server seed primed from the
+ * root layout.
  */
+
+import { overlayEnabled, seedFor, syncOverlay } from "./overlaySync";
 
 const KEY = "thrive:task-notes";
 
@@ -35,6 +40,13 @@ function storage(): Storage | null {
  */
 export function hydrateTaskNotes(): void {
 	if (hydrated) return;
+
+	const seeded = seedFor(KEY);
+	if (seeded) {
+		hydrated = true;
+		notes = seeded as NoteMap;
+		return;
+	}
 
 	const store = storage();
 	if (!store) return;
@@ -81,6 +93,9 @@ export function setNote(taskId: string, note: string) {
 	}
 
 	notes = next;
+
+	syncOverlay(KEY, taskId, trimmed || undefined);
+	if (overlayEnabled()) return;
 
 	const store = storage();
 	if (!store) return;
