@@ -1292,17 +1292,19 @@ THRIVE_API_ORIGIN=http://127.0.0.1:8123 ORIGIN=http://localhost:3123 PORT=3123 \
 NODE_PID=$!
 sleep 3
 
+# NOTE: address Django and the Node server by the SAME hostname (e.g. both localhost) — session cookies are host-scoped and a 127.0.0.1/localhost mix splits the cookie jar.
+
 # 1. Unauthenticated → redirect to dev login
 curl -s -o /dev/null -w "%{http_code} %{redirect_url}\n" http://localhost:3123/
 # expect: 303 http://127.0.0.1:8123/api/thrive/dev-login?next=...
 
 # 2. Log in as demo (grab csrf, post credentials, keep the session cookie)
 JAR=/tmp/f4a-cookies.txt
-curl -s -c $JAR http://127.0.0.1:8123/api/thrive/dev-login > /dev/null
+curl -s -c $JAR http://localhost:8123/api/thrive/dev-login > /dev/null
 CSRF=$(grep csrftoken $JAR | awk '{print $7}')
 curl -s -b $JAR -c $JAR -o /dev/null -w "%{http_code}\n" \
   -d "username=demo&password=demo&next=/&csrfmiddlewaretoken=$CSRF" \
-  http://127.0.0.1:8123/api/thrive/dev-login
+  http://localhost:8123/api/thrive/dev-login
 # expect: 302
 
 # 3. Authenticated dashboard renders real data

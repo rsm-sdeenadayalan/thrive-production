@@ -17,7 +17,7 @@ export class ApiError extends Error {
 }
 
 export function apiOrigin(): string | null {
-	return process.env.THRIVE_API_ORIGIN || null;
+	return (process.env.THRIVE_API_ORIGIN || null)?.replace(/\/+$/, "") ?? null;
 }
 
 export function apiEnabled(): boolean {

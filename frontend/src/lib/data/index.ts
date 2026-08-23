@@ -8,7 +8,7 @@
  * Three things are public, and nothing else is:
  *
  * - `./types`     the domain contract
- * - `./providers` the 25 functions and `SlotUnavailableError`
+ * - `./providers` the 27 functions and `SlotUnavailableError`
  * - `./labels`    presentation strings for the closed unions in `types`
  *
  * `./mock/*` and `./latency` are deliberately not re-exported. Everything under
