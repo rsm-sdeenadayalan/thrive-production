@@ -1,0 +1,117 @@
+{
+  "product-manager": {
+    "label": "Product Manager",
+    "description": "Owns product strategy and execution; needs experimentation literacy, customer insight, tech strategy, and communication.",
+    "career_tags": ["product", "strategy-consulting", "communication", "people-decisions"],
+    "boost_courses": {
+      "MGTA 458": 2.0,
+      "MGT 451": 2.0,
+      "MGT 477": 1.5,
+      "MGTA 460": 1.5,
+      "MGTA 495-GENAI": 1.5,
+      "MGTA 402": 1.0,
+      "MGTA 479": 1.0,
+      "MGTA 461": 0.5
+    }
+  },
+  "data-scientist": {
+    "label": "Data Scientist",
+    "description": "Builds statistical and ML models end-to-end; needs modeling depth, causal inference, and production awareness.",
+    "career_tags": ["machine-learning", "data-engineering", "ai-genai"],
+    "boost_courses": {
+      "CSE 251A": 1.5,
+      "MGTA 463": 3.0,
+      "MGTA 495-MKTG": 1.0,
+      "MGTA 466": 1.0,
+      "MGTA 415": 1.0,
+      "MGTA 461": 1.0,
+      "CSE 251B": 1.0,
+      "MGTA 458": 0.5,
+      "CSE 256": 0.5
+    }
+  },
+  "data-engineer": {
+    "label": "Data Engineer",
+    "description": "Builds data pipelines and platforms; needs SQL/ETL, distributed computing, and BI tooling.",
+    "career_tags": ["data-engineering", "machine-learning"],
+    "boost_courses": {
+      "MGTA 464": 2.0,
+      "MGTA 466": 2.0,
+      "MGTA 457": 1.0,
+      "MGTA 461": 0.5
+    }
+  },
+  "ml-engineer": {
+    "label": "Machine Learning Engineer",
+    "description": "Ships ML systems to production; needs deep ML theory, deep learning, and scalable computing.",
+    "career_tags": ["machine-learning", "data-engineering", "ai-genai"],
+    "boost_courses": {
+      "CSE 251A": 2.0,
+      "CSE 251B": 2.0,
+      "MGTA 466": 1.5,
+      "MGTA 461": 1.5,
+      "CSE 256": 1.0,
+      "MGTA 415": 1.0
+    }
+  },
+  "marketing-analyst": {
+    "label": "Marketing Analyst / Marketing Data Scientist",
+    "description": "Drives marketing decisions with data; needs experimentation, consumer insight, pricing, and segmentation methods.",
+    "career_tags": ["marketing", "pricing", "machine-learning"],
+    "boost_courses": {
+      "MGTA 495-MKTG": 2.0,
+      "MGTA 479": 1.5,
+      "MGTA 458": 1.5,
+      "MGT 477": 1.0
+    }
+  },
+  "consultant": {
+    "label": "Analytics Consultant / Strategy",
+    "description": "Advises clients using analytics; needs problem framing, influence, and communication.",
+    "career_tags": ["strategy-consulting", "communication", "people-decisions"],
+    "boost_courses": {
+      "MGTA 459": 1.5,
+      "MGTA 402": 1.5,
+      "MGTA 460": 1.0
+    }
+  },
+  "finance-quant": {
+    "label": "Finance / Quantitative Analyst",
+    "description": "Applies analytics to financial decisions; needs forecasting, behavioral finance, and risk modeling.",
+    "career_tags": ["finance", "machine-learning"],
+    "boost_courses": {
+      "MGTF 405": 2.0,
+      "MGTF 406": 1.5,
+      "MGTA 463": 1.0
+    }
+  },
+  "operations-supply-chain": {
+    "label": "Operations / Supply Chain Analyst",
+    "description": "Optimizes operations and supply chains; needs forecasting, inventory models, and prescriptive analytics.",
+    "career_tags": ["operations", "supply-chain"],
+    "boost_courses": {
+      "MGTA 456": 2.0,
+      "MGTA 495-AIPA": 1.0,
+      "MGTA 460": 1.0
+    }
+  },
+  "healthcare-analyst": {
+    "label": "Healthcare Analytics",
+    "description": "Analytics for health systems and policy; needs decision modeling and cost-effectiveness methods.",
+    "career_tags": ["healthcare", "operations", "machine-learning"],
+    "boost_courses": {
+      "MGTA 495-HC": 2.0,
+      "MGTA 495-AIPA": 1.5
+    }
+  },
+  "fraud-risk-analyst": {
+    "label": "Fraud / Risk Analyst",
+    "description": "Detects fraud and manages risk with ML; needs anomaly detection and feature engineering on messy data.",
+    "career_tags": ["fraud-risk", "machine-learning", "finance"],
+    "boost_courses": {
+      "MGTA 463": 2.5,
+      "MGTA 464": 1.0,
+      "MGTA 466": 0.5
+    }
+  }
+}

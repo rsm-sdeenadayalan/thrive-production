@@ -1,0 +1,1541 @@
+[
+ {
+  "id": "MGTA 403",
+  "code": "MGTA 403",
+  "title": "AI-Math and Programming for Business Analytics",
+  "units": 2,
+  "units_note": "Catalog lists 2-4; pre-term intensive graded S/U, treated as required prep (not counted toward the 50 units).",
+  "is_core": true,
+  "offerings": [
+   {
+    "term": "SU26",
+    "season": "SU",
+    "instructor": "Nijs",
+    "format_notes": "Compressed two-week intensive with daily class and lab sessions."
+   }
+  ],
+  "description": "An intensive summer gateway course that builds math, statistics, and programming foundations for the MSBA in a Generative AI era. Students implement core concepts (mean, variance, A/B testing, clustering) from scratch in Python without external libraries, practice test-driven development, and learn to collaborate with AI tools on business problems.",
+  "topics": [
+   "Python programming fundamentals",
+   "probability and statistics",
+   "test-driven development",
+   "A/B testing",
+   "clustering and segmentation",
+   "Generative AI collaboration",
+   "agentic engineering"
+  ],
+  "skills": [
+   "writing Python from first principles",
+   "implementing statistical concepts in code",
+   "test-driven development",
+   "guiding GenAI tools for coding",
+   "explaining code and math orally"
+  ],
+  "tools": [
+   "Python",
+   "GitHub",
+   "Claude Code",
+   "DataCamp"
+  ],
+  "prerequisites": "Assigned DataCamp coursework, self-paced online math & stats bootcamp, recommended OpenIntro Statistics review (Ch. 1-5).",
+  "workload": "heavy",
+  "workload_basis": "Compressed two-week format: daily sessions, skills test, programming cases, probability problem sets, written and oral final exam.",
+  "career_tags": [
+   "ai-genai",
+   "machine-learning"
+  ],
+  "technical_level": 4,
+  "grading": "Pass/fail (S/U) based on written and oral final exam; individual assignments and participation count significantly.",
+  "notes": "All work individual; students must be able to explain every line of code in person; some assignments allow GenAI, some forbid it.",
+  "department": "MGTA"
+ },
+ {
+  "id": "MGTA 451",
+  "code": "MGTA 451",
+  "title": "Business Analytics in Marketing, Finance, and Operations",
+  "units": 4,
+  "is_core": true,
+  "offerings": [
+   {
+    "term": "SU26",
+    "season": "SU",
+    "instructor": "Buti, Shahsavand, Wilbur",
+    "format_notes": "Three modules taught by three different professors, each 1/3 of the grade."
+   }
+  ],
+  "description": "A three-module intensive course introducing analytics applications in marketing, finance, and operations, each taught by a different professor. Topics span customer value and advertising measurement, time value of money and portfolio concepts, and process analysis with capacity and inventory fundamentals.",
+  "topics": [
+   "marketing and customer value",
+   "advertising measurement and causality",
+   "time value of money",
+   "NPV and investment decisions",
+   "risk and return",
+   "process analysis and Little's Law",
+   "capacity and flow time analysis"
+  ],
+  "skills": [
+   "applying customer value concepts",
+   "evaluating advertising effectiveness and causal claims",
+   "financial decision-making with NPV and TVM",
+   "process-flow, inventory, and capacity analysis"
+  ],
+  "tools": [],
+  "prerequisites": null,
+  "workload": "moderate",
+  "workload_basis": "Per-module assessments: quizzes and exercises (marketing), group homework plus take-home and oral exams (finance), homework plus written and oral exam (operations).",
+  "career_tags": [
+   "marketing",
+   "finance",
+   "operations"
+  ],
+  "technical_level": 2,
+  "grading": "Three module grades, each 1/3 of the total; marketing module curved; oral exams in finance and operations modules.",
+  "notes": "Paper quizzes with no devices; oral exams in two modules; preparation before class essential.",
+  "department": "MGTA"
+ },
+ {
+  "id": "MGTA 452",
+  "code": "MGTA 452",
+  "title": "Collecting and Analyzing Large Data",
+  "units": 4,
+  "is_core": true,
+  "offerings": [
+   {
+    "term": "FA25",
+    "season": "FA",
+    "instructor": "Hansen",
+    "format_notes": "8am Tuesday meetings; several flipped classes."
+   }
+  ],
+  "description": "An introduction to tools and frameworks for collecting and analyzing large datasets to drive strategic business decisions. Covers the full analytics project cycle \u2014 scoping, data collection (web scraping, APIs, experiments), exploratory analysis, predictive modeling, and presenting findings \u2014 with a team project consulting for a real organization.",
+  "topics": [
+   "analytics life-cycle",
+   "web scraping and APIs",
+   "A/B testing",
+   "exploratory data analysis",
+   "customer lifetime value",
+   "KPIs and dashboards",
+   "clickstream analytics",
+   "segmentation and clustering",
+   "regression and regularization",
+   "text analytics"
+  ],
+  "skills": [
+   "collecting data via scraping, APIs, and experiments",
+   "data cleaning and preprocessing",
+   "querying and joining transactional data",
+   "building visualizations and dashboards",
+   "predictive modeling and evaluation",
+   "consulting for a real business"
+  ],
+  "tools": [
+   "Python",
+   "R"
+  ],
+  "prerequisites": null,
+  "workload": "heavy",
+  "workload_basis": "Midterm and final exams, individual assignments, team project for a real organization, participation, flipped-class pre-work.",
+  "career_tags": [
+   "marketing",
+   "operations",
+   "machine-learning",
+   "data-engineering"
+  ],
+  "technical_level": 4,
+  "grading": "35% final exam, 20% midterm, 20% team project, 10% assignments, 15% participation.",
+  "notes": "Team project consults for an actual business; GenAI encouraged but students must explain all submitted code.",
+  "department": "MGTA"
+ },
+ {
+  "id": "MGTA 453",
+  "code": "MGTA 453",
+  "title": "Business Analytics",
+  "units": 4,
+  "is_core": true,
+  "offerings": [
+   {
+    "term": "FA25",
+    "season": "FA",
+    "instructor": "August"
+   }
+  ],
+  "description": "A foundations course in business analytics focused on using data, statistical models, and quantitative methods to make decisions under uncertainty. Covers decision analysis, statistical inference, simulation, regression, and optimization with hands-on programming in R and Python, applied through six team case studies.",
+  "topics": [
+   "decision analysis",
+   "statistical inference",
+   "simulation modeling",
+   "regression analysis",
+   "optimization",
+   "uncertainty and risk"
+  ],
+  "skills": [
+   "structuring decision problems analytically",
+   "reasoning about uncertainty and risk",
+   "building simulation models",
+   "running and interpreting regressions",
+   "formulating optimization problems",
+   "writing managerial case memos"
+  ],
+  "tools": [
+   "R",
+   "Radiant",
+   "Python"
+  ],
+  "prerequisites": null,
+  "workload": "heavy",
+  "workload_basis": "Seven homework assignments, six team case write-ups, participation, plus 3-hour midterm and final exams.",
+  "career_tags": [
+   "operations",
+   "finance"
+  ],
+  "technical_level": 4,
+  "grading": "35% final exam, 25% midterm, 15% case write-ups, 10% homework, 15% participation.",
+  "notes": "Six group case write-ups in study groups; open-book but strictly individual exams; peer evaluations factor into participation.",
+  "department": "MGTA"
+ },
+ {
+  "id": "MGTA 455",
+  "code": "MGTA 455",
+  "title": "Customer Analytics",
+  "units": 4,
+  "is_core": true,
+  "offerings": [
+   {
+    "term": "WI26",
+    "season": "WI",
+    "instructor": null
+   }
+  ],
+  "description": "Core course on customer analytics (no syllabus PDF was available; summary based on the Rady program website). Typically covers analytics for customer acquisition, retention and churn, customer lifetime value, and targeting/response models.",
+  "topics": [
+   "customer acquisition",
+   "churn and retention",
+   "customer lifetime value",
+   "targeting and response models"
+  ],
+  "skills": [
+   "customer-level predictive modeling",
+   "targeting decisions",
+   "CLV analysis"
+  ],
+  "tools": [],
+  "prerequisites": null,
+  "workload": "moderate",
+  "workload_basis": "Unknown \u2014 syllabus not available.",
+  "career_tags": [
+   "marketing",
+   "machine-learning"
+  ],
+  "technical_level": 3,
+  "grading": "Unknown \u2014 syllabus not available.",
+  "notes": "Core per the Rady MSBA website; details limited because no syllabus was in the source folder.",
+  "department": "MGTA"
+ },
+ {
+  "id": "MGTA 444",
+  "code": "MGTA 444",
+  "title": "Business Analytics Consulting and Solution Design",
+  "units": 2,
+  "is_core": true,
+  "offerings": [
+   {
+    "term": "WI26",
+    "season": "WI",
+    "instructor": "Peterson",
+    "format_notes": "Five sessions; attendance mandatory."
+   }
+  ],
+  "description": "A case-based course on designing effective business analytics solutions, emphasizing that framing the problem correctly is the most critical part of any analytics project. Students learn to translate business needs into solvable analytical problems, avoid common data-science failure modes, and plan modeling, prescriptive analytics, and deployment.",
+  "topics": [
+   "problem framing",
+   "translating business needs into analytical problems",
+   "modeling strategy and evaluation",
+   "prescriptive analytics and ROI",
+   "solution deployment",
+   "why data science projects fail"
+  ],
+  "skills": [
+   "framing and scoping business problems",
+   "evaluating project proposals",
+   "designing modeling strategies",
+   "estimating ROI of analytics",
+   "planning deployment"
+  ],
+  "tools": [],
+  "prerequisites": null,
+  "workload": "light",
+  "workload_basis": "Four assignments (mostly 1-page reviews plus a group capstone presentation review), readings, no exams.",
+  "career_tags": [
+   "strategy-consulting"
+  ],
+  "technical_level": 2,
+  "grading": "Four assignments (75 pts) plus attendance (25 pts); no final exam.",
+  "notes": "Unexcused absence costs half a letter grade; students review live capstone presentations in class.",
+  "department": "MGTA"
+ },
+ {
+  "id": "MGTA 454",
+  "code": "MGTA 454",
+  "title": "Business Analytics Capstone",
+  "units": 4,
+  "is_core": true,
+  "offerings": [
+   {
+    "term": "SP26",
+    "season": "SP",
+    "instructor": null
+   }
+  ],
+  "description": "The MSBA capstone: teams solve a real business analytics problem for an external sponsor company, covering the full project cycle from scoping and a client-approved charter through data preparation, analysis, and final recommendations. Emphasis on project management, stakeholder communication, and professional delivery.",
+  "topics": [
+   "project scoping and charters",
+   "client and stakeholder management",
+   "data preparation",
+   "exploratory and predictive analysis",
+   "prescriptive recommendations",
+   "professional presentations"
+  ],
+  "skills": [
+   "managing project scope",
+   "working with real clients",
+   "end-to-end analysis execution",
+   "team collaboration",
+   "presenting to technical and nontechnical audiences"
+  ],
+  "tools": [
+   "EduSourced",
+   "PowerPoint"
+  ],
+  "prerequisites": "Taken in the final quarter; applies techniques from the whole program (requires MGTA 451, 452, 453).",
+  "workload": "heavy",
+  "workload_basis": "Explicitly ~12 hours/week: weekly client and advisor meetings, biweekly peer surveys, mid-term and final presentations with individual exams.",
+  "career_tags": [
+   "strategy-consulting",
+   "communication",
+   "machine-learning"
+  ],
+  "technical_level": 3,
+  "grading": "25% professionalism, 25% teamwork (peer surveys), 15% output quality, 15% communication, 20% individual understanding.",
+  "notes": "External company sponsor; mandatory weekly client and faculty meetings; strict data handling rules.",
+  "department": "MGTA"
+ },
+ {
+  "id": "MGTA 402",
+  "code": "MGTA 402",
+  "title": "Data-Driven Communications",
+  "units": 2,
+  "is_core": false,
+  "offerings": [
+   {
+    "term": "FA25",
+    "season": "FA",
+    "instructor": "Walsh",
+    "format_notes": "Five highly participatory lab sessions."
+   }
+  ],
+  "description": "A highly participatory lab course on presenting data through clear, compelling storytelling. Students use actor-training techniques to strengthen delivery, vocal range, and audience connection, building weekly presentations that culminate in a final storytelling-with-data presentation.",
+  "topics": [
+   "storytelling with data",
+   "presentation structure",
+   "slide design",
+   "data visualization for audiences",
+   "public speaking and vocal delivery",
+   "storyboarding"
+  ],
+  "skills": [
+   "delivering engaging presentations",
+   "structuring a narrative around data",
+   "designing effective slides",
+   "giving and receiving peer feedback"
+  ],
+  "tools": [],
+  "prerequisites": null,
+  "workload": "moderate",
+  "workload_basis": "Weekly readings, presentation prep, peer feedback and reflections, plus a final project presentation over five sessions.",
+  "career_tags": [
+   "communication"
+  ],
+  "technical_level": 1,
+  "grading": "40% engagement/participation/peer feedback, 60% individual and group assignments; no exams.",
+  "notes": "Attendance essentially mandatory (participatory lab); AI-generated work explicitly prohibited.",
+  "department": "MGTA"
+ },
+ {
+  "id": "MGTA 415",
+  "code": "MGTA 415",
+  "title": "Analyzing Unstructured Data (NLP & LLM Applications)",
+  "units": 4,
+  "is_core": false,
+  "offerings": [
+   {
+    "term": "SU25",
+    "season": "SU",
+    "instructor": "Wu",
+    "format_notes": "Five sessions; taught by an industry data science VP."
+   }
+  ],
+  "description": "An applied course on natural language processing and large language models for business. Briefly reviews classical NLP (preprocessing, embeddings) then moves into transformers, prompt engineering, RAG, LLM agents, and multimodal models, with one comprehensive group project building an AI-driven business application.",
+  "topics": [
+   "NLP and LLM fundamentals",
+   "embeddings",
+   "transformers",
+   "prompt engineering",
+   "LLM agents",
+   "retrieval-augmented generation",
+   "sentiment analysis",
+   "multimodal models",
+   "responsible AI"
+  ],
+  "skills": [
+   "applying NLP to business text data",
+   "prompt engineering",
+   "building RAG pipelines",
+   "building LLM agent applications",
+   "presenting analytical projects"
+  ],
+  "tools": [
+   "Python",
+   "Hugging Face",
+   "NLTK",
+   "OpenAI API",
+   "LangChain",
+   "CrewAI",
+   "Pinecone",
+   "FAISS"
+  ],
+  "prerequisites": "Math and basic statistics, Python programming, basic supervised machine learning.",
+  "workload": "moderate",
+  "workload_basis": "One comprehensive group project with midterm and final presentations, plus quizzes and labs; no exams.",
+  "career_tags": [
+   "ai-genai",
+   "machine-learning"
+  ],
+  "technical_level": 4,
+  "grading": "30% attendance/quizzes/labs, 30% midterm project presentation, 40% final project presentation.",
+  "notes": "Team project (3-4 students); strict attendance policy; heavy GenAI use expected and rewarded.",
+  "department": "MGTA"
+ },
+ {
+  "id": "MGTA 456",
+  "code": "MGTA 456",
+  "title": "Supply Chain Analytics",
+  "units": 4,
+  "is_core": false,
+  "offerings": [
+   {
+    "term": "WI26",
+    "season": "WI",
+    "instructor": "Montgomery"
+   }
+  ],
+  "description": "Links supply chain theory with data analytics applications: mapping a company's supply chain, managing demand and supply-side uncertainty, and communicating improvement strategies. Spans classical methods (newsvendor, forecasting, inventory) through last-mile delivery, sustainability, and revenue management, with hands-on Python and Excel work.",
+  "topics": [
+   "newsvendor models",
+   "demand forecasting",
+   "exponential smoothing",
+   "network design",
+   "inventory control",
+   "last-mile delivery",
+   "sustainability",
+   "revenue management"
+  ],
+  "skills": [
+   "mapping supply chains",
+   "demand forecasting",
+   "inventory modeling under uncertainty",
+   "communicating analytical recommendations"
+  ],
+  "tools": [
+   "Python",
+   "Excel"
+  ],
+  "prerequisites": null,
+  "workload": "moderate",
+  "workload_basis": "Weekly quizzes, 5-7 homework assignments, group case write-up, group final project; no exams.",
+  "career_tags": [
+   "supply-chain",
+   "operations"
+  ],
+  "technical_level": 3,
+  "grading": "10% participation, 10% case write-up, 25% homework, 25% quizzes, 30% final project; no exams.",
+  "notes": "Quizzes every class (lowest dropped); group case and group final project; AI tool use encouraged.",
+  "department": "MGTA"
+ },
+ {
+  "id": "MGTA 457",
+  "code": "MGTA 457",
+  "title": "Business Intelligence Systems",
+  "units": 2,
+  "is_core": false,
+  "offerings": [
+   {
+    "term": "FA25",
+    "season": "FA",
+    "instructor": "Schibler",
+    "format_notes": "Weeks 6-10 (second half of quarter); Tableau-focused, no Snowflake."
+   },
+   {
+    "term": "SP26",
+    "season": "SP",
+    "instructor": "Jambulapati",
+    "format_notes": "Weeks 6-10; adds Snowflake cloud data warehousing alongside Tableau."
+   }
+  ],
+  "description": "A hands-on, project-based course on turning high-volume data from disparate systems into actionable insights through interactive dashboards. The Fall section centers on Tableau and Tableau Prep; the Spring section adds the Snowflake Data Cloud for scalable storage, SQL/ELT, and data modeling. Culminates in a team dashboard project and presentation.",
+  "topics": [
+   "business intelligence architecture",
+   "dashboard design",
+   "data visualization principles",
+   "ETL and data cleansing",
+   "data storytelling",
+   "Snowflake data warehousing (SP section)",
+   "SQL and ELT (SP section)"
+  ],
+  "skills": [
+   "designing and building interactive dashboards",
+   "combining and cleansing data feeds",
+   "data modeling",
+   "presenting data stories",
+   "SQL in Snowflake (SP section)"
+  ],
+  "tools": [
+   "Tableau",
+   "Tableau Prep",
+   "Snowflake",
+   "SQL"
+  ],
+  "prerequisites": null,
+  "workload": "moderate",
+  "workload_basis": "One multi-part team project (design doc, prep workflow, dashboards, presentation, final doc) plus quizzes over 5 weeks; no exams.",
+  "career_tags": [
+   "data-engineering",
+   "communication"
+  ],
+  "technical_level": 3,
+  "grading": "Mostly project-based (presentation + deliverables ~85%), quizzes ~5-10%.",
+  "notes": "Half-quarter course (weeks 6-10). Portfolio-ready team project; GenAI use expected but logic must be explainable.",
+  "department": "MGTA"
+ },
+ {
+  "id": "MGTA 458",
+  "code": "MGTA 458",
+  "title": "Experiments for Business Analytics (Experiments in Firms)",
+  "units": 4,
+  "is_core": false,
+  "offerings": [
+   {
+    "term": "WI26",
+    "season": "WI",
+    "instructor": "Johnson"
+   }
+  ],
+  "description": "Covers how businesses and policymakers use randomized experiments in pricing, marketing, employee incentives, and consumer behavior, incorporating behavioral economics into experimental interventions. Groups develop a business question, design a randomized experiment, run a pilot study, and present results.",
+  "topics": [
+   "randomized experiment design",
+   "behavioral economics",
+   "pilot studies",
+   "pricing experiments",
+   "marketing experiments",
+   "employee incentives",
+   "consumer behavior"
+  ],
+  "skills": [
+   "designing randomized experiments",
+   "applying behavioral economics to interventions",
+   "running pilot studies",
+   "presenting experimental results"
+  ],
+  "tools": [],
+  "prerequisites": null,
+  "workload": "moderate",
+  "workload_basis": "Midterm (35%), two small individual assignments, milestone-based group pilot project with presentation.",
+  "career_tags": [
+   "marketing",
+   "pricing",
+   "people-decisions",
+   "product"
+  ],
+  "technical_level": 2,
+  "grading": "15% participation, 10% individual assignments, 35% midterm, 40% group final project.",
+  "notes": "Quarter-long teams of 2-4 with peer evaluation; strict no-AI policy for assignments and exams.",
+  "department": "MGTA"
+ },
+ {
+  "id": "MGTA 459",
+  "code": "MGTA 459",
+  "title": "Managerial Judgment and Decision Making",
+  "units": 4,
+  "is_core": false,
+  "offerings": [
+   {
+    "term": "FA25",
+    "season": "FA",
+    "instructor": "Rottenstreich",
+    "format_notes": "Thursday/Friday intensive blocks."
+   },
+   {
+    "term": "FA25",
+    "season": "FA",
+    "instructor": "Schurr",
+    "format_notes": "Six 4-hour Saturday morning sessions (8am-12pm) \u2014 good for students preferring a weekend/compressed schedule."
+   }
+  ],
+  "description": "A two-part course on making better decisions and getting them implemented. Part one examines judgment under uncertainty (heuristics, biases, noise, group decisions, models vs. intuition, risk taking); part two covers building influence through coalitions, networks, and persuasion, ending with a personal action plan.",
+  "topics": [
+   "heuristics and biases",
+   "judgment under uncertainty",
+   "group decision making",
+   "noise in judgment",
+   "models vs. intuition",
+   "risk taking and framing",
+   "coalitions and networks",
+   "persuasion and influence"
+  ],
+  "skills": [
+   "recognizing and mitigating decision biases",
+   "designing decision processes",
+   "structuring group decisions",
+   "applying persuasion frameworks",
+   "expanding personal influence"
+  ],
+  "tools": [],
+  "prerequisites": null,
+  "workload": "moderate",
+  "workload_basis": "Heavy reading and case prep, frequent pre-class surveys/assignments, take-home midterm, open-format final project; no coding.",
+  "career_tags": [
+   "people-decisions",
+   "strategy-consulting",
+   "communication"
+  ],
+  "technical_level": 1,
+  "grading": "25% participation, 35% take-home midterm, 40% final project (Personal Action Plan).",
+  "notes": "Discussion- and case-heavy with graded participation; two sections with identical content but different schedules; AI use allowed with disclosure.",
+  "department": "MGTA"
+ },
+ {
+  "id": "MGTA 460",
+  "code": "MGTA 460",
+  "title": "Business Analytics Project Management",
+  "units": 2,
+  "is_core": false,
+  "offerings": [
+   {
+    "term": "SP26",
+    "season": "SP",
+    "instructor": "Erat",
+    "format_notes": "Five sessions; pop-quiz every class."
+   }
+  ],
+  "description": "Focuses on leading analytics projects: designing and planning work, coordinating dispersed teams, managing senior-management expectations, and managing risk. Covers stage-gate processes, critical path and PERT scheduling, resource allocation, real options, modularity, and agile development, anchored by a team case building a Python simulation of uncertain project durations.",
+  "topics": [
+   "project planning",
+   "stage-gate processes",
+   "critical path method",
+   "PERT and uncertainty",
+   "schedule crashing and resource allocation",
+   "risk management and real options",
+   "agile development"
+  ],
+  "skills": [
+   "building project network representations",
+   "Monte Carlo simulation of project durations in Python",
+   "writing design documents",
+   "managing analytics project risk"
+  ],
+  "tools": [
+   "Python",
+   "Jupyter",
+   "Basecamp"
+  ],
+  "prerequisites": null,
+  "workload": "moderate",
+  "workload_basis": "Pop-quiz every class, two individual quizzes, two-part team case with code and design doc, final exam worth 40%.",
+  "career_tags": [
+   "operations",
+   "strategy-consulting",
+   "data-engineering"
+  ],
+  "technical_level": 3,
+  "grading": "10% pop-quizzes, 30% team case (write-up + code), 40% final exam, 20% individual quizzes.",
+  "notes": "Attendance effectively mandatory (missed class forfeits pop-quiz credit); team deliverable is a reusable Jupyter Monte-Carlo tool.",
+  "department": "MGTA"
+ },
+ {
+  "id": "MGTA 463",
+  "code": "MGTA 463",
+  "title": "Fraud Analytics",
+  "units": 4,
+  "is_core": false,
+  "offerings": [
+   {
+    "term": "SP26",
+    "season": "SP",
+    "instructor": "Coggeshall",
+    "format_notes": "Fully online (no physical classroom); no exams."
+   }
+  ],
+  "description": "Teaches building statistical and machine learning models to detect fraud: raw data analysis and cleaning, expert feature engineering, algorithm selection, and model evaluation. Real-world supervised and unsupervised problems include credit card transaction fraud, NY property tax anomalies, and application identity fraud.",
+  "topics": [
+   "modes of fraud",
+   "data quality reports",
+   "feature engineering",
+   "supervised vs. unsupervised fraud models",
+   "ML algorithms (trees, random forests, boosting, neural nets)",
+   "model evaluation",
+   "fuzzy matching and linking"
+  ],
+  "skills": [
+   "end-to-end fraud detection pipelines in Python",
+   "cleaning and profiling large dirty datasets",
+   "feature engineering for fraud",
+   "anomaly detection on unlabeled data",
+   "writing professional business reports"
+  ],
+  "tools": [
+   "Python"
+  ],
+  "prerequisites": "Good background in math and statistics and working ability in Python.",
+  "workload": "heavy",
+  "workload_basis": "Ten individual homework assignments with weekly deadlines, including three substantial report-based projects on real datasets.",
+  "career_tags": [
+   "fraud-risk",
+   "machine-learning",
+   "finance"
+  ],
+  "technical_level": 5,
+  "grading": "10 homeworks (130 pts) plus participation (10 pts); curved (roughly half As).",
+  "notes": "Taught online by an industry fraud-analytics practitioner; real datasets; no exams; curved grading.",
+  "department": "MGTA"
+ },
+ {
+  "id": "MGTA 464",
+  "code": "MGTA 464",
+  "title": "SQL and ETL",
+  "units": 2,
+  "units_note": "Catalog lists 2-4 depending on offering.",
+  "is_core": false,
+  "offerings": [
+   {
+    "term": "SU25",
+    "season": "SU",
+    "instructor": "Perols",
+    "format_notes": "Mixed remote and in-person Saturday morning sessions; proctored skills test each class; advanced SQL through window functions and recursive CTEs; ETL case with Python + Snowflake."
+   },
+   {
+    "term": "SU26",
+    "season": "SU",
+    "instructor": "August",
+    "format_notes": "Quiz-heavy format with proctored in-class quizzes; ETL case project."
+   }
+  ],
+  "description": "Foundational course on working with data in relational databases using SQL and on building Extract, Transform, Load (ETL) workflows. Progresses from database concepts through complex querying (joins, subqueries, aggregations, CTEs, window functions) to ETL pipelines producing analysis-ready datasets, ending with an ETL case project.",
+  "topics": [
+   "relational databases",
+   "SQL querying",
+   "joins and subqueries",
+   "aggregations",
+   "common table expressions",
+   "window functions",
+   "ETL workflows",
+   "data pipelines"
+  ],
+  "skills": [
+   "writing SQL of increasing complexity",
+   "window functions",
+   "regex and fuzzy matching",
+   "designing ETL workflows",
+   "loading and transforming data in Snowflake",
+   "building reproducible data workflows"
+  ],
+  "tools": [
+   "SQL",
+   "PostgreSQL",
+   "Python",
+   "Snowflake"
+  ],
+  "prerequisites": null,
+  "workload": "moderate",
+  "workload_basis": "Proctored SQL quizzes/skills tests most sessions plus a group ETL project.",
+  "career_tags": [
+   "data-engineering",
+   "operations",
+   "finance",
+   "strategy-consulting"
+  ],
+  "technical_level": 3,
+  "grading": "Mostly proctored quizzes/tests (70-90%) plus ETL group project.",
+  "notes": "Highly test-based grading; strong foundation for any data-engineering-leaning role.",
+  "department": "MGTA"
+ },
+ {
+  "id": "MGTA 466",
+  "code": "MGTA 466",
+  "title": "Scalable Analytics",
+  "units": 2,
+  "units_note": "Catalog lists 2; weekly programming assignments make it feel bigger.",
+  "is_core": false,
+  "offerings": [
+   {
+    "term": "WI26",
+    "season": "WI",
+    "instructor": "Nguyen"
+   }
+  ],
+  "description": "Performing analytics at scale on big data: computer systems and parallelism fundamentals, distributed processing with Hadoop and Spark, and cloud-based analytics on AWS. Hands-on weekly programming assignments in PySpark and Python, including machine learning with Spark MLlib, Amazon EMR, and SageMaker.",
+  "topics": [
+   "parallelism and computer systems",
+   "Hadoop",
+   "Spark",
+   "machine learning with Spark MLlib",
+   "cloud computing",
+   "Amazon EMR",
+   "Amazon SageMaker"
+  ],
+  "skills": [
+   "distributed data processing in PySpark",
+   "building analytics models on big data",
+   "using cloud platforms for scalable analytics"
+  ],
+  "tools": [
+   "Python",
+   "PySpark",
+   "Apache Spark",
+   "Hadoop",
+   "AWS",
+   "Amazon EMR",
+   "Amazon SageMaker"
+  ],
+  "prerequisites": "Solid Python programming experience required (all assignments in PySpark/Python).",
+  "workload": "heavy",
+  "workload_basis": "A programming assignment every week (80% of grade) plus four strict closed-book quizzes.",
+  "career_tags": [
+   "data-engineering",
+   "machine-learning"
+  ],
+  "technical_level": 5,
+  "grading": "80% weekly programming assignments, 20% quizzes.",
+  "notes": "Strictly individual assignments; closed-book quizzes with no AI/notes; strong signal for data engineering roles.",
+  "department": "MGTA"
+ },
+ {
+  "id": "MGTA 479",
+  "code": "MGTA 479",
+  "title": "Pricing Analytics",
+  "units": 4,
+  "is_core": false,
+  "offerings": [
+   {
+    "term": "WI26",
+    "season": "WI",
+    "instructor": "Faltings"
+   }
+  ],
+  "description": "A heavily quantitative, hands-on course treating pricing as the intersection of economics, strategy, and data science. Covers value pricing, demand estimation from surveys, experiments, and field data, price discrimination, bundling, and subscriptions, applied to real managerial data with a team pricing-strategy project for an actual product or business.",
+  "topics": [
+   "value pricing",
+   "demand estimation",
+   "survey methods",
+   "pricing experiments",
+   "price discrimination",
+   "bundling and subscriptions",
+   "sales promotions"
+  ],
+  "skills": [
+   "quantifying customer value",
+   "estimating demand and setting optimal prices",
+   "analyzing pricing data in Python",
+   "designing a data-driven pricing strategy",
+   "presenting pricing recommendations"
+  ],
+  "tools": [
+   "Python"
+  ],
+  "prerequisites": "Statistics and regression knowledge expected; no prior economics needed.",
+  "workload": "moderate",
+  "workload_basis": "Five short homeworks, in-class midterm, and a substantial team project worth half the grade.",
+  "career_tags": [
+   "pricing",
+   "marketing",
+   "strategy-consulting"
+  ],
+  "technical_level": 3,
+  "grading": "10% homework, 10% attendance/participation, 30% midterm, 50% team project.",
+  "notes": "Team project (2-4 people) with week-10 presentations; human-in-the-loop AI use encouraged.",
+  "department": "MGTA"
+ },
+ {
+  "id": "MGTA 495-GENAI",
+  "code": "MGTA 495",
+  "title": "Special Topics: GenAI for Business",
+  "units": 4,
+  "units_note": "Catalog lists 2-4; quarter-long course.",
+  "is_core": false,
+  "offerings": [
+   {
+    "term": "SP26",
+    "season": "SP",
+    "instructor": "Nijs, Teixeira",
+    "format_notes": "Co-taught; includes guest lectures and optional Monday work sessions."
+   }
+  ],
+  "description": "A practical course on leveraging Generative AI to create business value: when and how to integrate GenAI into business processes and decision-making. Centerpiece is a quarter-long group project building an 'AI-coworker' prototype that automates a real business process, supported by modules on prompt engineering, RAG, tool use/MCP, and agent systems.",
+  "topics": [
+   "GenAI for data generation and analysis",
+   "prompt engineering",
+   "retrieval augmented generation",
+   "tool use and MCP",
+   "single and multi-agent systems",
+   "business process automation"
+  ],
+  "skills": [
+   "identifying where GenAI adds value",
+   "building working GenAI prototypes",
+   "prompt engineering",
+   "communicating AI capabilities to stakeholders"
+  ],
+  "tools": [
+   "Claude Code",
+   "N8N",
+   "VS Code",
+   "ChatGPT",
+   "GitHub Copilot"
+  ],
+  "prerequisites": "No programming experience required.",
+  "workload": "moderate",
+  "workload_basis": "Quarter-long group project with milestones, individual assignments, and weekly TODOs.",
+  "career_tags": [
+   "ai-genai",
+   "strategy-consulting",
+   "product",
+   "communication"
+  ],
+  "technical_level": 2,
+  "grading": "50% group project, 20% individual assignments, 30% participation.",
+  "notes": "Attendance-sensitive (absent/late more than once lowers participation grade); peer evaluations required.",
+  "department": "MGTA"
+ },
+ {
+  "id": "MGTA 495-HC",
+  "code": "MGTA 495",
+  "title": "Special Topics: Healthcare Analytics",
+  "units": 2,
+  "is_core": false,
+  "offerings": [
+   {
+    "term": "SP26",
+    "season": "SP",
+    "instructor": "Kazemian",
+    "format_notes": "Compressed 5-week course; missing more than 2 of 5 sessions results in an F."
+   }
+  ],
+  "description": "A rigorous introduction to healthcare decision modeling centered on cost-effectiveness analysis for evaluating competing health interventions. Covers deterministic and probabilistic sensitivity analysis and Markov cohort and microsimulation models of disease progression, applied to a project on type 2 diabetes medications.",
+  "topics": [
+   "cost-effectiveness analysis",
+   "ICER",
+   "sensitivity analysis",
+   "Markov cohort models",
+   "microsimulation",
+   "valuing health outcomes"
+  ],
+  "skills": [
+   "building healthcare decision models",
+   "cost-effectiveness evaluation under uncertainty",
+   "Markov and microsimulation modeling"
+  ],
+  "tools": [
+   "TreeAge Pro"
+  ],
+  "prerequisites": "MGTA 453 or knowledge of probability and statistics.",
+  "workload": "light",
+  "workload_basis": "Two homework assignments and a group project over 5 weeks; no exams.",
+  "career_tags": [
+   "healthcare",
+   "operations",
+   "strategy-consulting"
+  ],
+  "technical_level": 3,
+  "grading": "40% homework, 20% attendance/participation, 40% group project.",
+  "notes": "Strict mandatory attendance; niche but valuable for healthcare-focused careers.",
+  "department": "MGTA"
+ },
+ {
+  "id": "MGTA 495-MKTG",
+  "code": "MGTA 495",
+  "title": "Special Topics: Marketing Analytics",
+  "units": 4,
+  "units_note": "Catalog lists 2-4; quarter-long course.",
+  "is_core": false,
+  "offerings": [
+   {
+    "term": "SP26",
+    "season": "SP",
+    "instructor": "Yavorsky",
+    "format_notes": "Taught by Head of Analytics at GBK Collective (ex-Bain); no exams."
+   }
+  ],
+  "description": "Develops technical, statistical, and communication skills for analytically-based consumer insights. Five topics \u2014 experimentation/causal inference, preference measurement via maximum likelihood, conjoint-based pricing with Bayesian methods, segmentation via unsupervised learning, and driver analysis via supervised learning \u2014 implemented 'by hand' in code and published as blog posts on a student-built portfolio website.",
+  "topics": [
+   "A/B testing and causal inference",
+   "regression discontinuity and diff-in-diff",
+   "maximum likelihood and logit models",
+   "conjoint analysis and Bayesian pricing",
+   "customer segmentation",
+   "variable importance and Shapley values",
+   "cross-validation"
+  ],
+  "skills": [
+   "implementing statistical methods from scratch",
+   "designing and analyzing experiments",
+   "estimating consumer preferences",
+   "optimal pricing via conjoint",
+   "communicating results as blog posts",
+   "building a portfolio website with Quarto and Git"
+  ],
+  "tools": [
+   "R",
+   "Python",
+   "Quarto",
+   "Git"
+  ],
+  "prerequisites": null,
+  "workload": "moderate",
+  "workload_basis": "Five substantial coding problem sets (~18% each) submitted as website blog posts; no exams; collaboration allowed.",
+  "career_tags": [
+   "marketing",
+   "pricing",
+   "machine-learning",
+   "communication",
+   "strategy-consulting"
+  ],
+  "technical_level": 4,
+  "grading": "Five assignments ~90%, engagement and website quality ~10%; no exams.",
+  "notes": "You leave with a public portfolio website of your coursework \u2014 a real asset for job searches.",
+  "department": "MGTA"
+ },
+ {
+  "id": "MGTA 495-AIPA",
+  "code": "MGTA 495",
+  "title": "Special Topics: AI & Prescriptive Analytics",
+  "units": 4,
+  "units_note": "Catalog lists 2-4; full 10-week course.",
+  "is_core": false,
+  "offerings": [
+   {
+    "term": "WI26",
+    "season": "WI",
+    "instructor": "Kazemian",
+    "format_notes": "Mandatory attendance: missing more than 3 classes results in an F."
+   }
+  ],
+  "description": "An integrated introduction to AI and prescriptive analytics: first half covers deep learning (MLPs, CNNs, RNNs/LSTMs, transformers, NLP, LLMs) plus interpretability and bias; second half covers discrete-event simulation, mixed-integer programming, and dynamic programming for data-driven decisions. Hands-on Python labs apply methods to operations, finance, and healthcare.",
+  "topics": [
+   "deep neural networks",
+   "computer vision with CNNs",
+   "NLP and LLMs",
+   "explainable AI and bias",
+   "discrete-event simulation",
+   "mixed-integer programming",
+   "dynamic programming"
+  ],
+  "skills": [
+   "building deep learning models",
+   "evaluating AI fairness and interpretability",
+   "simulation modeling with SimPy",
+   "solving MIP problems with DOcplex",
+   "sequential decision problems"
+  ],
+  "tools": [
+   "Python",
+   "SimPy",
+   "DOcplex"
+  ],
+  "prerequisites": null,
+  "workload": "heavy",
+  "workload_basis": "Five homework assignments plus take-home midterm and final exam over 10 weeks, with mandatory attendance.",
+  "career_tags": [
+   "ai-genai",
+   "machine-learning",
+   "operations",
+   "healthcare",
+   "finance"
+  ],
+  "technical_level": 4,
+  "grading": "30% homework, 20% attendance/participation, 20% take-home midterm, 30% final exam.",
+  "notes": "Bridges predictive AI and prescriptive optimization \u2014 rare combination in one course.",
+  "department": "MGTA"
+ },
+ {
+  "id": "MGTA 461",
+  "code": "MGTA 461",
+  "title": "Web Mining and Recommender Systems (cross-listed CSE 258)",
+  "units": 4,
+  "is_core": false,
+  "department": "MGTA",
+  "offerings": [
+   {
+    "term": "varies",
+    "season": "FA",
+    "instructor": null,
+    "format_notes": "Offering term varies by year \u2014 confirm on the UCSD Schedule of Classes."
+   },
+   {
+    "term": "varies",
+    "season": "WI",
+    "instructor": null,
+    "format_notes": "Offering term varies by year \u2014 confirm on the UCSD Schedule of Classes."
+   },
+   {
+    "term": "varies",
+    "season": "SP",
+    "instructor": null,
+    "format_notes": "Offering term varies by year \u2014 confirm on the UCSD Schedule of Classes."
+   }
+  ],
+  "description": "Current methods for data mining and predictive analytics with emphasis on real-world datasets and building working systems: recommender systems, web mining, and putting current machine learning research into practice.",
+  "topics": [
+   "recommender systems",
+   "web mining",
+   "collaborative filtering",
+   "predictive analytics",
+   "real-world datasets"
+  ],
+  "skills": [
+   "building recommender systems",
+   "large-scale data mining",
+   "applied machine learning engineering"
+  ],
+  "tools": [
+   "Python"
+  ],
+  "prerequisites": "Comfortable programming and machine learning fundamentals.",
+  "workload": "heavy",
+  "workload_basis": "Programming-assignment and project driven CSE-style course.",
+  "career_tags": [
+   "machine-learning",
+   "data-engineering",
+   "product"
+  ],
+  "technical_level": 5,
+  "grading": "See department syllabus.",
+  "notes": "Cross-listed with CSE 258 \u2014 counts as an MGTA elective (not against the 16-unit non-MGTA cap). Taught in the CSE department style: expect substantial coding."
+ },
+ {
+  "id": "CSE 251A",
+  "code": "CSE 251A",
+  "title": "Machine Learning: Learning Algorithms",
+  "units": 4,
+  "is_core": false,
+  "department": "CSE",
+  "offerings": [
+   {
+    "term": "varies",
+    "season": "FA",
+    "instructor": null,
+    "format_notes": "Offering term varies by year \u2014 confirm on the UCSD Schedule of Classes."
+   },
+   {
+    "term": "varies",
+    "season": "WI",
+    "instructor": null,
+    "format_notes": "Offering term varies by year \u2014 confirm on the UCSD Schedule of Classes."
+   },
+   {
+    "term": "varies",
+    "season": "SP",
+    "instructor": null,
+    "format_notes": "Offering term varies by year \u2014 confirm on the UCSD Schedule of Classes."
+   }
+  ],
+  "description": "Algorithms for supervised and unsupervised learning from data: maximum likelihood, log-linear models including logistic regression, nearest neighbor methods, kernel methods, decision trees, ensemble methods, optimization, topic models, neural networks, and backpropagation.",
+  "topics": [
+   "supervised learning",
+   "logistic regression",
+   "kernel methods",
+   "decision trees",
+   "ensemble methods",
+   "neural networks",
+   "optimization"
+  ],
+  "skills": [
+   "rigorous ML theory and implementation",
+   "deriving and implementing learning algorithms"
+  ],
+  "tools": [
+   "Python"
+  ],
+  "prerequisites": "Graduate standing; strong math (linear algebra, probability) strongly advised.",
+  "workload": "heavy",
+  "workload_basis": "Graduate CSE problem sets and exams; mathematically demanding.",
+  "career_tags": [
+   "machine-learning",
+   "data-engineering"
+  ],
+  "technical_level": 5,
+  "grading": "See department syllabus.",
+  "notes": "Pre-approved MSBA elective (listed by Rady as CSE 250B, renumbered to 251A). CSE majors have priority; enroll as space permits."
+ },
+ {
+  "id": "CSE 251B",
+  "code": "CSE 251B",
+  "title": "Deep Learning",
+  "units": 4,
+  "is_core": false,
+  "department": "CSE",
+  "offerings": [
+   {
+    "term": "varies",
+    "season": "FA",
+    "instructor": null,
+    "format_notes": "Offering term varies by year \u2014 confirm on the UCSD Schedule of Classes."
+   },
+   {
+    "term": "varies",
+    "season": "WI",
+    "instructor": null,
+    "format_notes": "Offering term varies by year \u2014 confirm on the UCSD Schedule of Classes."
+   },
+   {
+    "term": "varies",
+    "season": "SP",
+    "instructor": null,
+    "format_notes": "Offering term varies by year \u2014 confirm on the UCSD Schedule of Classes."
+   }
+  ],
+  "description": "Fundamentals of deep neural networks at the graduate level: multi-layer perceptrons, backpropagation, automatic differentiation, convolutional networks, recurrent networks, transformers, and advanced deep learning topics.",
+  "topics": [
+   "multi-layer perceptrons",
+   "backpropagation",
+   "CNNs",
+   "RNNs",
+   "transformers",
+   "automatic differentiation"
+  ],
+  "skills": [
+   "building and training deep neural networks",
+   "modern architectures (CNNs, transformers)"
+  ],
+  "tools": [
+   "Python",
+   "PyTorch"
+  ],
+  "prerequisites": "CSE 251A (or equivalent ML background).",
+  "workload": "heavy",
+  "workload_basis": "Graduate CSE programming projects; mathematically demanding.",
+  "career_tags": [
+   "machine-learning",
+   "ai-genai"
+  ],
+  "technical_level": 5,
+  "grading": "See department syllabus.",
+  "notes": "Successor to the old 'Neural Networks for Pattern Recognition' (CSE 253) on Rady's pre-approved list. CSE majors have priority; enroll as space permits."
+ },
+ {
+  "id": "CSE 254",
+  "code": "CSE 254",
+  "title": "Statistical Learning",
+  "units": 4,
+  "is_core": false,
+  "department": "CSE",
+  "offerings": [
+   {
+    "term": "varies",
+    "season": "FA",
+    "instructor": null,
+    "format_notes": "Offering term varies by year \u2014 confirm on the UCSD Schedule of Classes."
+   },
+   {
+    "term": "varies",
+    "season": "WI",
+    "instructor": null,
+    "format_notes": "Offering term varies by year \u2014 confirm on the UCSD Schedule of Classes."
+   },
+   {
+    "term": "varies",
+    "season": "SP",
+    "instructor": null,
+    "format_notes": "Offering term varies by year \u2014 confirm on the UCSD Schedule of Classes."
+   }
+  ],
+  "description": "Learning algorithms based on statistics: minimum-variance unbiased estimators, maximum likelihood estimation, likelihood ratio tests, resampling methods, linear logistic regression, feature selection, regularization, dimensionality reduction, manifold detection.",
+  "topics": [
+   "estimation theory",
+   "maximum likelihood",
+   "resampling",
+   "regularization",
+   "dimensionality reduction",
+   "feature selection"
+  ],
+  "skills": [
+   "statistical foundations of machine learning",
+   "rigorous model selection"
+  ],
+  "tools": [
+   "Python"
+  ],
+  "prerequisites": "Graduate standing or consent of instructor; strong statistics background advised.",
+  "workload": "heavy",
+  "workload_basis": "Graduate CSE theory-oriented coursework.",
+  "career_tags": [
+   "machine-learning"
+  ],
+  "technical_level": 5,
+  "grading": "See department syllabus.",
+  "notes": "Pre-approved MSBA elective. CSE majors have priority; enroll as space permits."
+ },
+ {
+  "id": "CSE 256",
+  "code": "CSE 256",
+  "title": "Statistical Natural Language Processing",
+  "units": 4,
+  "is_core": false,
+  "department": "CSE",
+  "offerings": [
+   {
+    "term": "varies",
+    "season": "FA",
+    "instructor": null,
+    "format_notes": "Offering term varies by year \u2014 confirm on the UCSD Schedule of Classes."
+   },
+   {
+    "term": "varies",
+    "season": "WI",
+    "instructor": null,
+    "format_notes": "Offering term varies by year \u2014 confirm on the UCSD Schedule of Classes."
+   },
+   {
+    "term": "varies",
+    "season": "SP",
+    "instructor": null,
+    "format_notes": "Offering term varies by year \u2014 confirm on the UCSD Schedule of Classes."
+   }
+  ],
+  "description": "Modern statistical approaches to natural language processing: part-of-speech tagging, word sense disambiguation, parsing, Markov and hidden Markov models, and probabilistic context-free grammars.",
+  "topics": [
+   "POS tagging",
+   "parsing",
+   "hidden Markov models",
+   "probabilistic grammars",
+   "statistical NLP"
+  ],
+  "skills": [
+   "building NLP pipelines from statistical foundations",
+   "language model fundamentals"
+  ],
+  "tools": [
+   "Python"
+  ],
+  "prerequisites": "Graduate standing or consent of instructor.",
+  "workload": "heavy",
+  "workload_basis": "Graduate CSE problem sets and projects.",
+  "career_tags": [
+   "machine-learning",
+   "ai-genai"
+  ],
+  "technical_level": 5,
+  "grading": "See department syllabus.",
+  "notes": "Pre-approved MSBA elective; deeper theoretical complement to MGTA 415. CSE majors have priority; enroll as space permits."
+ },
+ {
+  "id": "MGT 451",
+  "code": "MGT 451",
+  "title": "Technology and Innovation Strategy",
+  "units": 4,
+  "is_core": false,
+  "department": "MGT",
+  "offerings": [
+   {
+    "term": "varies",
+    "season": "FA",
+    "instructor": null,
+    "format_notes": "Offering term varies by year \u2014 confirm on the UCSD Schedule of Classes."
+   },
+   {
+    "term": "varies",
+    "season": "WI",
+    "instructor": null,
+    "format_notes": "Offering term varies by year \u2014 confirm on the UCSD Schedule of Classes."
+   },
+   {
+    "term": "varies",
+    "season": "SP",
+    "instructor": null,
+    "format_notes": "Offering term varies by year \u2014 confirm on the UCSD Schedule of Classes."
+   }
+  ],
+  "description": "MBA elective on strategy for technology-driven businesses: how firms create and capture value from innovation, platform and ecosystem dynamics, and competitive strategy in technology markets.",
+  "topics": [
+   "innovation strategy",
+   "platform competition",
+   "technology adoption",
+   "value capture",
+   "ecosystem strategy"
+  ],
+  "skills": [
+   "strategic analysis of technology markets",
+   "framing product and platform strategy"
+  ],
+  "tools": [],
+  "prerequisites": "MBA program admission or consent of instructor.",
+  "workload": "moderate",
+  "workload_basis": "MBA case-discussion course.",
+  "career_tags": [
+   "product",
+   "strategy-consulting"
+  ],
+  "technical_level": 1,
+  "grading": "See department syllabus.",
+  "notes": "Pre-approved MSBA elective (MBA course \u2014 enrollment by consent). Highly relevant for product management careers."
+ },
+ {
+  "id": "MGT 477",
+  "code": "MGT 477",
+  "title": "Consumer Behavior",
+  "units": 4,
+  "is_core": false,
+  "department": "MGT",
+  "offerings": [
+   {
+    "term": "varies",
+    "season": "FA",
+    "instructor": null,
+    "format_notes": "Offering term varies by year \u2014 confirm on the UCSD Schedule of Classes."
+   },
+   {
+    "term": "varies",
+    "season": "WI",
+    "instructor": null,
+    "format_notes": "Offering term varies by year \u2014 confirm on the UCSD Schedule of Classes."
+   },
+   {
+    "term": "varies",
+    "season": "SP",
+    "instructor": null,
+    "format_notes": "Offering term varies by year \u2014 confirm on the UCSD Schedule of Classes."
+   }
+  ],
+  "description": "MBA elective on how consumers perceive, decide, and buy: psychological foundations of consumer decision-making and their implications for marketing strategy, brand, and product design.",
+  "topics": [
+   "consumer psychology",
+   "judgment and choice",
+   "branding",
+   "persuasion",
+   "customer insight"
+  ],
+  "skills": [
+   "translating consumer psychology into marketing and product decisions"
+  ],
+  "tools": [],
+  "prerequisites": "MBA program admission or consent of instructor.",
+  "workload": "moderate",
+  "workload_basis": "MBA case-discussion course.",
+  "career_tags": [
+   "marketing",
+   "product",
+   "people-decisions"
+  ],
+  "technical_level": 1,
+  "grading": "See department syllabus.",
+  "notes": "Pre-approved MSBA elective (MBA course \u2014 enrollment by consent). Pairs well with experiments (MGTA 458) for PM/marketing careers."
+ },
+ {
+  "id": "MGTF 405",
+  "code": "MGTF 405",
+  "title": "Business Forecasting",
+  "units": 4,
+  "is_core": false,
+  "department": "MGTF",
+  "offerings": [
+   {
+    "term": "varies",
+    "season": "FA",
+    "instructor": null,
+    "format_notes": "Offering term varies by year \u2014 confirm on the UCSD Schedule of Classes."
+   },
+   {
+    "term": "varies",
+    "season": "WI",
+    "instructor": null,
+    "format_notes": "Offering term varies by year \u2014 confirm on the UCSD Schedule of Classes."
+   },
+   {
+    "term": "varies",
+    "season": "SP",
+    "instructor": null,
+    "format_notes": "Offering term varies by year \u2014 confirm on the UCSD Schedule of Classes."
+   }
+  ],
+  "description": "Master of Finance course on forecasting for business and financial decisions: time-series methods, forecast evaluation, and applications to financial and economic data.",
+  "topics": [
+   "time-series analysis",
+   "forecasting models",
+   "forecast evaluation",
+   "financial data"
+  ],
+  "skills": [
+   "building and evaluating forecasting models for finance"
+  ],
+  "tools": [
+   "R",
+   "Python"
+  ],
+  "prerequisites": "Restricted to MFin/MBA or by consent of instructor.",
+  "workload": "heavy",
+  "workload_basis": "Quantitative MFin coursework; letter grades only.",
+  "career_tags": [
+   "finance",
+   "machine-learning"
+  ],
+  "technical_level": 4,
+  "grading": "See department syllabus.",
+  "notes": "Pre-approved MSBA elective (MFin course \u2014 enrollment by consent)."
+ },
+ {
+  "id": "MGTF 406",
+  "code": "MGTF 406",
+  "title": "Behavioral Finance",
+  "units": 4,
+  "is_core": false,
+  "department": "MGTF",
+  "offerings": [
+   {
+    "term": "varies",
+    "season": "FA",
+    "instructor": null,
+    "format_notes": "Offering term varies by year \u2014 confirm on the UCSD Schedule of Classes."
+   },
+   {
+    "term": "varies",
+    "season": "WI",
+    "instructor": null,
+    "format_notes": "Offering term varies by year \u2014 confirm on the UCSD Schedule of Classes."
+   },
+   {
+    "term": "varies",
+    "season": "SP",
+    "instructor": null,
+    "format_notes": "Offering term varies by year \u2014 confirm on the UCSD Schedule of Classes."
+   }
+  ],
+  "description": "Master of Finance course on how psychology shapes financial markets and investor behavior: biases, market anomalies, and behavioral explanations for asset-pricing puzzles.",
+  "topics": [
+   "investor psychology",
+   "market anomalies",
+   "biases in financial decisions",
+   "behavioral asset pricing"
+  ],
+  "skills": [
+   "applying behavioral insights to investment and financial decisions"
+  ],
+  "tools": [],
+  "prerequisites": "Letter grades only; MFin course.",
+  "workload": "moderate",
+  "workload_basis": "MFin lecture/case coursework.",
+  "career_tags": [
+   "finance",
+   "people-decisions"
+  ],
+  "technical_level": 2,
+  "grading": "See department syllabus.",
+  "notes": "Pre-approved MSBA elective (MFin course \u2014 enrollment by consent)."
+ }
+]
