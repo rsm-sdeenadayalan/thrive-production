@@ -34,8 +34,10 @@ describe("write providers", () => {
 
   it("bookAppointment translates 409 and slot_unknown into SlotUnavailableError", async () => {
     stubFetch(409, { error: { code: "slot_unavailable", message: "That time was just taken. Pick another." } });
+    const attempt409 = runWithAuth(AUTH, () => api.bookAppointment("s1", "r"));
+    await expect(attempt409).rejects.toThrow(SlotUnavailableError);
     await expect(runWithAuth(AUTH, () => api.bookAppointment("s1", "r")))
-      .rejects.toThrow(SlotUnavailableError);
+      .rejects.toThrow("That time was just taken. Pick another.");
 
     stubFetch(404, { error: { code: "slot_unknown", message: "That time is no longer listed." } });
     const attempt = runWithAuth(AUTH, () => api.bookAppointment("s1", "r"));
