@@ -9,6 +9,7 @@ from .degree import (  # noqa: F401
     DegreeGap, DegreeRequirement, ProgramPhaseRow,
 )
 from .events import Event  # noqa: F401
+from .jobs import JobPosting, MatchReport  # noqa: F401
 from .knowledge import Document, DocumentChunk  # noqa: F401
 from .overlay import (  # noqa: F401
     CalendarPrefs, EventJoin, IgnoredEvent, SharedTask, StudentTask, TaskNote,
