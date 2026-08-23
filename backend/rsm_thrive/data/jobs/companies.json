@@ -7,7 +7,6 @@
     {"board": "instacart", "company": "Instacart"}
   ],
   "lever": [
-    {"slug": "netflix", "company": "Netflix"},
     {"slug": "spotify", "company": "Spotify"},
     {"slug": "plaid", "company": "Plaid"}
   ]
