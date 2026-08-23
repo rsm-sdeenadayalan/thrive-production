@@ -83,7 +83,9 @@ def answer_electives(llm, user, question, history):
 
     roles = [r for r in (envelope.get("career_roles") or []) if r in careers]
     if not envelope.get("ready") or not roles:
-        return BotReply(envelope.get("reply") or CLARIFY_FALLBACK, [], "clarify")
+        reply = envelope.get("reply")
+        is_usable = isinstance(reply, str) and reply.strip()
+        return BotReply(reply if is_usable else CLARIFY_FALLBACK, [], "clarify")
 
     interests = [i for i in (envelope.get("interests") or []) if isinstance(i, str)]
     ranked = recommend_for(user, roles, interests,

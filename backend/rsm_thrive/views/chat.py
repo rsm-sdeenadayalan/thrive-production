@@ -40,19 +40,19 @@ def _history_of(conversation):
     ]
 
 
-def _run_bot(user, destination, question, history):
+def _run_bot(conversation, destination, question, history):
     started = time.monotonic()
     try:
         llm = llm_factory()
         if destination == "courses":
-            reply = answer_electives(llm, user, question, history)
+            reply = answer_electives(llm, conversation.user, question, history)
         elif destination == "career":
             reply = answer_career(llm, question, history)
         else:
             reply = answer_faq(llm, question, history)
     except Exception:
         logger.exception("bot turn failed (conversation=%s, destination=%s)",
-                         getattr(user, "pk", None), destination)
+                         conversation.pk, destination)
         reply = BotReply(DEGRADED_REPLY, [], "degraded")
     duration_ms = int((time.monotonic() - started) * 1000)
     return reply, duration_ms
@@ -70,7 +70,7 @@ def _append_turn(conversation, destination, question):
         ChatMessage.objects.create(conversation=conversation, role="student",
                                    body=question)
 
-    reply, duration_ms = _run_bot(conversation.user, destination, question, history)
+    reply, duration_ms = _run_bot(conversation, destination, question, history)
 
     with transaction.atomic():
         assistant = ChatMessage.objects.create(conversation=conversation,
@@ -118,6 +118,7 @@ def _own_conversation(user, conversation_id):
 
 
 @api_login_required
+@require_http_methods(["GET"])
 def conversation(request, conversation_id):
     row = _own_conversation(request.user, conversation_id)
     if row is None:

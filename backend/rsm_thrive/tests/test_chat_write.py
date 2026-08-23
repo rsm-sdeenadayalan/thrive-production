@@ -140,3 +140,8 @@ class TestMethodGuards:
     def test_get_list_still_works_and_delete_is_405(self, client, student):
         assert client.get("/api/thrive/conversations").status_code == 200
         assert client.delete("/api/thrive/conversations").status_code == 405
+
+    def test_conversation_detail_delete_is_405(self, client, student):
+        conv = Conversation.objects.create(user=student, destination="career",
+                                           title="t")
+        assert client.delete(f"/api/thrive/conversations/conv-{conv.pk}").status_code == 405

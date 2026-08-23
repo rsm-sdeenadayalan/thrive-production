@@ -41,12 +41,20 @@ ingested the same way, locally and on the server.
 Run the golden FAQ eval against whatever corpus is ingested:
 
 ```bash
-uv run python manage.py eval_bots --llm fake   # deterministic, no API key
-uv run python manage.py eval_bots --llm real    # needs GEMINI_API_KEY
+THRIVE_LLM=fake uv run python manage.py eval_bots --llm fake   # deterministic, no API key
+uv run python manage.py eval_bots --llm real                   # needs GEMINI_API_KEY
 ```
+
+`THRIVE_LLM=fake` is required alongside `--llm fake`: without it, retrieval
+still instantiates `GeminiEmbeddings` and needs an API key, even though the
+bot's own LLM calls are faked.
 
 It prints `PASS`/`FAIL` per case in `rsm_thrive/data/evals/faq_golden.json`
 with the retrieved chunk ids, and exits non-zero on any regression — add
 cases to that file as the corpus grows. A `must_refuse: false` case that
 retrieves nothing fails as `no-retrieval`, which usually means the corpus is
-missing material rather than the bot misbehaving.
+missing material rather than the bot misbehaving. The shipped golden set is
+calibrated to a policy-only corpus (the seeded handbook fixture); run against
+a larger mixed corpus (e.g. the fixture plus `--catalog`) and fake-embedding
+retrieval dilutes, so several cases fail by design — run the eval against the
+corpus the goldens target, or grow/tune the goldens as the corpus grows.

@@ -3,7 +3,7 @@ import json
 import pytest
 from django.contrib.auth.models import User
 
-from rsm_thrive.services.bots import answer_electives
+from rsm_thrive.services.bots import CLARIFY_FALLBACK, answer_electives
 from rsm_thrive.services.llm import FakeLLM
 
 pytestmark = pytest.mark.django_db
@@ -56,3 +56,10 @@ class TestElectivesBot:
         fake = FakeLLM(replies=[_extract(False, [])])
         answer_electives(fake, user, "hi", [])
         assert "data-scientist" in fake.calls[0][0]
+
+    def test_non_string_reply_falls_back_to_clarify_copy(self, user):
+        fake = FakeLLM(replies=[json.dumps(
+            {"reply": {"x": 1}, "ready": False, "career_roles": []})])
+        reply = answer_electives(fake, user, "hello", [])
+        assert reply.model_note == "clarify"
+        assert reply.body == CLARIFY_FALLBACK

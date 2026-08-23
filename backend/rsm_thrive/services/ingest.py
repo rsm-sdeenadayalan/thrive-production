@@ -67,6 +67,14 @@ def extract_pdf_text(path):
 
 @transaction.atomic
 def ingest_document(source, title, kind, destinations, text, embeddings):
+    """Delete-and-recreate the document for `source`, then re-chunk and re-embed it.
+
+    Because this deletes and recreates rather than diffing in place, chunks get
+    new pks on every re-ingest. Any ChatTurnLog.chunk_ids recorded before a
+    re-ingest will dangle (referencing pks that no longer resolve to the
+    original chunk). Acceptable for v1; revisit when scheduled re-ingestion
+    lands.
+    """
     Document.objects.filter(source=source).delete()
     doc = Document.objects.create(source=source, title=title, kind=kind,
                                   destinations=destinations)
