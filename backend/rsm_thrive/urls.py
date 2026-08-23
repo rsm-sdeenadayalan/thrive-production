@@ -14,6 +14,8 @@ urlpatterns = [
     path("calendar-items/<str:item_key>/urgent", personal.item_urgent, name="calendar-item-urgent"),
     path("calendar-prefs", overlay.calendar_prefs, name="calendar-prefs"),
     path("conversations", chat.conversations, name="conversations"),
+    path("conversations/<str:conversation_id>/messages",
+         chat.conversation_messages, name="conversation_messages"),
     path("conversations/<str:conversation_id>", chat.conversation, name="conversation"),
     path("courses", courses.courses, name="courses"),
     path("custom-events/<str:key>", personal.custom_event, name="custom-event"),

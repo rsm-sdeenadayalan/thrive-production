@@ -1,9 +1,11 @@
 import datetime as dt
+import json
 
 import jsonschema
 import pytest
 from django.utils import timezone
 
+from rsm_thrive.services.llm import FakeLLM
 from rsm_thrive.services.requests import build_prefill
 from rsm_thrive.services.resume import generate_version
 from rsm_thrive.testing import (
@@ -13,6 +15,8 @@ from rsm_thrive.testing import (
     make_skill, make_slot, make_student, make_student_task, make_syllabus,
     set_assignment_status, set_override,
 )
+from rsm_thrive.views import chat as chat_views
+
 from . import schemas
 
 pytestmark = pytest.mark.django_db
@@ -98,3 +102,24 @@ def test_contract(world, client, path, schema, is_list):
             jsonschema.validate(item, schema)
     else:
         jsonschema.validate(body, schema)
+
+
+def test_create_conversation_contract(world, client, monkeypatch):
+    fake = FakeLLM(replies=["Keep it to one page."])
+    monkeypatch.setattr(chat_views, "llm_factory", lambda: fake)
+    resp = client.post("/api/thrive/conversations",
+                       json.dumps({"destination": "career", "body": "resume length?"}),
+                       content_type="application/json")
+    assert resp.status_code == 201
+    jsonschema.validate(resp.json(), schemas.CONVERSATION)
+
+
+def test_conversation_messages_contract(world, client, monkeypatch):
+    fake = FakeLLM(replies=["follow-up answer"])
+    monkeypatch.setattr(chat_views, "llm_factory", lambda: fake)
+    conv = make_conversation(world)
+    resp = client.post(f"/api/thrive/conversations/conv-{conv.pk}/messages",
+                       json.dumps({"body": "and a follow-up?"}),
+                       content_type="application/json")
+    assert resp.status_code == 200
+    jsonschema.validate(resp.json(), schemas.CONVERSATION)

@@ -4,7 +4,7 @@ from .academic import (  # noqa: F401
 from .appointments import (  # noqa: F401
     Advisor, Appointment, AppointmentNotification, AppointmentSlot,
 )
-from .chat import ChatMessage, Conversation  # noqa: F401
+from .chat import ChatMessage, ChatTurnLog, Conversation  # noqa: F401
 from .degree import (  # noqa: F401
     DegreeGap, DegreeRequirement, ProgramPhaseRow,
 )

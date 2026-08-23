@@ -24,3 +24,17 @@ class ChatMessage(models.Model):
 
     class Meta:
         ordering = ["sent_at", "pk"]
+
+
+class ChatTurnLog(models.Model):
+    """Provenance for one assistant turn: which bot, which chunks, how long.
+
+    The spec's diagnosability requirement: a wrong answer is traceable to the
+    exact retrieved chunks in one look.
+    """
+    message = models.OneToOneField(ChatMessage, on_delete=models.CASCADE,
+                                   related_name="turn_log")
+    bot = models.CharField(max_length=16)
+    model_note = models.CharField(max_length=32)
+    chunk_ids = models.JSONField(default=list)
+    duration_ms = models.IntegerField(default=0)
