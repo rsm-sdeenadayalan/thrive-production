@@ -31,6 +31,17 @@ class TestChunkText:
         chunks = chunk_text("intro line\n\n# H\n\nbody")
         assert chunks[0]["heading"] == "" and "intro" in chunks[0]["text"]
 
+    def test_single_oversized_paragraph_is_hard_wrapped(self):
+        # A single paragraph with no blank lines, longer than max_chars
+        para = "x" * 4000  # 4000 chars, well over default max_chars=1400
+        chunks = chunk_text("# Section\n\n" + para)
+        assert len(chunks) > 1
+        assert all(len(c["text"]) <= 1400 for c in chunks)
+        assert all(c["heading"] == "Section" for c in chunks)
+        # Verify no text is truncated: concatenation includes the final 50 chars
+        full_text = "".join(c["text"] for c in chunks)
+        assert full_text.endswith(para[-50:])
+
 
 class TestIngestDocument:
     def test_creates_chunks_with_embeddings(self):

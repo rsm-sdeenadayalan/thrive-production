@@ -33,10 +33,26 @@ def chunk_text(text, max_chars=1400, overlap=200):
         paragraphs = [p for p in re.split(r"\n\s*\n", body) if p.strip()]
         piece = ""
         for paragraph in paragraphs:
-            if piece and len(piece) + 2 + len(paragraph) > max_chars:
-                chunks.append({"heading": heading, "text": piece[:max_chars]})
-                piece = piece[-overlap:]
-            piece = (piece + "\n\n" + paragraph).strip() if piece else paragraph
+            # If paragraph itself exceeds max_chars, hard-wrap it
+            if len(paragraph) > max_chars:
+                # Flush any accumulated piece first
+                if piece:
+                    chunks.append({"heading": heading, "text": piece[:max_chars]})
+                    piece = ""
+                # Hard-wrap the oversized paragraph with overlap
+                pos = 0
+                while pos < len(paragraph):
+                    chunk_end = min(pos + max_chars, len(paragraph))
+                    chunks.append({"heading": heading, "text": paragraph[pos:chunk_end]})
+                    if chunk_end == len(paragraph):
+                        break
+                    pos = chunk_end - overlap
+            else:
+                # Normal paragraph handling
+                if piece and len(piece) + 2 + len(paragraph) > max_chars:
+                    chunks.append({"heading": heading, "text": piece[:max_chars]})
+                    piece = piece[-overlap:]
+                piece = (piece + "\n\n" + paragraph).strip() if piece else paragraph
         if piece:
             chunks.append({"heading": heading, "text": piece[:max_chars]})
     return chunks
