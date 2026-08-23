@@ -1,0 +1,14 @@
+{
+  "greenhouse": [
+    {"board": "stripe", "company": "Stripe"},
+    {"board": "airbnb", "company": "Airbnb"},
+    {"board": "databricks", "company": "Databricks"},
+    {"board": "doordashusa", "company": "DoorDash"},
+    {"board": "instacart", "company": "Instacart"}
+  ],
+  "lever": [
+    {"slug": "netflix", "company": "Netflix"},
+    {"slug": "spotify", "company": "Spotify"},
+    {"slug": "plaid", "company": "Plaid"}
+  ]
+}
