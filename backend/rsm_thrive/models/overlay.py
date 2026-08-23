@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.db.models import Q
 
 TASK_SOURCE_CHOICES = [
     ("class", "class"), ("career", "career"), ("admin", "admin"), ("event", "event"),
@@ -25,6 +26,16 @@ class StudentTask(models.Model):
     source = models.CharField(max_length=16, choices=TASK_SOURCE_CHOICES, default="admin")
     priority = models.CharField(max_length=8, choices=PRIORITY_CHOICES, default="medium")
     subtasks = models.JSONField(default=list)
+    client_key = models.CharField(max_length=64, null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "client_key"],
+                condition=Q(client_key__isnull=False),
+                name="uniq_student_task_client_key",
+            ),
+        ]
 
 
 class TaskOverride(models.Model):

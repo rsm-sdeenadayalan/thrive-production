@@ -15,7 +15,7 @@ def _priority_for_weight(weight: int) -> str:
     return "low"
 
 
-def _base_tasks(user):
+def _base_tasks(user, include_student=True):
     course_ids = dict(
         Enrollment.objects.filter(user=user).values_list("course_id", "course__code")
     )
@@ -52,17 +52,18 @@ def _base_tasks(user):
             row["courseId"] = s.course_id
             row["courseCode"] = s.course.code
         tasks.append(row)
-    for t in StudentTask.objects.filter(user=user):
-        tasks.append({
-            "id": f"stu:{t.pk}",
-            "title": t.title,
-            "dueDate": iso_instant(t.due_date),
-            "_due": t.due_date,
-            "source": t.source,
-            "priority": t.priority,
-            "done": False,
-            "subtasks": [dict(st) for st in t.subtasks],
-        })
+    if include_student:
+        for t in StudentTask.objects.filter(user=user):
+            tasks.append({
+                "id": t.client_key or f"stu:{t.pk}",
+                "title": t.title,
+                "dueDate": iso_instant(t.due_date),
+                "_due": t.due_date,
+                "source": t.source,
+                "priority": t.priority,
+                "done": False,
+                "subtasks": [dict(st) for st in t.subtasks],
+            })
     return tasks
 
 
@@ -82,6 +83,17 @@ def _apply_override(task: dict, ov: TaskOverride) -> None:
         for st in task["subtasks"]:
             if st["id"] in ov.subtask_done:
                 st["done"] = ov.subtask_done[st["id"]]
+
+
+def assemble_source_tasks(user) -> list[dict]:
+    """Assignment-derived + shared tasks only, no overrides — the mock-parity
+    source view the API frontend merges client overrides onto."""
+    tasks = _base_tasks(user, include_student=False)
+    tasks.sort(key=lambda t: (t["done"], t["_due"], t["id"]))
+    for task in tasks:
+        task.pop("_due", None)
+        task.pop("_order", None)
+    return tasks
 
 
 def assemble_tasks(user) -> list[dict]:

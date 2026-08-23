@@ -1,16 +1,19 @@
 import datetime as dt
 
+from django.db.models import Q
 from django.http import HttpResponse
 from django.utils.dateparse import parse_datetime
 from django.views.decorators.http import require_http_methods
 
 from rsm_thrive.http import BadRequest, api_login_required, json_error, json_ok, parse_body
 from rsm_thrive.models import StudentTask, TaskOverride
-from rsm_thrive.services.tasks import assemble_tasks
+from rsm_thrive.services.tasks import assemble_source_tasks, assemble_tasks
 
 
 @api_login_required
 def tasks(request):
+    if request.GET.get("view") == "source":
+        return json_ok(assemble_source_tasks(request.user))
     return json_ok(assemble_tasks(request.user))
 
 
@@ -113,22 +116,36 @@ def create_task(request):
             raise BadRequest(f"source must be one of {sorted(VALID_TASK_SOURCES)}.")
     except BadRequest as exc:
         return json_error("bad_request", str(exc), 400)
-    row = StudentTask.objects.create(
-        user=request.user, title=title.strip(), due_date=due,
-        priority=priority, source=source,
-    )
+    client_key = body.get("clientKey")
+    if client_key is not None:
+        if (not isinstance(client_key, str) or not client_key.strip()
+                or len(client_key) > 64
+                or client_key.startswith(("asg:", "shared:", "stu:"))):
+            return json_error("bad_request", "clientKey is invalid.", 400)
+        row, _created = StudentTask.objects.update_or_create(
+            user=request.user, client_key=client_key,
+            defaults={"title": title.strip(), "due_date": due,
+                      "priority": priority, "source": source},
+        )
+    else:
+        row = StudentTask.objects.create(
+            user=request.user, title=title.strip(), due_date=due,
+            priority=priority, source=source,
+        )
     merged = {t["id"]: t for t in assemble_tasks(request.user)}
-    return json_ok(merged[f"stu:{row.pk}"], status=201)
+    return json_ok(merged[row.client_key or f"stu:{row.pk}"], status=201)
 
 
 @api_login_required
 @require_http_methods(["DELETE"])
 def delete_task(request, task_id):
-    if not task_id.startswith("stu:"):
+    if task_id.startswith(("asg:", "shared:")):
         return json_error("not_deletable", "Only self-added tasks can be deleted.", 400)
-    deleted, _ = StudentTask.objects.filter(
-        user=request.user, pk=task_id.removeprefix("stu:")
-    ).delete()
+    if task_id.startswith("stu:"):
+        lookup = Q(pk=task_id.removeprefix("stu:"))
+    else:
+        lookup = Q(client_key=task_id)
+    deleted, _ = StudentTask.objects.filter(user=request.user).filter(lookup).delete()
     if not deleted:
         return json_error("unknown_task", f"No task {task_id}.", 404)
     TaskOverride.objects.filter(user=request.user, task_key=task_id).delete()
