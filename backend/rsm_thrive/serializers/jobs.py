@@ -23,3 +23,16 @@ def serialize_job(posting, full=False) -> dict:
             snippet += "…"
         payload["snippet"] = snippet
     return payload
+
+
+def serialize_report(report) -> dict:
+    return {
+        "id": f"rep-{report.pk}",
+        "jobId": f"job-{report.posting_id}",
+        "score": report.score,
+        "competency": report.competency,
+        "matchedSkills": list(report.matched_skills),
+        "gaps": list(report.gaps),
+        "verdict": report.verdict,
+        "createdAt": iso_instant(report.created_at),
+    }

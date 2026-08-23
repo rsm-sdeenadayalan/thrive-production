@@ -28,6 +28,7 @@ urlpatterns = [
     path("health", health.health, name="health"),
     path("jobs", jobs.jobs_search, name="jobs-search"),
     path("jobs/<str:job_id>", jobs.job_detail, name="job-detail"),
+    path("jobs/<str:job_id>/report", jobs.job_report, name="job-report"),
     path("me", students.me, name="me"),
     path("overlay", overlay.overlay, name="overlay"),
     path("requests/prefill", requests.prefill, name="request-prefill"),
