@@ -5,12 +5,15 @@ over stored embeddings (same pattern as chatbot retrieval — the posting set
 is small). Postgres FTS is an F5 swap inside `_matching_postings` only.
 """
 
+import logging
 from collections import Counter
 
 from django.db.models import Q
 
 from rsm_thrive.models import JobPosting, ResumeVersion
 from rsm_thrive.services.embeddings import cosine, get_embeddings
+
+logger = logging.getLogger("rsm_thrive.jobs")
 
 
 def profile_of(user):
@@ -44,6 +47,15 @@ def search_postings(user, query, limit=20, embeddings=None):
     if profile is not None and postings:
         embeddings = embeddings or get_embeddings()
         [profile_vector] = embeddings.embed([profile["text"]])
+        for posting in postings:
+            if posting.embedding:
+                if len(posting.embedding) != len(profile_vector):
+                    logger.warning(
+                        "embedding dimension mismatch (profile %d vs postings %d) "
+                        "— ranking degrades to skill overlap; re-run ingest_jobs "
+                        "under the current THRIVE_LLM",
+                        len(profile_vector), len(posting.embedding))
+                break
 
     results = []
     for posting in postings:

@@ -844,7 +844,7 @@ export const messages = {
 		eyebrow: 'jobs',
 		title: 'Search job postings',
 		intro:
-			'Search postings and see how they line up against your skills. There is no live job board behind this yet -- results come from a small fixed sample.',
+			'Search postings and see how they line up against your skills. Postings come from public company job boards, refreshed by a periodic ingest run -- not a live feed of every opening the moment it posts.',
 
 		search: {
 			label: 'Job title, company, or skill',

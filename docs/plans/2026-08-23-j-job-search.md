@@ -1384,3 +1384,4 @@ git add backend frontend && git commit -m "feat(j): jobs smoke, gates, and docs"
 - **Benchmark caching**: computed per request; cache table only if posting volume makes it slow.
 - **Skill vocabulary growth**: `skills_vocab.json` is versioned config — extend as real postings reveal gaps (the ingest recomputes skills on every run, so vocabulary edits self-heal the corpus).
 - **companies.json curation**: starter list; board slugs verified at smoke — expand with MSBA-target employers over time.
+- **Skip-unchanged guard in `ingest_from`**: a content-hash check so an unchanged posting is not re-embedded on every run is a HARD prerequisite for the F5 nightly cron — every run currently re-embeds the full corpus.

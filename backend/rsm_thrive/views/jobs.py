@@ -32,7 +32,7 @@ def jobs_search(request):
     results = [
         {
             "job": serialize_job(row["posting"]),
-            "score": round(row["score"], 3),
+            "score": round(row["score"] * 100),
             "matchedSkills": row["matched_skills"],
             "missingSkills": row["missing_skills"],
         }

@@ -19,7 +19,7 @@ export const mockJobs: JobFixture[] = [
     company: "Bloom Analytics",
     location: "San Diego, CA",
     url: "https://example.com/jobs/bloom-analytics-data-analyst",
-    source: "LinkedIn",
+    source: "greenhouse",
     skills: ["SQL", "Excel", "Data visualization", "Tableau", "Python"],
     postedAt: at(-3),
     snippet:
@@ -33,7 +33,7 @@ export const mockJobs: JobFixture[] = [
     company: "Meridian Health Systems",
     location: "Remote",
     url: "https://example.com/jobs/meridian-health-data-analyst",
-    source: "Indeed",
+    source: "lever",
     skills: ["SQL", "Python", "Data visualization", "Statistics", "Power BI"],
     postedAt: at(-6),
     snippet:
@@ -61,7 +61,7 @@ export const mockJobs: JobFixture[] = [
     company: "Nimbus AI",
     location: "San Francisco, CA (hybrid)",
     url: "https://example.com/jobs/nimbus-ai-data-scientist",
-    source: "LinkedIn",
+    source: "greenhouse",
     skills: ["Python", "Machine learning", "Model evaluation", "SQL", "Statistics"],
     postedAt: at(-2),
     snippet:
@@ -75,7 +75,7 @@ export const mockJobs: JobFixture[] = [
     company: "Harbor Freight Analytics",
     location: "Remote",
     url: "https://example.com/jobs/harbor-freight-data-scientist",
-    source: "Indeed",
+    source: "lever",
     skills: ["Python", "Machine learning", "Deep learning", "SQL", "Model evaluation"],
     postedAt: at(-8),
     snippet:

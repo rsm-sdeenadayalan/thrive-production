@@ -14,9 +14,12 @@ import type { Actions, PageServerLoad } from "./$types";
  * Unlike `getConversation`, which hands back `null` for an unknown id and lets
  * the page decide, the job providers throw in both modes -- a plain `Error` in
  * mock, an `ApiError` in API mode. Both mean the same thing here (there is no
- * posting behind this id), so both become the one 404. Nothing else can throw
- * from a GET by id, so a catch-all is the honest shape rather than a narrower
- * one that would need to guess at a second cause.
+ * posting behind this id): an `ApiError` with status 404, or a mock-mode
+ * `Error` whose message starts with "Unknown job". Both become the one 404.
+ * Anything else is a failure nobody has a story for -- a network error, a
+ * malformed response -- and rethrowing it is the honest shape, rather than a
+ * catch-all that would report it to a student as "not on file" when the
+ * posting might well exist.
  */
 export const load: PageServerLoad = async ({ params }) => {
 	try {
@@ -25,8 +28,14 @@ export const load: PageServerLoad = async ({ params }) => {
 			job: toJobPostingDetailView(job),
 			benchmark,
 		};
-	} catch {
-		error(404, messages.jobs.notFound);
+	} catch (err) {
+		if (err instanceof ApiError && err.status === 404) {
+			error(404, messages.jobs.notFound);
+		}
+		if (err instanceof Error && err.message.startsWith("Unknown job")) {
+			error(404, messages.jobs.notFound);
+		}
+		throw err;
 	}
 };
 

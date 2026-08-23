@@ -101,6 +101,7 @@
 					};
 				}}
 			>
+				<input type="hidden" name="q" value={data.query} />
 				<div class="min-w-0">
 					<label for="jobs-resume" class="mb-1.5 block text-2xs text-ink uppercase">
 						{copy.profileBanner.fileLabel}

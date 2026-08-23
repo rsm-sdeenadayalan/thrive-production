@@ -20,9 +20,27 @@ import type { Actions, PageServerLoad } from "./$types";
  * `toJobResultView` calls `formatShortDate` on each posting's `postedAt`
  * before it ever reaches a component, the same rule every other surface in
  * this app follows: a `.svelte` file never sees a raw instant.
+ *
+ * ## No query, no search
+ *
+ * The page's own empty state ("Search above to see postings") already covers
+ * a student who has not typed anything, and ignores `results` in that case.
+ * Calling `searchJobs` anyway would mean every landing hit -- `/jobs` with no
+ * `q` at all -- pays for a full unfiltered search whose results are thrown
+ * away unseen. A blank/whitespace-only query skips the call entirely.
  */
 export const load: PageServerLoad = async ({ url }) => {
 	const query = url.searchParams.get("q") ?? "";
+
+	if (query.trim().length === 0) {
+		return {
+			query,
+			profileAvailable: false,
+			benchmark: { sampleSize: 0, topSkills: [] },
+			results: [],
+		};
+	}
+
 	const result = await searchJobs(query);
 
 	return {
@@ -69,7 +87,9 @@ export const actions: Actions = {
 			throw error;
 		}
 
-		const query = url.searchParams.get("q") ?? "";
+		const rawQuery = form.get("q");
+		const query =
+			(typeof rawQuery === "string" ? rawQuery : null) ?? url.searchParams.get("q") ?? "";
 		redirect(303, `/jobs?q=${encodeURIComponent(query)}`);
 	},
 };

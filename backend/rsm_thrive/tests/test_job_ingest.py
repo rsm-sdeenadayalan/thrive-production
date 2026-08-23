@@ -50,3 +50,19 @@ class TestIngest:
                              embeddings=FakeEmbeddings())
         assert result["failed_sources"] == ["boom"]
         assert JobPosting.objects.get().active  # fake source refreshed it
+
+    def test_null_title_ingests_with_empty_title(self):
+        row = _row()
+        row["title"] = None
+        result = ingest_from([FakeJobSource([row])], embeddings=FakeEmbeddings())
+        assert result["ingested"] == 1
+        assert JobPosting.objects.get().title == ""
+
+    def test_bad_url_row_skipped_sibling_ingests(self):
+        bad = _row(external_id="1")
+        bad["url"] = "javascript:alert(1)"
+        good = _row(external_id="2")
+        result = ingest_from([FakeJobSource([bad, good])], embeddings=FakeEmbeddings())
+        assert result["ingested"] == 1
+        assert JobPosting.objects.count() == 1
+        assert JobPosting.objects.get().external_id == "2"

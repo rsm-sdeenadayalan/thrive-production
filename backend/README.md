@@ -69,7 +69,10 @@ knobs as the chatbots — `THRIVE_LLM=fake`/`gemini` and `GEMINI_API_KEY` —
 govern both endpoints: `fake` makes `get_llm()` raise, so `job_report` and
 `resume_upload` fail honest with a `503 llm_unavailable` rather than a silent
 or fabricated result, and switches embeddings to `FakeEmbeddings` for
-ranking/ingestion.
+ranking/ingestion. Switching `THRIVE_LLM` (`fake` ↔ real) changes embedding
+dimensions, so re-run `ingest_jobs` after switching — otherwise ranking
+silently degrades to skill overlap (a warning is logged, but postings keep
+their stale, wrong-dimension embeddings until re-ingested).
 
 **Sources** (`rsm_thrive/services/jobs/sources.py`) sit behind one `JobSource`
 ABC (`fetch() -> list[dict]`):
