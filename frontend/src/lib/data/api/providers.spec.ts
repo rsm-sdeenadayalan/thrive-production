@@ -27,7 +27,7 @@ describe("read providers", () => {
     ["getCourses", () => api.getCourses(), "/api/thrive/courses"],
     ["getSyllabi", () => api.getSyllabi(), "/api/thrive/syllabi"],
     ["getAssignments", () => api.getAssignments(), "/api/thrive/assignments"],
-    ["getTasks", () => api.getTasks(), "/api/thrive/tasks"],
+    ["getTasks", () => api.getTasks(), "/api/thrive/tasks?view=source"],
     ["getEvents", () => api.getEvents(), "/api/thrive/events"],
     ["getDegreeProgress", () => api.getDegreeProgress(), "/api/thrive/degree/progress"],
     ["getProgramTimeline", () => api.getProgramTimeline(), "/api/thrive/degree/timeline"],

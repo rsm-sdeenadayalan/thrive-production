@@ -48,7 +48,11 @@ export function getAssignments(): Promise<Assignment[]> {
 }
 
 export function getTasks(): Promise<Task[]> {
-	return apiFetch<Task[]>("/tasks");
+	// In API mode the client owns the merge (stores are seeded from the
+	// server), so this must deliver SOURCE tasks, exactly like the mock
+	// provider does. `/tasks` without the query stays the server-merged view,
+	// used by the contract suite.
+	return apiFetch<Task[]>("/tasks?view=source");
 }
 
 export function getEvents(): Promise<Event[]> {
