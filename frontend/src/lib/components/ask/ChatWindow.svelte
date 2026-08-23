@@ -3,6 +3,7 @@
 	import CornerDownLeft from '@lucide/svelte/icons/corner-down-left';
 	import Sparkles from '@lucide/svelte/icons/sparkles';
 
+	import { goto } from '$app/navigation';
 	import { showsDayLabel, type ChatMessageView, type ConversationDetailView } from '$lib/ask';
 	import Button from '$lib/components/ui/Button.svelte';
 	import { messages } from '$lib/messages';
@@ -18,20 +19,35 @@
 	 * from the server with every date already formatted, and it is what a retrieval
 	 * service will eventually write.
 	 *
-	 * The SENT half is not. There is nothing to answer with, so a message typed
-	 * here gets a fixed reply saying so and lives in `sent` below: component state,
-	 * gone the moment the student navigates. That is stated on screen BEFORE
-	 * anything is typed, not after, because a student who discovered it by leaving
-	 * would reasonably read it as having lost something.
+	 * The SENT half depends on `live`. With the backend off there is nothing to
+	 * answer with, so a message typed here gets a fixed reply saying so and lives
+	 * in `sent` below: component state, gone the moment the student navigates. That
+	 * is stated on screen BEFORE anything is typed, not after, because a student
+	 * who discovered it by leaving would reasonably read it as having lost
+	 * something.
 	 *
-	 * The reply says plainly that it cannot answer. A placeholder that mimics a
-	 * real answer teaches a student to trust something that is not there -- the
+	 * The mock reply says plainly that it cannot answer. A placeholder that mimics
+	 * a real answer teaches a student to trust something that is not there -- the
 	 * same call the floating assistant made, for the same reason.
 	 *
-	 * Deliberately NOT a `localStorage` store. Conversations are large and grow
-	 * without bound, a second laptop would show an empty history indistinguishable
-	 * from never having asked anything, and it is persistence that would have to be
-	 * torn out when the backend lands. Ephemeral-and-honest beats persistent-and-wrong.
+	 * Deliberately NOT a `localStorage` store for the mock half. Conversations are
+	 * large and grow without bound, a second laptop would show an empty history
+	 * indistinguishable from never having asked anything, and it is persistence
+	 * that would have to be torn out when the backend lands. Ephemeral-and-honest
+	 * beats persistent-and-wrong.
+	 *
+	 * ## The live half
+	 *
+	 * When `live` is true, `sent` is used differently: as the OPTIMISTIC half of a
+	 * real round trip rather than a permanent fiction. A submit pushes the
+	 * student's own bubble immediately, posts to `/ask-sync`, and on success
+	 * `goto`s to the URL carrying the persisted conversation id with
+	 * `invalidateAll` -- the server reload is what actually renders the saved
+	 * turns, and `sent` is cleared once that lands (explicitly, for the
+	 * same-conversation case where the id does not change and the `{#key}` below
+	 * does not remount). On failure the student's bubble stays exactly where it
+	 * is and a THRIVE-side bubble explains what happened; nothing is lost because
+	 * it was never a draft to begin with, it is already rendered.
 	 *
 	 * ## The log's accessibility, ported from the floating assistant
 	 *
@@ -56,19 +72,29 @@
 	 */
 	let {
 		destination,
-		conversation
+		conversation,
+		live
 	}: {
 		destination: AskDestination;
 		/** The saved conversation in view, or null for a fresh one. */
 		conversation: ConversationDetailView | null;
+		/** Whether `/ask-sync` is reachable. See the doc comment above. */
+		live: boolean;
 	} = $props();
 
 	const copy = messages.ask;
 
-	/** This tab's exchange. Never persisted -- see the note above. */
+	/**
+	 * This tab's exchange. Never persisted when `!live` -- see the note above.
+	 * When `live`, this is cleared once the server round trip lands; it never
+	 * accumulates a full history of its own.
+	 */
 	let sent = $state<ChatMessageView[]>([]);
 	let draft = $state('');
 	let logEl = $state<HTMLDivElement | null>(null);
+
+	/** True while a live send is in flight. Disables the composer. */
+	let pending = $state(false);
 
 	/**
 	 * A counter, not a timestamp, and not `Date.now()`.
@@ -101,6 +127,13 @@
 		const body = draft.trim();
 		if (!body) return;
 
+		draft = '';
+
+		if (live) {
+			sendLive(body);
+			return;
+		}
+
 		/*
 		 * No time label on these. Every stamp in the saved half was formatted on the
 		 * server, and a component has no business asking the browser what time it is
@@ -119,8 +152,49 @@
 			}
 		];
 
-		draft = '';
 		scrollToNewest();
+	}
+
+	/**
+	 * The live half of `send`. See the component doc comment for the full
+	 * round trip; this is steps 1-4 of it.
+	 */
+	async function sendLive(body: string) {
+		sent = [...sent, { id: `sent-${nextId++}`, role: 'student', body, timeLabel: '', dayLabel: '' }];
+		pending = true;
+		scrollToNewest();
+
+		try {
+			const response = await fetch('/ask-sync', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify(
+					conversation
+						? { action: 'message', conversationId: conversation.id, body }
+						: { action: 'create', destination, body }
+				)
+			});
+
+			if (!response.ok) throw new Error('ask-sync request failed');
+
+			const payload = (await response.json()) as { conversation: { id: string } };
+
+			await goto(`/ask/${destination}?c=${payload.conversation.id}`, { invalidateAll: true });
+
+			// The `{#key}` above only remounts for a NEW conversation id; the
+			// same-conversation case (a second message in an already-open thread)
+			// keeps this component alive, so the optimistic state is cleared here
+			// explicitly rather than relying on the remount.
+			sent = [];
+			pending = false;
+		} catch {
+			pending = false;
+			sent = [
+				...sent,
+				{ id: `sent-${nextId++}`, role: 'thrive', body: copy.chat.errorReply, timeLabel: '', dayLabel: '' }
+			];
+			scrollToNewest();
+		}
 	}
 
 	/**
@@ -285,6 +359,20 @@
 			{#each sent as message (message.id)}
 				{@render bubble(message, false)}
 			{/each}
+
+			{#if pending}
+				<!--
+					Not part of `sent`: it is a status, not a message, and it must not
+					survive into the "keep the student bubble" failure branch alongside a
+					second, separately-pushed error bubble. `role="log"` /
+					`aria-live="polite"` on the container above already announces this the
+					same way a real reply would be announced.
+				-->
+				{@render bubble(
+					{ id: 'pending', role: 'thrive', body: copy.chat.pendingReply, timeLabel: '', dayLabel: '' },
+					false
+				)}
+			{/if}
 		{/if}
 	</div>
 
@@ -296,11 +384,17 @@
 			name="question"
 			bind:value={draft}
 			autocomplete="off"
+			disabled={pending}
 			placeholder={copy.chat.placeholder}
 			class="min-h-11 min-w-0 flex-1 rounded-md border-[1.5px] border-line-strong bg-surface px-2.5 text-sm text-ink placeholder:text-muted-ink"
 		/>
 
-		<Button type="submit" variant="primary" disabled={draft.trim().length === 0} class="min-h-11">
+		<Button
+			type="submit"
+			variant="primary"
+			disabled={pending || draft.trim().length === 0}
+			class="min-h-11"
+		>
 			<CornerDownLeft aria-hidden="true" class="size-3.5" />
 			{copy.chat.send}
 		</Button>

@@ -76,7 +76,9 @@
 	<header>
 		<p class="thrive-eyebrow">{copy.eyebrow}</p>
 		<h1 class="mt-1 text-3xl font-bold text-ink">{copy.title}</h1>
-		<p class="mt-1.5 max-w-measure text-sm text-body">{copy.intro}</p>
+		<p class="mt-1.5 max-w-measure text-sm text-body">
+			{data.live ? copy.introLive : copy.intro}
+		</p>
 	</header>
 
 	<!-- Only below `lg`, where the navigation rail is not on screen. -->

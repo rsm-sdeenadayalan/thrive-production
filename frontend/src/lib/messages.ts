@@ -854,6 +854,17 @@ export const messages = {
 			'Three places to ask, depending on what you need. None of them are connected to real material yet — the saved conversations below are examples of what this will hold.',
 
 		/**
+		 * The live counterpart of `intro`, shown once the backend is actually
+		 * answering.
+		 *
+		 * Same split as everywhere else `live` gates copy: the mock sentence is a
+		 * disclaimer that nothing is connected, and leaving it up once something IS
+		 * connected would be a lie the student has no way to catch.
+		 */
+		introLive:
+			"Three places to ask, depending on what you need. Answers come from the program's own material — conversations are saved to your account.",
+
+		/**
 		 * The three destinations. Keyed by `AskDestination`, so a fourth is a
 		 * compile error here rather than a blank panel on screen.
 		 *
@@ -954,7 +965,24 @@ export const messages = {
 			 */
 			notSaved: 'Nothing you type here is saved yet. Leaving this page clears it.',
 			/** The heading over an exchange that only exists in this tab. */
-			draftHeading: 'This session'
+			draftHeading: 'This session',
+
+			/**
+			 * Shown as a THRIVE-side bubble while a live send is in flight.
+			 *
+			 * A bubble rather than a spinner: the log's `role="log"` /
+			 * `aria-live="polite"` pair already announces new bubbles, so this rides
+			 * the same channel a real reply will use instead of needing a second one.
+			 */
+			pendingReply: 'Thinking…',
+
+			/**
+			 * A live send that failed. The student's own bubble stays on screen above
+			 * this one -- the draft is never lost, because it is not a draft any more,
+			 * it is a message already rendered.
+			 */
+			errorReply:
+				'Something went wrong sending that. Your message is shown above — try again in a moment.'
 		},
 
 		/** A destination or a conversation that does not exist. */

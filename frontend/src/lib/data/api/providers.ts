@@ -10,6 +10,7 @@ import type {
 	Appointment,
 	AppointmentSlot,
 	Assignment,
+	AskDestination,
 	Conversation,
 	Course,
 	CourseRequest,
@@ -100,6 +101,34 @@ export async function getConversation(
 		if (error instanceof ApiError && error.status === 404) return null;
 		throw error;
 	}
+}
+
+/**
+ * Write providers for the chat composer. No mock counterpart on purpose --
+ * mock mode's `ChatWindow` never persists anything (see its own doc comment),
+ * so there is nothing for these to delegate through and they are not added to
+ * `data/providers.ts`'s list. `/ask-sync` imports them directly, the same way
+ * `/overlay-sync` imports `apiFetch` directly rather than going through a
+ * delegator.
+ */
+export function createConversation(
+	destination: AskDestination,
+	body: string,
+): Promise<Conversation> {
+	return apiFetch<Conversation>("/conversations", {
+		method: "POST",
+		body: { destination, body },
+	});
+}
+
+export function sendConversationMessage(
+	conversationId: string,
+	body: string,
+): Promise<Conversation> {
+	return apiFetch<Conversation>(
+		`/conversations/${encodeURIComponent(conversationId)}/messages`,
+		{ method: "POST", body: { body } },
+	);
 }
 
 export async function bookAppointment(

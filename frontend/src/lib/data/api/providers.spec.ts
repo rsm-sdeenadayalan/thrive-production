@@ -74,3 +74,27 @@ describe("read providers", () => {
     });
   });
 });
+
+describe("write providers", () => {
+  it("createConversation POSTs destination and body", async () => {
+    const impl = stubFetch(201, { id: "conv-9", destination: "career",
+      title: "q", messages: [], updatedAt: "2026-08-23T09:00:00-07:00" });
+    const result = await runWithAuth(AUTH, () =>
+      api.createConversation("career", "resume length?"));
+    const [url, init] = impl.mock.calls[0];
+    expect(url).toBe("http://api.test/api/thrive/conversations");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual(
+      { destination: "career", body: "resume length?" });
+    expect(result.id).toBe("conv-9");
+  });
+
+  it("sendConversationMessage POSTs to the conversation", async () => {
+    const impl = stubFetch(200, { id: "conv-9", destination: "career",
+      title: "q", messages: [], updatedAt: "2026-08-23T09:00:00-07:00" });
+    await runWithAuth(AUTH, () => api.sendConversationMessage("conv-9", "more"));
+    const [url, init] = impl.mock.calls[0];
+    expect(url).toBe("http://api.test/api/thrive/conversations/conv-9/messages");
+    expect(JSON.parse(init.body as string)).toEqual({ body: "more" });
+  });
+});

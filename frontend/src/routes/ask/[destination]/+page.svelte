@@ -20,5 +20,5 @@
 </script>
 
 {#key data.conversation?.id ?? data.destination}
-	<ChatWindow destination={data.destination} conversation={data.conversation} />
+	<ChatWindow destination={data.destination} conversation={data.conversation} live={data.live} />
 {/key}

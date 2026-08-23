@@ -1,6 +1,7 @@
 import { error } from "@sveltejs/kit";
 
 import { isAskDestination, toConversationDetailView } from "$lib/ask";
+import { apiEnabled } from "$lib/data/api/client";
 import { getConversation } from "$lib/data";
 import { messages } from "$lib/messages";
 import { dayKeyOf } from "$lib/schedule";
@@ -48,8 +49,16 @@ export const load: PageServerLoad = async ({ params, url }) => {
 	 */
 	const todayKey = dayKeyOf(new Date());
 
+	/**
+	 * Whether the write path is live. `ChatWindow` needs this to pick its send
+	 * flow; the layout above computes the same flag for the intro copy it
+	 * renders. Two reads of the same env var, not one threaded down -- the same
+	 * tradeoff the layout's own doc comment makes for `todayKey`.
+	 */
+	const live = apiEnabled();
+
 	if (!conversationId) {
-		return { destination, conversation: null, todayKey };
+		return { destination, conversation: null, todayKey, live };
 	}
 
 	const conversation = await getConversation(conversationId);
@@ -75,5 +84,6 @@ export const load: PageServerLoad = async ({ params, url }) => {
 		destination,
 		conversation: toConversationDetailView(conversation, todayKey),
 		todayKey,
+		live,
 	};
 };

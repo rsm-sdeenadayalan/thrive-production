@@ -1,4 +1,5 @@
 import { toConversationView, type ConversationView } from "$lib/ask";
+import { apiEnabled } from "$lib/data/api/client";
 import { getConversations } from "$lib/data";
 import { dayKeyOf } from "$lib/schedule";
 import type { LayoutServerLoad } from "./$types";
@@ -39,5 +40,12 @@ export const load: LayoutServerLoad = async () => {
 	return {
 		/** Every saved conversation, newest first, already formatted. */
 		conversations: views,
+		/**
+		 * Whether the backend is actually connected, for the intro copy the
+		 * header renders below. Read here rather than threaded down from the
+		 * page: the same tradeoff as the two clock reads above, applied to a
+		 * flag instead of a timestamp.
+		 */
+		live: apiEnabled(),
 	};
 };
