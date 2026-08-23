@@ -1,7 +1,7 @@
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
-from rsm_thrive.http import api_login_required, json_error, json_ok, BadRequest, parse_body
+from rsm_thrive.http import api_login_required, json_error, json_ok, BadRequest, parse_body, profile_required
 from rsm_thrive.services.degree import NotConfigured
 from rsm_thrive.services.requests import build_prefill
 from rsm_thrive.models import CourseRequest, StudentProfile
@@ -9,9 +9,10 @@ from rsm_thrive.serializers.requests import request_payload
 
 
 @api_login_required
+@profile_required
 def prefill(request):
     try:
-        return json_ok(build_prefill(request.user.thrive_profile))
+        return json_ok(build_prefill(request.thrive_profile))
     except NotConfigured as exc:
         return json_error("not_configured", str(exc), 503)
 
@@ -31,6 +32,7 @@ def my_requests(request):
 
 
 @api_login_required
+@profile_required
 def create_request(request):
     try:
         body = parse_body(request)
@@ -46,7 +48,7 @@ def create_request(request):
     if not isinstance(reason, str) or not reason.strip():
         return json_error("bad_request", "reason is required.", 400)
     try:
-        snapshot = build_prefill(request.user.thrive_profile)
+        snapshot = build_prefill(request.thrive_profile)
     except NotConfigured as exc:
         return json_error("not_configured", str(exc), 503)
     row = CourseRequest.objects.create(
@@ -86,12 +88,14 @@ def submit_request(request, request_id):
 
 
 @api_login_required
+@profile_required
 def tss(request):
-    return json_ok({"connected": request.user.thrive_profile.tss_connected})
+    return json_ok({"connected": request.thrive_profile.tss_connected})
 
 
 @api_login_required
 @require_http_methods(["POST"])
+@profile_required
 def tss_connect(request):
     StudentProfile.objects.filter(user=request.user).update(tss_connected=True)
     return json_ok({"connected": True})

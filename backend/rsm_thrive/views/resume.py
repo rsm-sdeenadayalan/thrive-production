@@ -1,7 +1,7 @@
 from django.db import transaction
 from django.views.decorators.http import require_http_methods
 
-from rsm_thrive.http import api_login_required, json_error, json_ok
+from rsm_thrive.http import api_login_required, json_error, json_ok, profile_required
 from rsm_thrive.models import ResumeVersion, Skill
 from rsm_thrive.serializers.resume import skill_payload, version_payload
 from rsm_thrive.services.resume import generate_version
@@ -29,8 +29,9 @@ def resume_current(request):
 
 
 @api_login_required
+@profile_required
 def generate_version_view(request):
-    version, diff = generate_version(request.user.thrive_profile)
+    version, diff = generate_version(request.thrive_profile)
     return json_ok({"version": version_payload(version), "diff": diff}, status=201)
 
 

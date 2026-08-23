@@ -25,6 +25,19 @@ def api_login_required(view):
     return wrapper
 
 
+def profile_required(view):
+    """Use under api_login_required: guarantees request.thrive_profile."""
+    @functools.wraps(view)
+    def wrapper(request, *args, **kwargs):
+        from rsm_thrive.models import StudentProfile
+        try:
+            request.thrive_profile = request.user.thrive_profile
+        except StudentProfile.DoesNotExist:
+            return json_error("no_profile", "No student profile for this account.", 403)
+        return view(request, *args, **kwargs)
+    return wrapper
+
+
 def parse_body(request) -> dict:
     try:
         data = json.loads(request.body or b"{}")
