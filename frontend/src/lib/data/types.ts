@@ -461,6 +461,64 @@ export interface ResumeDiff {
 }
 
 // ---------------------------------------------------------------------------
+// Job search
+// ---------------------------------------------------------------------------
+
+/** How a match report grades the student against a posting's requirements. */
+export type JobCompetency = "strong" | "good" | "stretch" | "reach";
+
+export interface JobPosting {
+  id: string; // "job-<pk>"
+  title: string;
+  company: string;
+  location: string;
+  url: string;
+  source: string;
+  skills: string[];
+  postedAt: ISODateTime | null;
+  snippet: string;
+}
+
+/** The single-posting view. Trades `snippet` for the full `description`. */
+export interface JobPostingDetail extends Omit<JobPosting, "snippet"> {
+  description: string;
+}
+
+/** One search result: a posting plus how it compares to the student. */
+export interface JobSearchEntry {
+  job: JobPosting;
+  score: number;
+  matchedSkills: string[];
+  missingSkills: string[];
+}
+
+/** What postings for a role typically ask for, across the sample searched. */
+export interface RoleBenchmark {
+  sampleSize: number;
+  topSkills: { name: string; share: number }[];
+}
+
+export interface JobSearchResult {
+  query: string;
+  /** False when the student has no resume to score against yet. */
+  profileAvailable: boolean;
+  benchmark: RoleBenchmark;
+  results: JobSearchEntry[];
+}
+
+/** A generated fit assessment against one posting. */
+export interface MatchReport {
+  id: string; // "rep-<pk>"
+  jobId: string;
+  score: number;
+  competency: JobCompetency;
+  matchedSkills: string[];
+  gaps: string[];
+  verdict: string;
+  createdAt: ISODateTime;
+}
+
+// ---------------------------------------------------------------------------
 // Resources
 // ---------------------------------------------------------------------------
 

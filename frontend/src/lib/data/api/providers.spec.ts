@@ -35,6 +35,7 @@ describe("read providers", () => {
     ["getAdvisors", () => api.getAdvisors(), "/api/thrive/advisors"],
     ["getMyAppointments", () => api.getMyAppointments(), "/api/thrive/appointments"],
     ["getConversations", () => api.getConversations(), "/api/thrive/conversations"],
+    ["getJobPosting", () => api.getJobPosting("job-1"), "/api/thrive/jobs/job-1"],
   ] as const)("%s hits its endpoint", async (_name, call, expectedPath) => {
     const impl = stubFetch(200, []);
     await runWithAuth(AUTH, call as () => Promise<any>);
@@ -96,5 +97,36 @@ describe("write providers", () => {
     const [url, init] = impl.mock.calls[0];
     expect(url).toBe("http://api.test/api/thrive/conversations/conv-9/messages");
     expect(JSON.parse(init.body as string)).toEqual({ body: "more" });
+  });
+});
+
+describe("job search providers", () => {
+  it("searchJobs encodes the query", async () => {
+    const impl = stubFetch(200, { query: "x", profileAvailable: false,
+      benchmark: { sampleSize: 0, topSkills: [] }, results: [] });
+    await runWithAuth(AUTH, () => api.searchJobs("data analyst"));
+    expect(impl.mock.calls[0][0])
+      .toBe("http://api.test/api/thrive/jobs?q=data%20analyst");
+  });
+
+  it("generateMatchReport POSTs and unwraps", async () => {
+    const impl = stubFetch(200, { report: { id: "rep-1", jobId: "job-1",
+      score: 70, competency: "good", matchedSkills: [], gaps: [],
+      verdict: "v", createdAt: "2026-08-23T09:00:00-07:00" } });
+    const report = await runWithAuth(AUTH, () => api.generateMatchReport("job-1"));
+    expect(impl.mock.calls[0][1].method).toBe("POST");
+    expect(report.id).toBe("rep-1");
+  });
+
+  it("uploadResume sends a multipart body with no forced content-type", async () => {
+    const impl = stubFetch(201, {});
+    const file = new File(["hello"], "resume.pdf", { type: "application/pdf" });
+    await runWithAuth(AUTH, () => api.uploadResume(file));
+    const [url, init] = impl.mock.calls[0];
+    expect(url).toBe("http://api.test/api/thrive/resume/upload");
+    expect(init.method).toBe("POST");
+    expect(init.body).toBeInstanceOf(FormData);
+    expect((init.body as FormData).get("file")).toBe(file);
+    expect(init.headers["content-type"]).toBeUndefined();
   });
 });

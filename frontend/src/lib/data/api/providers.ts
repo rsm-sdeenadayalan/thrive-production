@@ -18,10 +18,14 @@ import type {
 	CourseRequestPrefill,
 	DegreeProgress,
 	Event,
+	JobPostingDetail,
+	JobSearchResult,
+	MatchReport,
 	ProgramTimeline,
 	ResourceLink,
 	ResumeDiff,
 	ResumeVersion,
+	RoleBenchmark,
 	Skill,
 	Student,
 	Syllabus,
@@ -240,4 +244,39 @@ export async function setCurrentVersion(
 		if (error instanceof ApiError && error.status === 404) return null;
 		throw error;
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Job search
+// ---------------------------------------------------------------------------
+
+export function searchJobs(query: string): Promise<JobSearchResult> {
+	return apiFetch<JobSearchResult>(`/jobs?q=${encodeURIComponent(query)}`);
+}
+
+export function getJobPosting(
+	jobId: string,
+): Promise<{ job: JobPostingDetail; benchmark: RoleBenchmark }> {
+	return apiFetch<{ job: JobPostingDetail; benchmark: RoleBenchmark }>(
+		`/jobs/${encodeURIComponent(jobId)}`,
+	);
+}
+
+export async function generateMatchReport(jobId: string): Promise<MatchReport> {
+	const { report } = await apiFetch<{ report: MatchReport }>(
+		`/jobs/${encodeURIComponent(jobId)}/report`,
+		{ method: "POST" },
+	);
+	return report;
+}
+
+/**
+ * Multipart upload: the resume file goes in a `FormData` body so `client.ts`
+ * skips JSON-encoding it and leaves the content-type header for the runtime
+ * to set with its multipart boundary.
+ */
+export async function uploadResume(file: File): Promise<void> {
+	const body = new FormData();
+	body.append("file", file);
+	await apiFetch<unknown>("/resume/upload", { method: "POST", body });
 }

@@ -47,10 +47,17 @@ import type {
   CourseRequestPrefill,
   DegreeProgress,
   Event,
+  JobCompetency,
+  JobPosting,
+  JobPostingDetail,
+  JobSearchEntry,
+  JobSearchResult,
+  MatchReport,
   ProgramTimeline,
   ResourceLink,
   ResumeDiff,
   ResumeVersion,
+  RoleBenchmark,
   Skill,
   Student,
   Syllabus,
@@ -79,6 +86,7 @@ import { buildMockConversations } from "./mock/conversations";
 import { buildMockCourses } from "./mock/courses";
 import { mockDegreeProgress } from "./mock/degree";
 import { buildMockEvents } from "./mock/events";
+import { type JobFixture, mockJobs } from "./mock/jobs";
 import { mockResources } from "./mock/resources";
 import { mockStudent } from "./mock/student";
 import { buildMockSyllabi } from "./mock/syllabi";
@@ -579,6 +587,148 @@ async function mockGetConversation(
 }
 
 // ---------------------------------------------------------------------------
+// Job search
+// ---------------------------------------------------------------------------
+//
+// SIMULATED. There is no job board integration and no scoring model behind
+// these -- `mockSearchJobs` fakes relevance from overlap with the mock
+// student's skills, and `mockGenerateMatchReport` derives a fixed-shape
+// report the same way. Fixtures live in `mock/jobs.ts`; the shaping logic
+// lives here, same split as every other mock surface in this file.
+
+function toPosting(fixture: JobFixture): JobPosting {
+  const { description: _description, ...posting } = fixture;
+  return { ...posting, skills: [...posting.skills] };
+}
+
+function toDetail(fixture: JobFixture): JobPostingDetail {
+  const { snippet: _snippet, ...detail } = fixture;
+  return { ...detail, skills: [...detail.skills] };
+}
+
+/** Split a posting's skills against what the mock student's resume claims. */
+function splitSkills(job: JobPosting) {
+  const known = new Set(mockSkills.map((skill) => skill.name));
+  return {
+    matchedSkills: job.skills.filter((skill) => known.has(skill)),
+    missingSkills: job.skills.filter((skill) => !known.has(skill)),
+  };
+}
+
+/** Sample size and top skills across every posting sharing a title. */
+function benchmarkFor(title: string): RoleBenchmark {
+  const group = mockJobs.filter((job) => job.title === title);
+  const counts = new Map<string, number>();
+
+  for (const job of group) {
+    for (const skill of job.skills) {
+      counts.set(skill, (counts.get(skill) ?? 0) + 1);
+    }
+  }
+
+  const topSkills = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([name, count]) => ({
+      name,
+      share: Math.round((count / group.length) * 100) / 100,
+    }));
+
+  return { sampleSize: group.length, topSkills };
+}
+
+/**
+ * Terms filter across title, company, and skills. An empty query matches
+ * everything, the same way an empty search box would show the full board.
+ */
+function mockSearchJobs(query: string): Promise<JobSearchResult> {
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+
+  const matches = mockJobs.filter((job) => {
+    if (terms.length === 0) return true;
+    const haystack = `${job.title} ${job.company} ${job.skills.join(" ")}`.toLowerCase();
+    return terms.some((term) => haystack.includes(term));
+  });
+
+  // Fake relevance: more overlap with the mock profile scores higher, then
+  // nudge each entry down by its rank so a tie still sorts strictly
+  // descending -- a results list is more convincing without twins.
+  const results: JobSearchEntry[] = matches
+    .map((job) => {
+      const { matchedSkills, missingSkills } = splitSkills(job);
+      return {
+        job: toPosting(job),
+        score: 55 + matchedSkills.length * 9,
+        matchedSkills,
+        missingSkills,
+      };
+    })
+    .sort((a, b) => b.score - a.score)
+    .map((entry, index) => ({ ...entry, score: Math.max(35, entry.score - index) }));
+
+  const primaryTitle = matches[0]?.title ?? mockJobs[0].title;
+
+  return resolveAfterDelay({
+    query,
+    profileAvailable: true,
+    benchmark: benchmarkFor(primaryTitle),
+    results,
+  });
+}
+
+/** One posting by id, with the benchmark for its title. */
+function mockGetJobPosting(
+  jobId: string,
+): Promise<{ job: JobPostingDetail; benchmark: RoleBenchmark }> {
+  const fixture = mockJobs.find((job) => job.id === jobId);
+  if (!fixture) throw new Error(`Unknown job id: ${jobId}`);
+
+  return resolveAfterDelay({
+    job: toDetail(fixture),
+    benchmark: benchmarkFor(fixture.title),
+  });
+}
+
+function competencyFor(score: number): JobCompetency {
+  if (score >= 85) return "strong";
+  if (score >= 70) return "good";
+  if (score >= 50) return "stretch";
+  return "reach";
+}
+
+let nextReportId = 1;
+
+/** A fixed, plausible report -- there is no scoring model behind this yet. */
+function mockGenerateMatchReport(jobId: string): Promise<MatchReport> {
+  const fixture = mockJobs.find((job) => job.id === jobId);
+  const { matchedSkills, missingSkills } = fixture
+    ? splitSkills(fixture)
+    : { matchedSkills: [], missingSkills: [] };
+
+  const score = Math.min(95, 50 + matchedSkills.length * 10);
+  const competency = competencyFor(score);
+
+  return resolveAfterDelay({
+    id: `rep-${nextReportId++}`,
+    jobId,
+    score,
+    competency,
+    matchedSkills,
+    gaps: missingSkills,
+    verdict:
+      competency === "strong" || competency === "good"
+        ? "Your resume covers most of what this posting asks for."
+        : "This posting asks for a few skills your resume doesn't show yet.",
+    createdAt: new Date().toISOString(),
+  });
+}
+
+/** No-op: nothing parses the file yet, this only simulates the round trip. */
+function mockUploadResume(_file: File): Promise<void> {
+  return resolveAfterDelay(undefined);
+}
+
+// ---------------------------------------------------------------------------
 // Delegation: THRIVE_API_ORIGIN selects the Django implementations.
 // ---------------------------------------------------------------------------
 
@@ -714,4 +864,24 @@ export function getConversation(
   return apiEnabled()
     ? api.getConversation(conversationId)
     : mockGetConversation(conversationId);
+}
+
+export function searchJobs(query: string): Promise<JobSearchResult> {
+  return apiEnabled() ? api.searchJobs(query) : mockSearchJobs(query);
+}
+
+export function getJobPosting(
+  jobId: string,
+): Promise<{ job: JobPostingDetail; benchmark: RoleBenchmark }> {
+  return apiEnabled() ? api.getJobPosting(jobId) : mockGetJobPosting(jobId);
+}
+
+export function generateMatchReport(jobId: string): Promise<MatchReport> {
+  return apiEnabled()
+    ? api.generateMatchReport(jobId)
+    : mockGenerateMatchReport(jobId);
+}
+
+export function uploadResume(file: File): Promise<void> {
+  return apiEnabled() ? api.uploadResume(file) : mockUploadResume(file);
 }

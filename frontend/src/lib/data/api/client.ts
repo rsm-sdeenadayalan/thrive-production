@@ -48,11 +48,22 @@ export async function apiFetch<T>(
 		if (token) headers["x-csrftoken"] = token;
 		headers.referer = origin;
 	}
-	if (init.body !== undefined) headers["content-type"] = "application/json";
+	const isFormData = init.body instanceof FormData;
+	// FormData bodies are left alone: the browser/undici sets the multipart
+	// boundary in the content-type header itself, and stamping our own would
+	// produce a boundary-less header that the server can't parse.
+	if (init.body !== undefined && !isFormData) {
+		headers["content-type"] = "application/json";
+	}
 	const response = await fetch(`${origin}/api/thrive${path}`, {
 		method,
 		headers,
-		body: init.body === undefined ? undefined : JSON.stringify(init.body),
+		body:
+			init.body === undefined
+				? undefined
+				: isFormData
+					? (init.body as FormData)
+					: JSON.stringify(init.body),
 	});
 	if (response.status === 204) return undefined as T;
 	const payload = (await response.json().catch(() => null)) as (Envelope & T) | null;
