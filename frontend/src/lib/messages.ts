@@ -829,7 +829,9 @@ export const messages = {
 			 * A press that produces no response is this repo's worst failure mode.
 			 * Every branch of the callback now ends in something on screen.
 			 */
-			unexpected: 'Something went wrong on our end. Nothing was booked — try again.'
+			unexpected: 'Something went wrong on our end. Nothing was booked — try again.',
+			/** Session lapsed server-side between page render and form submit. */
+			signedOut: 'Your session has ended. Refresh to sign in again.'
 		},
 
 		disclaimer:

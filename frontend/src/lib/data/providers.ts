@@ -88,24 +88,27 @@ import { SlotUnavailableError } from "./errors";
 
 export { SlotUnavailableError } from "./errors";
 
+import * as api from "./api/providers";
+import { apiEnabled } from "./api/client";
+
 // ---------------------------------------------------------------------------
 // Student, courses, coursework
 // ---------------------------------------------------------------------------
 
-export function getStudent(): Promise<Student> {
+function mockGetStudent(): Promise<Student> {
   return resolveAfterDelay({ ...mockStudent });
 }
 
-export function getCourses(): Promise<Course[]> {
+function mockGetCourses(): Promise<Course[]> {
   return resolveAfterDelay(buildMockCourses());
 }
 
-export function getSyllabi(): Promise<Syllabus[]> {
+function mockGetSyllabi(): Promise<Syllabus[]> {
   return resolveAfterDelay(buildMockSyllabi());
 }
 
 /** Assignments, soonest due first. */
-export function getAssignments(): Promise<Assignment[]> {
+function mockGetAssignments(): Promise<Assignment[]> {
   const sorted = [...buildMockAssignments()].sort(
     (a, b) => Date.parse(a.dueDate) - Date.parse(b.dueDate),
   );
@@ -113,7 +116,7 @@ export function getAssignments(): Promise<Assignment[]> {
 }
 
 /** Tasks, soonest due first. Completed tasks sort last. */
-export function getTasks(): Promise<Task[]> {
+function mockGetTasks(): Promise<Task[]> {
   const sorted = [...buildMockTasks()].sort((a, b) => {
     if (a.done !== b.done) return a.done ? 1 : -1;
     return Date.parse(a.dueDate) - Date.parse(b.dueDate);
@@ -133,7 +136,7 @@ export function getTasks(): Promise<Task[]> {
  * filter moves into the database -- still server-side, still one answer to
  * "what time is it".
  */
-export function getEvents(): Promise<Event[]> {
+function mockGetEvents(): Promise<Event[]> {
   const now = Date.now();
   const upcoming = buildMockEvents()
     .filter((event) => Date.parse(event.end ?? event.start) >= now)
@@ -141,7 +144,7 @@ export function getEvents(): Promise<Event[]> {
   return resolveAfterDelay(upcoming);
 }
 
-export function getDegreeProgress(): Promise<DegreeProgress> {
+function mockGetDegreeProgress(): Promise<DegreeProgress> {
   return resolveAfterDelay({ ...mockDegreeProgress });
 }
 
@@ -150,12 +153,12 @@ export function getDegreeProgress(): Promise<DegreeProgress> {
  * track against today. Change the track on the student and the finish line,
  * the optional-phase tag, and the percentage all move with it.
  */
-export async function getProgramTimeline(): Promise<ProgramTimeline> {
+async function mockGetProgramTimeline(): Promise<ProgramTimeline> {
   const student = await getStudent();
   return buildProgramTimeline(student.programStart, student.track);
 }
 
-export function getResources(): Promise<ResourceLink[]> {
+function mockGetResources(): Promise<ResourceLink[]> {
   return resolveAfterDelay(mockResources.map((resource) => ({ ...resource })));
 }
 
@@ -168,7 +171,7 @@ export function getResources(): Promise<ResourceLink[]> {
 // "Add to calendar" stays a visual affordance until the student explicitly
 // connects one.
 
-export function getAdvisors(): Promise<Advisor[]> {
+function mockGetAdvisors(): Promise<Advisor[]> {
   return resolveAfterDelay(mockAdvisors.map((advisor) => ({ ...advisor })));
 }
 
@@ -177,7 +180,7 @@ export function getAdvisors(): Promise<Advisor[]> {
  * unavailable. Merging the store in here means no caller has to remember to
  * cross-reference bookings against the calendar.
  */
-export function getSlots(advisorId: string): Promise<AppointmentSlot[]> {
+function mockGetSlots(advisorId: string): Promise<AppointmentSlot[]> {
   const { claimedSlotIds } = readStore();
 
   const slots = buildSlotsFor(advisorId).map((slot) =>
@@ -188,7 +191,7 @@ export function getSlots(advisorId: string): Promise<AppointmentSlot[]> {
 }
 
 /** Confirmed appointments, soonest first. Cancelled ones drop out. */
-export function getMyAppointments(): Promise<Appointment[]> {
+function mockGetMyAppointments(): Promise<Appointment[]> {
   const { appointments } = readStore();
 
   const confirmed = appointments
@@ -206,7 +209,7 @@ export function getMyAppointments(): Promise<Appointment[]> {
  * student is looking at may have been rendered before somebody else took the
  * slot, and a real scheduling API would reject that too.
  */
-export async function bookAppointment(
+async function mockBookAppointment(
   slotId: string,
   reason: string,
 ): Promise<Appointment> {
@@ -264,7 +267,7 @@ export async function bookAppointment(
  * release is a single exact delete. It also drops the rebuild of the advisor's
  * whole slot list that the scan needed.
  */
-export async function cancelAppointment(
+async function mockCancelAppointment(
   appointmentId: string,
 ): Promise<Appointment | null> {
   const store = readStore();
@@ -296,7 +299,7 @@ export async function cancelAppointment(
  * providers the rest of the app reads. Building it here means the form never
  * has to know how to derive a unit count.
  */
-export async function getRequestPrefill(): Promise<CourseRequestPrefill> {
+async function mockGetRequestPrefill(): Promise<CourseRequestPrefill> {
   const [student, courses, degree] = await Promise.all([
     getStudent(),
     getCourses(),
@@ -316,7 +319,7 @@ export async function getRequestPrefill(): Promise<CourseRequestPrefill> {
 }
 
 /** Create a draft. Drafts are not sent anywhere; they only exist locally. */
-export async function createRequest(
+async function mockCreateRequest(
   input: CourseRequestInput,
 ): Promise<CourseRequest> {
   const store = readRequestStore();
@@ -346,7 +349,7 @@ export async function createRequest(
  * rather than being re-stamped or rejected, so a double-submitted form cannot
  * move an approved request back to "submitted".
  */
-export async function submitRequest(
+async function mockSubmitRequest(
   requestId: string,
 ): Promise<CourseRequest | null> {
   const store = readRequestStore();
@@ -362,7 +365,7 @@ export async function submitRequest(
 }
 
 /** All requests, drafts first then newest. Copies, so the store stays private. */
-export function getMyRequests(): Promise<CourseRequest[]> {
+function mockGetMyRequests(): Promise<CourseRequest[]> {
   const { requests } = readRequestStore();
 
   const ordered = [...requests]
@@ -378,11 +381,11 @@ export function getMyRequests(): Promise<CourseRequest[]> {
 }
 
 /** Whether the student record is "linked" to TSS. Simulated end to end. */
-export function getTssConnection(): Promise<boolean> {
+function mockGetTssConnection(): Promise<boolean> {
   return resolveAfterDelay(readRequestStore().tssConnected);
 }
 
-export function connectTss(): Promise<boolean> {
+function mockConnectTss(): Promise<boolean> {
   const store = readRequestStore();
   store.tssConnected = true;
   return resolveAfterDelay(true);
@@ -396,12 +399,12 @@ export function connectTss(): Promise<boolean> {
 // of the app uses and assembles a version from it. There is no file upload, no
 // document parsing, and no external resume service.
 
-export function getSkills(): Promise<Skill[]> {
+function mockGetSkills(): Promise<Skill[]> {
   return resolveAfterDelay(mockSkills.map((skill) => ({ ...skill })));
 }
 
 /** Versions newest first. Copies, so the store stays private. */
-export function getResumeVersions(): Promise<ResumeVersion[]> {
+function mockGetResumeVersions(): Promise<ResumeVersion[]> {
   const { versions } = readResumeStore();
 
   const ordered = [...versions]
@@ -411,7 +414,7 @@ export function getResumeVersions(): Promise<ResumeVersion[]> {
   return resolveAfterDelay(ordered);
 }
 
-export function getCurrentResume(): Promise<ResumeVersion | null> {
+function mockGetCurrentResume(): Promise<ResumeVersion | null> {
   const { versions } = readResumeStore();
   const current = versions.find((version) => version.isCurrent);
   return resolveAfterDelay(current ? { ...current } : null);
@@ -440,7 +443,7 @@ function composeSummary(goal: string, program: string, skillNames: string[]) {
  * Returns the version alongside a diff, so the UI can say what changed rather
  * than just claiming something did.
  */
-export async function generateNewVersion(): Promise<{
+async function mockGenerateNewVersion(): Promise<{
   version: ResumeVersion;
   diff: ResumeDiff;
 }> {
@@ -498,7 +501,7 @@ export async function generateNewVersion(): Promise<{
 }
 
 /** Make an earlier version current again. History is never deleted. */
-export function setCurrentVersion(
+function mockSetCurrentVersion(
   versionId: string,
 ): Promise<ResumeVersion | null> {
   const store = readResumeStore();
@@ -546,7 +549,7 @@ export function setCurrentVersion(
  * per-destination provider would mean three round trips to render one rail that
  * shows a count for each.
  */
-export function getConversations(): Promise<Conversation[]> {
+function mockGetConversations(): Promise<Conversation[]> {
   const conversations = buildMockConversations()
     .slice()
     .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
@@ -568,9 +571,147 @@ export function getConversations(): Promise<Conversation[]> {
  * to hold, and the page turns it into a 404 itself. Built on `getConversations`
  * so the copying rule has exactly one implementation.
  */
-export async function getConversation(
+async function mockGetConversation(
   conversationId: string,
 ): Promise<Conversation | null> {
   const conversations = await getConversations();
   return conversations.find((entry) => entry.id === conversationId) ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Delegation: THRIVE_API_ORIGIN selects the Django implementations.
+// ---------------------------------------------------------------------------
+
+export function getStudent(): Promise<Student> {
+  return apiEnabled() ? api.getStudent() : mockGetStudent();
+}
+
+export function getCourses(): Promise<Course[]> {
+  return apiEnabled() ? api.getCourses() : mockGetCourses();
+}
+
+export function getSyllabi(): Promise<Syllabus[]> {
+  return apiEnabled() ? api.getSyllabi() : mockGetSyllabi();
+}
+
+export function getAssignments(): Promise<Assignment[]> {
+  return apiEnabled() ? api.getAssignments() : mockGetAssignments();
+}
+
+export function getTasks(): Promise<Task[]> {
+  return apiEnabled() ? api.getTasks() : mockGetTasks();
+}
+
+export function getEvents(): Promise<Event[]> {
+  return apiEnabled() ? api.getEvents() : mockGetEvents();
+}
+
+export function getDegreeProgress(): Promise<DegreeProgress> {
+  return apiEnabled() ? api.getDegreeProgress() : mockGetDegreeProgress();
+}
+
+export function getProgramTimeline(): Promise<ProgramTimeline> {
+  return apiEnabled() ? api.getProgramTimeline() : mockGetProgramTimeline();
+}
+
+export function getResources(): Promise<ResourceLink[]> {
+  return apiEnabled() ? api.getResources() : mockGetResources();
+}
+
+export function getAdvisors(): Promise<Advisor[]> {
+  return apiEnabled() ? api.getAdvisors() : mockGetAdvisors();
+}
+
+export function getSlots(advisorId: string): Promise<AppointmentSlot[]> {
+  return apiEnabled() ? api.getSlots(advisorId) : mockGetSlots(advisorId);
+}
+
+export function getMyAppointments(): Promise<Appointment[]> {
+  return apiEnabled() ? api.getMyAppointments() : mockGetMyAppointments();
+}
+
+export function bookAppointment(
+  slotId: string,
+  reason: string,
+): Promise<Appointment> {
+  return apiEnabled()
+    ? api.bookAppointment(slotId, reason)
+    : mockBookAppointment(slotId, reason);
+}
+
+export function cancelAppointment(
+  appointmentId: string,
+): Promise<Appointment | null> {
+  return apiEnabled()
+    ? api.cancelAppointment(appointmentId)
+    : mockCancelAppointment(appointmentId);
+}
+
+export function getRequestPrefill(): Promise<CourseRequestPrefill> {
+  return apiEnabled() ? api.getRequestPrefill() : mockGetRequestPrefill();
+}
+
+export function createRequest(
+  input: CourseRequestInput,
+): Promise<CourseRequest> {
+  return apiEnabled() ? api.createRequest(input) : mockCreateRequest(input);
+}
+
+export function submitRequest(
+  requestId: string,
+): Promise<CourseRequest | null> {
+  return apiEnabled()
+    ? api.submitRequest(requestId)
+    : mockSubmitRequest(requestId);
+}
+
+export function getMyRequests(): Promise<CourseRequest[]> {
+  return apiEnabled() ? api.getMyRequests() : mockGetMyRequests();
+}
+
+export function getTssConnection(): Promise<boolean> {
+  return apiEnabled() ? api.getTssConnection() : mockGetTssConnection();
+}
+
+export function connectTss(): Promise<boolean> {
+  return apiEnabled() ? api.connectTss() : mockConnectTss();
+}
+
+export function getSkills(): Promise<Skill[]> {
+  return apiEnabled() ? api.getSkills() : mockGetSkills();
+}
+
+export function getResumeVersions(): Promise<ResumeVersion[]> {
+  return apiEnabled() ? api.getResumeVersions() : mockGetResumeVersions();
+}
+
+export function getCurrentResume(): Promise<ResumeVersion | null> {
+  return apiEnabled() ? api.getCurrentResume() : mockGetCurrentResume();
+}
+
+export function generateNewVersion(): Promise<{
+  version: ResumeVersion;
+  diff: ResumeDiff;
+}> {
+  return apiEnabled() ? api.generateNewVersion() : mockGenerateNewVersion();
+}
+
+export function setCurrentVersion(
+  versionId: string,
+): Promise<ResumeVersion | null> {
+  return apiEnabled()
+    ? api.setCurrentVersion(versionId)
+    : mockSetCurrentVersion(versionId);
+}
+
+export function getConversations(): Promise<Conversation[]> {
+  return apiEnabled() ? api.getConversations() : mockGetConversations();
+}
+
+export function getConversation(
+  conversationId: string,
+): Promise<Conversation | null> {
+  return apiEnabled()
+    ? api.getConversation(conversationId)
+    : mockGetConversation(conversationId);
 }

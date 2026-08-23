@@ -15,6 +15,7 @@ import {
 	publishedByDay,
 } from "$lib/availability";
 import { buildScheduleData } from "$lib/buildSchedule";
+import { apiEnabled } from "$lib/data/api/client";
 import {
 	bookAppointment,
 	cancelAppointment,
@@ -163,15 +164,20 @@ export const load: PageServerLoad = async () => {
  * for a reason we have not thought about should not be reported to a student as
  * a booking problem.
  *
- * ## No auth check, and that is a known hole
+ * ## Auth check, gated on the API being live
  *
- * There is no session to verify yet. A form action is reachable by direct POST,
- * exactly as the Next server actions were -- MIGRATION.md section 9 defect 2,
- * still open. A real deployment must check the session INSIDE these functions;
- * putting the check only in the UI leaves it open.
+ * Both actions now guard first: no `locals.student` while `apiEnabled()` is
+ * true fails the action with 401 rather than letting a direct POST reach the
+ * provider with no session -- MIGRATION.md section 9 defect 2, closed for the
+ * Django path. On the mock path there is still no session to check against,
+ * so the guard is a no-op there, same as before.
  */
 export const actions: Actions = {
-	book: async ({ request }) => {
+	book: async ({ request, locals }) => {
+		if (apiEnabled() && !locals.student) {
+			return fail(401, { error: messages.appointments.errors.signedOut });
+		}
+
 		const form = await request.formData();
 		const slotId = String(form.get("slotId") ?? "");
 		/*
@@ -217,7 +223,11 @@ export const actions: Actions = {
 		}
 	},
 
-	cancel: async ({ request }) => {
+	cancel: async ({ request, locals }) => {
+		if (apiEnabled() && !locals.student) {
+			return fail(401, { error: messages.appointments.errors.signedOut });
+		}
+
 		const form = await request.formData();
 		const appointmentId = String(form.get("appointmentId") ?? "");
 
