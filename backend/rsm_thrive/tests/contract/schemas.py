@@ -234,6 +234,35 @@ OVERLAY = {
 }
 
 # ---------------------------------------------------------------------------
+# Chat
+# ---------------------------------------------------------------------------
+
+CHAT_MESSAGE = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["id", "role", "body", "sentAt"],
+    "properties": {
+        "id": {"type": "string"},
+        "role": {"enum": ["student", "thrive"]},
+        "body": {"type": "string"},
+        "sentAt": ISO_INSTANT,
+    },
+}
+
+CONVERSATION = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["id", "destination", "title", "messages", "updatedAt"],
+    "properties": {
+        "id": {"type": "string"},
+        "destination": {"enum": ["resources", "courses", "career"]},
+        "title": {"type": "string"},
+        "messages": {"type": "array", "items": CHAT_MESSAGE},
+        "updatedAt": ISO_INSTANT,
+    },
+}
+
+# ---------------------------------------------------------------------------
 # Appointments
 # ---------------------------------------------------------------------------
 

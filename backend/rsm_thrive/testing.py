@@ -6,10 +6,11 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from rsm_thrive.models import (
-    Advisor, AppointmentSlot, Assignment, Course, CourseMeeting, CourseRequest,
-    DegreeGap, DegreeRequirement, Enrollment, Event, ProgramPhaseRow,
-    ResumeCourseHighlight, ResourceLink, SharedTask, Skill, StudentAssignment,
-    StudentProfile, StudentTask, Syllabus, TaskOverride,
+    Advisor, AppointmentSlot, Assignment, ChatMessage, Conversation, Course,
+    CourseMeeting, CourseRequest, DegreeGap, DegreeRequirement, Enrollment,
+    Event, ProgramPhaseRow, ResumeCourseHighlight, ResourceLink, SharedTask,
+    Skill, StudentAssignment, StudentProfile, StudentTask, Syllabus,
+    TaskOverride,
 )
 
 
@@ -200,3 +201,17 @@ def make_course_request(profile, **overrides) -> CourseRequest:
               "reason": "why", "prefill": {}}
     fields.update(overrides)
     return CourseRequest.objects.create(user=profile.user, **fields)
+
+
+def make_conversation(profile, **overrides) -> Conversation:
+    n = next(_counter)
+    fields = {"destination": "resources", "title": f"Conversation {n}",
+              "updated_at": timezone.now()}
+    fields.update(overrides)
+    return Conversation.objects.create(user=profile.user, **fields)
+
+
+def make_message(conversation, **overrides) -> ChatMessage:
+    fields = {"role": "student", "body": "hello", "sent_at": timezone.now()}
+    fields.update(overrides)
+    return ChatMessage.objects.create(conversation=conversation, **fields)

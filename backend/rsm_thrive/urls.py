@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import advisors, appointments, assignments, auth, courses, degree, events, health, overlay, requests, resources, resume, students, tasks
+from .views import advisors, appointments, assignments, auth, chat, courses, degree, events, health, overlay, requests, resources, resume, students, tasks
 
 app_name = "rsm_thrive"
 
@@ -11,6 +11,8 @@ urlpatterns = [
     path("appointments/<str:appointment_id>/cancel", appointments.cancel_appointment, name="appointment-cancel"),
     path("assignments", assignments.assignments, name="assignments"),
     path("calendar-prefs", overlay.calendar_prefs, name="calendar-prefs"),
+    path("conversations", chat.conversations, name="conversations"),
+    path("conversations/<str:conversation_id>", chat.conversation, name="conversation"),
     path("courses", courses.courses, name="courses"),
     path("degree/progress", degree.progress, name="degree-progress"),
     path("degree/timeline", degree.timeline, name="degree-timeline"),

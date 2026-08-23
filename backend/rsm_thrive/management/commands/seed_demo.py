@@ -55,5 +55,8 @@ class Command(BaseCommand):
             for course in demo_courses:
                 t.make_highlight(course.code, title=course.title,
                                  highlight=f"Applied analytics from {course.code}")
+            conv = t.make_conversation(profile, title="What are the core courses?")
+            t.make_message(conv, body="What are the core courses in my program?")
+            t.make_message(conv, role="thrive", body="The core courses are...")
             generate_version(profile)
         self.stdout.write(self.style.SUCCESS("demo world seeded (user: demo)"))

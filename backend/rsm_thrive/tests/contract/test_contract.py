@@ -7,11 +7,11 @@ from django.utils import timezone
 from rsm_thrive.services.requests import build_prefill
 from rsm_thrive.services.resume import generate_version
 from rsm_thrive.testing import (
-    enroll, make_advisor, make_assignment, make_course, make_course_request,
-    make_event, make_gap, make_highlight, make_meeting, make_phase,
-    make_requirement, make_resource, make_shared_task, make_skill, make_slot,
-    make_student, make_student_task, make_syllabus, set_assignment_status,
-    set_override,
+    enroll, make_advisor, make_assignment, make_conversation, make_course,
+    make_course_request, make_event, make_gap, make_highlight, make_meeting,
+    make_message, make_phase, make_requirement, make_resource, make_shared_task,
+    make_skill, make_slot, make_student, make_student_task, make_syllabus,
+    set_assignment_status, set_override,
 )
 from . import schemas
 
@@ -55,6 +55,9 @@ def world(client):
     make_course_request(profile, type="drop", course="MGTA 453 · Business Analytics",
                         reason="Scheduling conflict", status="submitted",
                         submitted_at=timezone.now(), prefill=prefill)
+    conv = make_conversation(profile)
+    make_message(conv)
+    make_message(conv, role="thrive", body="answer")
     generate_version(profile)
     client.force_login(profile.user)
     return profile
@@ -62,6 +65,7 @@ def world(client):
 
 CASES = [
     ("/api/thrive/me", schemas.STUDENT, False),
+    ("/api/thrive/conversations", schemas.CONVERSATION, True),
     ("/api/thrive/courses", schemas.COURSE, True),
     ("/api/thrive/syllabi", schemas.SYLLABUS, True),
     ("/api/thrive/assignments", schemas.ASSIGNMENT, True),
