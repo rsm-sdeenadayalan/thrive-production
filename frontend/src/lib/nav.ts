@@ -1,6 +1,7 @@
 import type House from '@lucide/svelte/icons/house';
 import BookOpen from '@lucide/svelte/icons/book-open';
 import Briefcase from '@lucide/svelte/icons/briefcase';
+import BriefcaseBusiness from '@lucide/svelte/icons/briefcase-business';
 import CalendarCheck from '@lucide/svelte/icons/calendar-check';
 import CalendarDays from '@lucide/svelte/icons/calendar-days';
 import CalendarRange from '@lucide/svelte/icons/calendar-range';
@@ -54,15 +55,16 @@ export interface NavItem {
 }
 
 /**
- * The visible navigation. FOUR DESTINATIONS, in this order.
+ * The visible navigation. FIVE DESTINATIONS, in this order.
  *
  * ONE LIST drives the desktop rail and the mobile bottom bar, so the two can
  * never drift apart. Trimmed from eleven on 2026-08-22: nine of the eleven were
  * placeholders, and a nav that is four-fifths stubs reads as broken rather than
- * unfinished. These four are what the product is for now.
+ * unfinished. Jobs was added on 2026-08-23 as the fifth -- a real page, not a
+ * stub, so the trim's own reasoning is not undone by growing the list back out.
  *
- * The bottom bar renders this list DIRECTLY rather than naming its own four
- * hrefs, which is new. It used to carry `PRIMARY_SLOTS = ['/', '/calendar',
+ * The bottom bar renders this list DIRECTLY rather than naming its own hrefs,
+ * which is new. It used to carry `PRIMARY_SLOTS = ['/', '/calendar',
  * '/classes', '/assignments']` -- a second, hardcoded copy of "which are the
  * important ones" that had to be kept in step by hand. Two of those four are
  * parked now, so that copy would have been the thing that broke.
@@ -85,6 +87,12 @@ export const primaryNav: NavItem[] = [
 		label: 'Appointments',
 		icon: CalendarCheck,
 		description: 'Book time with advising and career coaching'
+	},
+	{
+		href: '/jobs',
+		label: 'Jobs',
+		icon: BriefcaseBusiness,
+		description: 'Search postings ranked against your resume'
 	},
 	{
 		href: '/ask',

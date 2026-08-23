@@ -1,4 +1,4 @@
-import type { Standing } from '$lib/data';
+import type { JobCompetency, Standing } from '$lib/data';
 import type { DueUrgency } from '$lib/format';
 
 /**
@@ -114,3 +114,19 @@ export const nudgeTones: Partial<Record<Standing, string>> = {
 };
 
 export const nudgeToneFallback = 'border-primary bg-primary-soft text-primary-hover';
+
+/**
+ * A match report's competency becomes a tone in exactly one place.
+ *
+ * `strong` and `good` get the tones that already mean "this is fine" elsewhere
+ * in THRIVE; `stretch` and `reach` are not failures -- a posting is allowed to
+ * ask for more than a resume shows yet -- but they are the two competencies
+ * that name a gap worth noticing, so they take the same two tones a due date
+ * uses for "notice this."
+ */
+export const competencyTone: Record<JobCompetency, TagTone> = {
+	strong: 'on-track',
+	good: 'primary',
+	stretch: 'watch',
+	reach: 'needs-help'
+};

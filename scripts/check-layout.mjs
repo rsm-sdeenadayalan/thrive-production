@@ -108,6 +108,13 @@ const TARGETS = [
 		label: '/appointments booking',
 		click: '[data-service]:not([disabled])'
 	},
+	{ route: '/jobs', label: '/jobs' },
+	/*
+	 * A real query, so this measures the two-column results-plus-benchmark
+	 * layout rather than the empty "search to see postings" state above.
+	 */
+	{ route: '/jobs?q=data', label: '/jobs results' },
+	{ route: '/jobs/job-1', label: '/jobs detail' },
 	{ route: '/ask', label: '/ask' },
 	/*
 	 * A saved conversation OPEN, which is the tall state.

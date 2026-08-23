@@ -6,17 +6,19 @@
 	/**
 	 * Mobile navigation. Replaces SideRail below `lg`.
 	 *
-	 * One slot per destination, and there are four, so every destination is one
+	 * One slot per destination, and there are five, so every destination is one
 	 * tap away.
 	 *
 	 * ## The More sheet is gone (2026-08-22)
 	 *
 	 * It existed because nine destinations do not fit across a phone: four got a
 	 * slot and the rest lived behind an overflow sheet. With four destinations
-	 * total there is no overflow, so the sheet, its scrim, its
+	 * total there was no overflow, so the sheet, its scrim, its
 	 * `aria-expanded`/`aria-controls` wiring, its open state, and its
 	 * focus-return-on-dismiss all went with it. Kept as an empty sheet it would
-	 * have been a button that opens nothing.
+	 * have been a button that opens nothing. Jobs became a fifth slot on
+	 * 2026-08-23 -- still no overflow, `flex-1` just gives each tab a narrower
+	 * share of the same bar.
 	 *
 	 * What went with it, listed because each was a deliberate thing and someone
 	 * rebuilding an overflow later should know it existed:
@@ -27,8 +29,9 @@
 	 *     the sheet element's. The action itself is kept at
 	 *     `$lib/actions/escapeKey` -- it is general-purpose and the floating
 	 *     panels behind FEATURES will want it -- but this was its only call site.
-	 *   - `PRIMARY_SLOTS`, a hardcoded list of the four important hrefs. The bar
-	 *     renders `primaryNav` directly now, so "which four" is stated once.
+	 *   - `PRIMARY_SLOTS`, a hardcoded list of the four important hrefs at the
+	 *     time. The bar renders `primaryNav` directly now, so "which ones" is
+	 *     stated once -- and stayed true when Jobs made it five.
 	 *
 	 * PORTED AT 1px -- see the note in SideRail.
 	 */

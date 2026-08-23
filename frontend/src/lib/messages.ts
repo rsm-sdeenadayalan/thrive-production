@@ -838,6 +838,97 @@ export const messages = {
 			'This is a prototype. Bookings are held in THRIVE only. Nothing is written to your calendar, and no one is notified.'
 	},
 
+	/* --- Job search ---------------------------------------------------------- */
+	jobs: {
+		documentTitle: 'Jobs',
+		eyebrow: 'jobs',
+		title: 'Search job postings',
+		intro:
+			'Search postings and see how they line up against your skills. There is no live job board behind this yet -- results come from a small fixed sample.',
+
+		search: {
+			label: 'Job title, company, or skill',
+			placeholder: 'e.g. Data Analyst',
+			button: 'Search'
+		},
+
+		/** Which of the two dead ends a student is looking at. Never both. */
+		empty: {
+			noQuery: 'Search above to see postings.',
+			/** Says the query back, so a typo is obvious rather than a mystery. */
+			noResults: (query: string) => `No postings match “${query}”. Try different words.`
+		},
+
+		profileBanner: {
+			message: 'Upload your resume to rank results against your skills.',
+			fileLabel: 'Resume file',
+			upload: 'Upload resume',
+			uploading: 'Uploading…',
+			/** The guard before the file ever reaches the server. */
+			empty: 'Choose a file first.',
+			/** The provider failing for a reason nobody has thought about. */
+			error: 'Something went wrong uploading your resume. Try again.'
+		},
+
+		benchmark: {
+			headingId: 'jobs-benchmark-heading',
+			heading: 'What this role typically asks for',
+			/*
+			 * A function rather than a template at the call site, same reasoning as
+			 * every other count in this file: the sample size is a fact a translation
+			 * may want to place differently around the count.
+			 */
+			sampleSize: (n: number) =>
+				n === 1 ? 'Based on 1 posting like this one.' : `Based on ${n} postings like this one.`,
+			empty: 'Not enough postings yet to show what this role typically asks for.'
+		},
+
+		card: {
+			matchScore: 'Match score',
+			skillsHave: 'Skills you have',
+			skillsBuild: 'Skills to build',
+			/** The card's whole accessible name, since the title alone repeats. */
+			posted: (date: string) => `Posted ${date}`
+		},
+
+		/** An id with no posting behind it. A stale link, not a crash. */
+		notFound: 'That job posting is not on file.',
+
+		detail: {
+			skillsHeading: 'Skills this posting asks for',
+			viewPosting: 'View posting',
+			/** Spoken tail, since the link text alone does not say where it opens. */
+			viewPostingTail: ', opens in a new tab'
+		},
+
+		report: {
+			headingId: 'jobs-report-heading',
+			heading: 'How you match up',
+			generate: 'Generate match report',
+			generating: 'Generating…',
+			/** 409: nothing to score against yet. */
+			noResume: 'Upload a resume first to generate a match report.',
+			/** 503: the report service, not the posting, is the problem. */
+			unavailable: 'The match report service is unavailable right now. Try again shortly.',
+			matchedHeading: 'Skills you have',
+			gapsHeading: 'Skills to build',
+			/** Neither a `fail()` nor a success -- must still say something. */
+			unexpected: 'Something went wrong generating your report. Try again.',
+			/** Keyed by `JobCompetency`, so a fifth value is a compile error here. */
+			competencyLabels: {
+				strong: 'Strong match',
+				good: 'Good match',
+				stretch: 'Stretch',
+				reach: 'Reach'
+			}
+		},
+
+		errors: {
+			/** Session lapsed server-side between page render and form submit. */
+			signedOut: 'Your session has ended. Refresh to sign in again.'
+		}
+	},
+
 	/* --- Ask THRIVE -------------------------------------------------------- */
 	ask: {
 		documentTitle: 'Ask THRIVE',
