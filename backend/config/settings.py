@@ -68,3 +68,13 @@ MAILERS = {
         "BACKEND": "django.core.mail.backends.smtp.EmailBackend",
     },
 }
+
+THRIVE_DEV_LOGIN_ENABLED = os.environ.get("THRIVE_DEV_LOGIN", "1") == "1"
+THRIVE_FRONTEND_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get(
+        "THRIVE_FRONTEND_ORIGINS",
+        "http://localhost:5173,http://localhost:3000,http://localhost:3123",
+    ).split(",")
+    if origin.strip()
+]

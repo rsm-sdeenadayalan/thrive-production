@@ -19,6 +19,8 @@ class Command(BaseCommand):
         with transaction.atomic():
             profile = t.make_student(username="demo", display_name="Demo Student",
                                      goal="Data Scientist")
+            profile.user.set_password("demo")
+            profile.user.save(update_fields=["password"])
             demo_courses = []
             for i in (1, 2):
                 course = t.make_course(id=f"demo-c{i}")
