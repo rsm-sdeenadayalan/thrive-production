@@ -99,3 +99,39 @@ def test_bulk_order(client):
     assert client.patch("/api/thrive/tasks/order",
                         data=json.dumps({"orders": {"asg:a1": True}}),
                         content_type="application/json").status_code == 400
+
+
+def test_custom_event_null_optionals_treated_as_absent(client):
+    me = make_student()
+    client.force_login(me.user)
+    good = {"title": "Study jam", "dayKey": "2026-09-01", "createdAt": 1712345678901}
+
+    # time: null → treated as absent, stored as ""
+    assert _put(client, "/api/thrive/custom-events/custom-null-time",
+                {**good, "time": None}).status_code == 204
+    row = CustomCalendarEvent.objects.get(key="custom-null-time")
+    assert row.time == ""
+
+    # time: non-string (e.g., 123) → 400
+    assert _put(client, "/api/thrive/custom-events/custom-bad-time",
+                {**good, "time": 123}).status_code == 400
+
+    # label: null → treated as absent, stored as ""
+    assert _put(client, "/api/thrive/custom-events/custom-null-label",
+                {**good, "label": None}).status_code == 204
+    row = CustomCalendarEvent.objects.get(key="custom-null-label")
+    assert row.label == ""
+
+
+def test_quick_item_null_optionals_treated_as_absent(client):
+    me = make_student()
+    client.force_login(me.user)
+    item = {"title": "Buy poster board", "done": False, "createdAt": 1712345678901}
+
+    # copiedFrom: null, note: null → treated as absent, stored as ""
+    assert _put(client, "/api/thrive/quick-items/q-null-fields",
+                {**item, "copiedFrom": None, "note": None, "dueDate": None}).status_code == 204
+    row = QuickListItem.objects.get(key="q-null-fields")
+    assert row.copied_from == ""
+    assert row.note == ""
+    assert row.due_date == ""

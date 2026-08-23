@@ -74,7 +74,7 @@ def custom_event(request, key):
         return json_error("bad_request", "dayKey must match YYYY-MM-DD format.", 400)
 
     # Validate time (optional, but if present must match HH:MM)
-    time = body.get("time", "")
+    time = body.get("time") or ""  # Normalize None and missing to ""
     if time and (not isinstance(time, str) or not TIME_RE.match(time)):
         return json_error("bad_request", "time must match HH:MM format or be absent.", 400)
 
@@ -84,8 +84,8 @@ def custom_event(request, key):
         return json_error("bad_request", "urgent must be a boolean.", 400)
 
     # Validate label (optional string, default "")
-    label = body.get("label", "")
-    if not isinstance(label, str):
+    label = body.get("label") or ""  # Normalize None and missing to ""
+    if label and not isinstance(label, str):
         return json_error("bad_request", "label must be a string.", 400)
 
     # Validate createdAt (required int, not bool)
@@ -136,17 +136,17 @@ def quick_item(request, key):
     if isinstance(created_at, bool) or not isinstance(created_at, int):
         return json_error("bad_request", "createdAt must be an integer.", 400)
 
-    # Validate optional fields
-    copied_from = body.get("copiedFrom", "")
-    if not isinstance(copied_from, str):
+    # Validate optional fields (normalize None and missing to "")
+    copied_from = body.get("copiedFrom") or ""
+    if copied_from and not isinstance(copied_from, str):
         return json_error("bad_request", "copiedFrom must be a string.", 400)
 
-    due_date = body.get("dueDate", "")
-    if not isinstance(due_date, str):
+    due_date = body.get("dueDate") or ""
+    if due_date and not isinstance(due_date, str):
         return json_error("bad_request", "dueDate must be a string.", 400)
 
-    note = body.get("note", "")
-    if not isinstance(note, str):
+    note = body.get("note") or ""
+    if note and not isinstance(note, str):
         return json_error("bad_request", "note must be a string.", 400)
 
     QuickListItem.objects.update_or_create(
