@@ -41,14 +41,15 @@ below only blocks the step named next to it.
 8. **Zoom Server-to-Server OAuth app** (Rady/UCSD Zoom account owner): one
    app created → account ID, client ID, client secret. *Blocks: real Zoom
    links on bookings; we build against a fake client meanwhile.*
-9. **Canvas API access** (IT/program): institutional token or service
-   account. *Not blocking: per-student tokens work day one (F3).*
+9. ~~**Canvas API access** (IT/program)~~ — **withdrawn for now**: Canvas
+   integration is out of scope (decision 2026-08-23). Academic data stays
+   admin-seeded; revisit if the program wants live assignment sync later.
 
 ## What we're doing meanwhile (no dependencies)
 
 - F2a: appointments backend — booking with race-safe slots, ICS invite
   emails, Zoom behind a swappable client (fake until #8 lands).
 - F2b: course-request + living-resume providers.
-- F3: Canvas ingestion via per-student tokens.
+- ~~F3: Canvas ingestion~~ — dropped (2026-08-23); academic data is seeded/admin-entered.
 - F4: wiring the SvelteKit frontend to the API behind UCSD login.
 - Phases C/J: chatbots + job search (local Postgres/pgvector via Docker).
