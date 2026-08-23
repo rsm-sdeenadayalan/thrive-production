@@ -26,6 +26,7 @@ import type {
 	Syllabus,
 	Task,
 } from "../types";
+import { SlotUnavailableError } from "../errors";
 import { ApiError, apiFetch } from "./client";
 
 export async function getStudent(): Promise<Student> {
@@ -90,6 +91,117 @@ export async function getConversation(
 	try {
 		return await apiFetch<Conversation>(
 			`/conversations/${encodeURIComponent(conversationId)}`,
+		);
+	} catch (error) {
+		if (error instanceof ApiError && error.status === 404) return null;
+		throw error;
+	}
+}
+
+export async function bookAppointment(
+	slotId: string,
+	reason: string,
+): Promise<Appointment> {
+	try {
+		return await apiFetch<Appointment>("/appointments", {
+			method: "POST",
+			body: { slotId, reason },
+		});
+	} catch (error) {
+		if (
+			error instanceof ApiError &&
+			(error.status === 409 || error.code === "slot_unknown")
+		) {
+			throw new SlotUnavailableError(error.message);
+		}
+		throw error;
+	}
+}
+
+export async function cancelAppointment(
+	appointmentId: string,
+): Promise<Appointment | null> {
+	try {
+		return await apiFetch<Appointment>(
+			`/appointments/${encodeURIComponent(appointmentId)}/cancel`,
+			{ method: "POST" },
+		);
+	} catch (error) {
+		if (error instanceof ApiError && error.status === 404) return null;
+		throw error;
+	}
+}
+
+export function getRequestPrefill(): Promise<CourseRequestPrefill> {
+	return apiFetch<CourseRequestPrefill>("/requests/prefill");
+}
+
+export function createRequest(input: CourseRequestInput): Promise<CourseRequest> {
+	return apiFetch<CourseRequest>("/requests", { method: "POST", body: input });
+}
+
+export async function submitRequest(
+	requestId: string,
+): Promise<CourseRequest | null> {
+	try {
+		return await apiFetch<CourseRequest>(
+			`/requests/${encodeURIComponent(requestId)}/submit`,
+			{ method: "POST" },
+		);
+	} catch (error) {
+		if (error instanceof ApiError && error.status === 404) return null;
+		throw error;
+	}
+}
+
+export function getMyRequests(): Promise<CourseRequest[]> {
+	return apiFetch<CourseRequest[]>("/requests");
+}
+
+export async function getTssConnection(): Promise<boolean> {
+	return (await apiFetch<{ connected: boolean }>("/tss")).connected;
+}
+
+export async function connectTss(): Promise<boolean> {
+	return (
+		await apiFetch<{ connected: boolean }>("/tss/connect", { method: "POST" })
+	).connected;
+}
+
+export function getSkills(): Promise<Skill[]> {
+	return apiFetch<Skill[]>("/resume/skills");
+}
+
+export function getResumeVersions(): Promise<ResumeVersion[]> {
+	return apiFetch<ResumeVersion[]>("/resume/versions");
+}
+
+export async function getCurrentResume(): Promise<ResumeVersion | null> {
+	try {
+		return await apiFetch<ResumeVersion>("/resume/current");
+	} catch (error) {
+		if (error instanceof ApiError && error.status === 404) return null;
+		throw error;
+	}
+}
+
+export function generateNewVersion(): Promise<{
+	version: ResumeVersion;
+	diff: ResumeDiff;
+}> {
+	return apiFetch<{ version: ResumeVersion; diff: ResumeDiff }>(
+		"/resume/versions",
+		{ method: "POST" },
+	);
+}
+
+export async function setCurrentVersion(
+	versionId: string,
+): Promise<ResumeVersion | null> {
+	try {
+		return await apiFetch<ResumeVersion>(
+			`/resume/versions/${encodeURIComponent(versionId)}/current`,
+			{ method: "POST" },
 		);
 	} catch (error) {
 		if (error instanceof ApiError && error.status === 404) return null;
