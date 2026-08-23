@@ -25,12 +25,11 @@ def test_overlay_roundtrip(client):
                 {"note": "ask about rubric"}).status_code == 204
 
     body = client.get("/api/thrive/overlay").json()
-    assert body == {
-        "ignoredEventIds": ["evt-1"],
-        "joinedEventIds": ["evt-2"],
-        "calendarPrefs": {"view": "week", "filters": ["rady"]},
-        "taskNotes": {"asg:a1": "ask about rubric"},
-    }
+    assert body["ignoredEventIds"] == ["evt-1"]
+    assert body["joinedEventIds"] == ["evt-2"]
+    assert body["calendarPrefs"] == {"view": "week", "filters": ["rady"]}
+    assert body["taskNotes"] == {"asg:a1": "ask about rubric"}
+    assert "stores" in body
 
     # Delete ignore (idempotent)
     assert client.delete("/api/thrive/events/evt-1/ignore").status_code == 204

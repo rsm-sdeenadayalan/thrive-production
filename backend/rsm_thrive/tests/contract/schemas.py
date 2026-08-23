@@ -224,12 +224,13 @@ PROGRAM_TIMELINE = {
 OVERLAY = {
     "type": "object",
     "additionalProperties": False,
-    "required": ["ignoredEventIds", "joinedEventIds", "calendarPrefs", "taskNotes"],
+    "required": ["ignoredEventIds", "joinedEventIds", "calendarPrefs", "taskNotes", "stores"],
     "properties": {
         "ignoredEventIds": {"type": "array", "items": {"type": "string"}},
         "joinedEventIds": {"type": "array", "items": {"type": "string"}},
         "calendarPrefs": {"type": "object"},
         "taskNotes": {"type": "object", "additionalProperties": {"type": "string"}},
+        "stores": {"type": "object"},
     },
 }
 
