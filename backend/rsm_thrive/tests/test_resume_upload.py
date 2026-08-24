@@ -4,7 +4,7 @@ import pytest
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 
-from rsm_thrive.models import ResumeVersion
+from rsm_thrive.models import JobPosting, MatchReport, ResumeVersion
 from rsm_thrive.services.llm import FakeLLM
 from rsm_thrive.views import resume as resume_views
 
@@ -51,16 +51,62 @@ class TestUpload:
         assert version.experience[0]["organization"] == "Acme"
 
     def test_replaces_previous_current(self, client, student, monkeypatch):
-        ResumeVersion.objects.create(user=student, label="old", summary="s",
-                                     skills=[], courses=[], experience=[],
-                                     is_current=True)
+        old = ResumeVersion.objects.create(user=student, label="Uploaded resume",
+                                           summary="s", skills=[], courses=[],
+                                           experience=[], is_current=True)
         monkeypatch.setattr(resume_views, "extract_uploaded_text",
                             lambda f: "text " * 100)
         _install(monkeypatch, [_envelope()])
         assert _upload(client).status_code == 201
+        # The old uploaded version is gone, not just un-currented: only the
+        # newest uploaded resume should stick around for job-search scoring.
+        assert not ResumeVersion.objects.filter(pk=old.pk).exists()
+        assert ResumeVersion.objects.filter(user=student).count() == 1
+        current = ResumeVersion.objects.get(user=student, is_current=True)
+        assert current.label == "Uploaded resume"
+
+    def test_second_upload_deletes_old_upload_and_its_match_reports(
+            self, client, student, monkeypatch):
+        old = ResumeVersion.objects.create(user=student, label="Uploaded resume",
+                                           summary="s", skills=[], courses=[],
+                                           experience=[], is_current=True)
+        posting = JobPosting.objects.create(
+            source="fake", external_id="1", title="Data Analyst", company="Acme",
+            url="https://e.example/1", description="sql", skills=["sql"],
+            embedding=[])
+        report = MatchReport.objects.create(
+            user=student, posting=posting, resume_version=old,
+            competency="good", score=72, matched_skills=["sql"], gaps=[],
+            verdict="ok")
+
+        monkeypatch.setattr(resume_views, "extract_uploaded_text",
+                            lambda f: "text " * 100)
+        _install(monkeypatch, [_envelope()])
+        assert _upload(client).status_code == 201
+
+        uploaded = ResumeVersion.objects.filter(user=student,
+                                                label="Uploaded resume")
+        assert uploaded.count() == 1
+        newest = uploaded.get()
+        assert newest.is_current is True
+        assert newest.pk != old.pk
+        assert not MatchReport.objects.filter(pk=report.pk).exists()
+
+    def test_generated_version_survives_upload_uncurrented(
+            self, client, student, monkeypatch):
+        generated = ResumeVersion.objects.create(
+            user=student, label="Living resume v1", summary="s", skills=[],
+            courses=[], experience=[], is_current=True)
+
+        monkeypatch.setattr(resume_views, "extract_uploaded_text",
+                            lambda f: "text " * 100)
+        _install(monkeypatch, [_envelope()])
+        assert _upload(client).status_code == 201
+
+        generated.refresh_from_db()
+        assert generated.is_current is False
+        assert ResumeVersion.objects.filter(pk=generated.pk).exists()
         assert ResumeVersion.objects.filter(user=student).count() == 2
-        assert ResumeVersion.objects.get(user=student, is_current=True).label \
-            == "Uploaded resume"
 
     def test_non_pdf_400(self, client, student, monkeypatch):
         _install(monkeypatch, [])

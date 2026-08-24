@@ -104,6 +104,12 @@ def resume_upload(request):
             experience=experience_payload,
             is_current=True,
         )
+        # Only one uploaded resume should ever be live for job-search context;
+        # drop older uploads (and their cascade-deleted MatchReports) but leave
+        # generated (living-resume) versions untouched.
+        ResumeVersion.objects.filter(
+            user=request.user, label="Uploaded resume",
+        ).exclude(pk=version.pk).delete()
     return json_ok(version_payload(version), status=201)
 
 
