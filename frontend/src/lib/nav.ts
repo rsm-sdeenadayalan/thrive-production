@@ -90,9 +90,9 @@ export const primaryNav: NavItem[] = [
 	},
 	{
 		href: '/jobs',
-		label: 'Jobs',
+		label: 'Career',
 		icon: BriefcaseBusiness,
-		description: 'Search postings ranked against your resume'
+		description: 'Postings ranked against your resume — search, save, apply'
 	},
 	{
 		href: '/ask',
@@ -189,12 +189,6 @@ export const parkedNav: NavItem[] = [
 		label: 'Events',
 		icon: CalendarRange,
 		description: 'Career fairs, panels, and workshops'
-	},
-	{
-		href: '/career',
-		label: 'Career',
-		icon: Briefcase,
-		description: 'Steps toward your goal'
 	},
 	{
 		href: '/resources',

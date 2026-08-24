@@ -838,13 +838,13 @@ export const messages = {
 			'This is a prototype. Bookings are held in THRIVE only. Nothing is written to your calendar, and no one is notified.'
 	},
 
-	/* --- Job search ---------------------------------------------------------- */
+	/* --- Career -------------------------------------------------------------- */
 	jobs: {
-		documentTitle: 'Jobs',
-		eyebrow: 'jobs',
-		title: 'Search job postings',
+		documentTitle: 'Career',
+		eyebrow: 'career',
+		title: 'Your career feed',
 		intro:
-			'Search postings and see how they line up against your skills. Postings come from public company job boards, refreshed by a periodic ingest run -- not a live feed of every opening the moment it posts.',
+			'Postings ranked against your resume, search, save, and apply from one feed. Postings come from public company job boards, refreshed by a periodic ingest run -- not a live feed of every opening the moment it posts.',
 
 		search: {
 			label: 'Job title, company, or skill',
@@ -857,6 +857,51 @@ export const messages = {
 			noQuery: 'Search above to see postings.',
 			/** Says the query back, so a typo is obvious rather than a mystery. */
 			noResults: (query: string) => `No postings match “${query}”. Try different words.`
+		},
+
+		/**
+		 * The feed's three tabs and their counts, and the three dead ends a tab
+		 * can land on.
+		 *
+		 * Counts are functions rather than a template at the call site, same
+		 * reasoning as `benchmark.sampleSize` below: a translation may want the
+		 * number placed differently around the word.
+		 */
+		feed: {
+			tabsLabel: 'Job feed tabs',
+			tabs: {
+				recommended: (n: number) => `Recommended (${n})`,
+				liked: (n: number) => `Liked (${n})`,
+				all: (n: number) => `All (${n})`
+			},
+
+			empty: {
+				noJobsAtAll: 'No postings in this feed yet. Check back after the next ingest run.',
+				/** Says the query back, same reasoning as `empty.noResults` above. */
+				noMatchesForQuery: (query: string) =>
+					`No postings match “${query}”. Try different words.`,
+				likedTabEmpty:
+					'No liked postings yet. Like one from Recommended or All and it will show up here.'
+			},
+
+			card: {
+				/** The ring's accessible name -- the visual is decorative without it. */
+				ringLabel: (score: number) => `Match score, ${score} out of 100`,
+				/** Shown under the ring when the score is the search estimate rather
+				 *  than a generated report. */
+				estimatedMatch: 'Estimated match',
+				skillsHave: 'Skills you have',
+				skillsBuild: 'Skills to build',
+				posted: (date: string) => `Posted ${date}`,
+				like: 'Like',
+				liked: 'Liked',
+				dismiss: 'Dismiss',
+				restore: 'Restore',
+				apply: 'Apply on company site',
+				/** Spoken tail, since the link text alone does not say where it opens. */
+				applyTail: ', opens in a new tab',
+				getReport: 'Get AI match report'
+			}
 		},
 
 		profileBanner: {
@@ -896,7 +941,8 @@ export const messages = {
 
 		detail: {
 			skillsHeading: 'Skills this posting asks for',
-			viewPosting: 'View posting',
+			/** Matches `feed.card.apply` -- one phrase for the one external link. */
+			viewPosting: 'Apply on company site',
 			/** Spoken tail, since the link text alone does not say where it opens. */
 			viewPostingTail: ', opens in a new tab'
 		},
