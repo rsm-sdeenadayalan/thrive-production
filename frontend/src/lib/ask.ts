@@ -40,7 +40,7 @@ export const ASK_DESTINATIONS: readonly AskDestination[] = [
 export const DEFAULT_DESTINATION: AskDestination = "resources";
 
 /**
- * Is this URL segment one of the three?
+ * Is this URL segment a live Ask destination?
  *
  * The route parameter is a string from the address bar, so this is what stands
  * between a typo and a page rendering an empty rail with no explanation. The

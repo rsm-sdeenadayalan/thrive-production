@@ -35,7 +35,7 @@
 	 *
 	 * ## An item with children is a DISCLOSURE, and owes the whole contract
 	 *
-	 * Ask THRIVE's three subjects live here now rather than in a second rail on
+	 * Ask THRIVE's subjects live here now rather than in a second rail on
 	 * the page. That makes the parent two things at once -- a link to a real route
 	 * and the trigger for a group -- and those cannot be the same element:
 	 *
