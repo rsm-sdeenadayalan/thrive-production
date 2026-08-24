@@ -58,6 +58,7 @@ def _parse_min_score(raw):
 
 
 @api_login_required
+@profile_required
 def jobs_feed(request):
     if request.method != "GET":
         return json_error("method_not_allowed", "Use GET.", 405)

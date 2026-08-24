@@ -4,15 +4,16 @@ from django.contrib.auth.models import User
 from rsm_thrive.models import JobPosting, MatchReport, PostingInteraction, ResumeVersion
 from rsm_thrive.services.embeddings import FakeEmbeddings
 from rsm_thrive.services.jobs.feed import feed_for
+from rsm_thrive.testing import make_student
 
 pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture
 def student(client):
-    user = User.objects.create_user("stu", password="pw")
-    client.force_login(user)
-    return user
+    profile = make_student()
+    client.force_login(profile.user)
+    return profile.user
 
 
 def _posting(external_id, title="Data Analyst", description="sql python",
@@ -181,6 +182,13 @@ class TestFeedEndpoint:
 
     def test_requires_login(self, client):
         assert client.get("/api/thrive/jobs/feed").status_code == 401
+
+    def test_no_student_profile_403(self, client):
+        user = User.objects.create_user("noprofile", password="pw")
+        client.force_login(user)
+        response = client.get("/api/thrive/jobs/feed")
+        assert response.status_code == 403
+        assert response.json()["error"]["code"] == "no_profile"
 
     def test_post_is_405(self, client, student):
         response = client.post("/api/thrive/jobs/feed")

@@ -9,6 +9,7 @@ TABS = {"recommended", "liked", "all"}
 
 
 def feed_for(user, *, query="", tab="recommended", min_score=0, limit=50, embeddings=None):
+    """Rank postings for `user`, overlay report/interaction state, and split into tabs."""
     if tab not in TABS:
         tab = "recommended"
 
