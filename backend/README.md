@@ -66,41 +66,71 @@ a larger mixed corpus (e.g. the fixture plus `--catalog`) and fake-embedding
 retrieval dilutes, so several cases fail by design — run the eval against the
 corpus the goldens target, or grow/tune the goldens as the corpus grows.
 
-## Jobs: ingest, sources, and match reports
+## Jobs: ingest, sources, feed, and match reports
 
-Job search (`GET /api/thrive/jobs?q=`), a job detail view
-(`GET /api/thrive/jobs/<id>`), an LLM match report
-(`POST /api/thrive/jobs/<id>/report`), and resume upload
-(`POST /api/thrive/resume/upload`) round out the career surface. Same two
-knobs as the chatbots — `THRIVE_LLM=fake`/`tritonai` and `TRITONAI_API_KEY` —
-govern both endpoints: `fake` makes `get_llm()` raise, so `job_report` and
-`resume_upload` fail honest with a `503 llm_unavailable` rather than a silent
-or fabricated result, and switches embeddings to `FakeEmbeddings` for
-ranking/ingestion. Switching `THRIVE_LLM` (`fake` ↔ real) — or switching
-embedding backends generally, e.g. after correcting `TRITONAI_EMBED_MODEL` —
-changes embedding dimensions, so re-run `ingest_corpus`/`ingest_jobs` after
-switching — otherwise ranking/retrieval silently degrades (a dim-mismatch
-warning is logged, but postings/chunks keep their stale, wrong-dimension
-embeddings until re-ingested).
+The Career tab is a ranked, no-query feed backed by:
+
+- `GET /api/thrive/jobs?q=` — free-text job search.
+- `GET /api/thrive/jobs/feed` — the Career tab's feed: no query required,
+  ranks all active postings against the caller's current resume, overlays
+  cached `MatchReport`/`PostingInteraction` state, and splits into three tabs
+  (`?tab=recommended|liked|all`, default `recommended`) plus `?min_score=`
+  and per-tab `counts`. `recommended` excludes dismissed postings; `all`
+  and the counts still include them. With no current resume, ranking falls
+  back to recency order and the response's `profileAvailable` is `false`.
+- `GET /api/thrive/jobs/<id>` — job detail plus the role benchmark.
+- `POST /api/thrive/jobs/<id>/like` / `POST /api/thrive/jobs/<id>/dismiss` —
+  per-user, per-posting toggles (`PostingInteraction`); each call flips the
+  flag and returns the new `liked`/`dismissed` state. Both require a student
+  profile, same as the feed.
+- `POST /api/thrive/jobs/<id>/report` — an LLM match report, cached per
+  `(user, posting, resume_version)`.
+- `POST /api/thrive/resume/upload` — resume ingestion feeding all of the
+  above.
+
+Same two knobs as the chatbots — `THRIVE_LLM=fake`/`tritonai` and
+`TRITONAI_API_KEY` — govern all of it: `fake` makes `get_llm()` raise, so
+`job_report` and `resume_upload` fail honest with a `503 llm_unavailable`
+rather than a silent or fabricated result, and switches embeddings to
+`FakeEmbeddings` for ranking/ingestion. Switching `THRIVE_LLM` (`fake` ↔
+real) — or switching embedding backends generally, e.g. after correcting
+`TRITONAI_EMBED_MODEL` — changes embedding dimensions, so re-run
+`ingest_corpus`/`ingest_jobs` after switching — otherwise ranking/retrieval
+silently degrades (a dim-mismatch warning is logged, but postings/chunks
+keep their stale, wrong-dimension embeddings until re-ingested).
 
 **Sources** (`rsm_thrive/services/jobs/sources.py`) sit behind one `JobSource`
-ABC (`fetch() -> list[dict]`):
+ABC (`fetch() -> list[dict]`), four of them backing the shipped
+`companies.json` (~20 boards):
 
 - `GreenhouseSource` / `LeverSource` — public, keyless JSON boards
-  (`boards-api.greenhouse.io`, `api.lever.co`), configured per company in
-  `rsm_thrive/data/jobs/companies.json`.
+  (`boards-api.greenhouse.io`, `api.lever.co`).
+- `AshbySource` / `WorkableSource` — public, keyless JSON boards
+  (`api.ashbyhq.com/posting-api/job-board/<board>`,
+  `apply.workable.com/api/v1/widget/accounts/<account>`), same shape as the
+  above two.
 - `FakeJobSource` — an in-memory source for tests and offline seeding; takes
   the same row shape the real sources normalize to.
 - An aggregator source (Adzuna/JSearch) slots in later behind the same ABC
   once a free API key exists (backlog).
 
+All four are configured per company in `rsm_thrive/data/jobs/companies.json`
+under the `greenhouse`/`lever`/`ashby`/`workable` keys.
+
 **Ingest** (`ingest_from` in `rsm_thrive/services/jobs/ingest.py`) is
 idempotent per `(source, external_id)`: it fetches each configured source,
 upserts postings, recomputes `skills` (`services/jobs/skills.py`,
-vocabulary in `rsm_thrive/data/jobs/skills_vocab.json`), embeds title+description
-for ranking, and deactivates postings from sources that succeeded this run
-but weren't seen (stale expiry). A source that fails to fetch is skipped —
-its existing postings are left untouched rather than deactivated.
+vocabulary in `rsm_thrive/data/jobs/skills_vocab.json`), and deactivates
+postings from sources that succeeded this run but weren't seen (stale
+expiry). A source that fails to fetch is skipped — its existing postings are
+left untouched rather than deactivated. Embedding is hash-skipped: each row's
+`sha256(title + "\n" + description)` is compared against the stored
+`content_hash`, and only postings whose content actually changed are
+re-embedded (title+description, truncated to 2000 chars) — unchanged rows
+just get `last_seen_at`/`active` refreshed. On a repo with thousands of live
+postings this makes re-runs fast and cheap: a first run against the full
+`companies.json` embeds everything, a same-day second run embeds
+essentially nothing.
 
 ```bash
 uv run python manage.py ingest_jobs                    # real boards, needs TRITONAI_API_KEY for embeddings
@@ -123,12 +153,13 @@ print(ingest_from([FakeJobSource(rows)], embeddings=get_embeddings()))
 "
 ```
 
-`companies.json` is a starter list of MSBA-target employers' Greenhouse/Lever
-board slugs — expand it over time, and correct or drop any slug that starts
-404ing (boards get renamed or migrate off the platform; e.g. Netflix's public
-Lever board no longer resolves and was dropped rather than guessed at). F5
-schedules `ingest_jobs` as a nightly Celery task; the command's idempotency is
-what makes that safe to run unattended.
+`companies.json` is a starter list of MSBA-target employers' Greenhouse,
+Lever, Ashby, and Workable board slugs — expand it over time, and correct or
+drop any slug that starts 404ing (boards get renamed or migrate off the
+platform; e.g. Netflix's public Lever board no longer resolves and was
+dropped rather than guessed at). F5 schedules `ingest_jobs` as a nightly
+Celery task; the command's idempotency is what makes that safe to run
+unattended.
 
 Search ranks by cosine similarity between the resume embedding and each
 posting's embedding, blended with skill overlap
