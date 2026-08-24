@@ -4,10 +4,25 @@
     {"board": "airbnb", "company": "Airbnb"},
     {"board": "databricks", "company": "Databricks"},
     {"board": "doordashusa", "company": "DoorDash"},
-    {"board": "instacart", "company": "Instacart"}
+    {"board": "instacart", "company": "Instacart"},
+    {"board": "datadog", "company": "Datadog"},
+    {"board": "duolingo", "company": "Duolingo"},
+    {"board": "affirm", "company": "Affirm"},
+    {"board": "samsara", "company": "Samsara"},
+    {"board": "gusto", "company": "Gusto"},
+    {"board": "figma", "company": "Figma"},
+    {"board": "robinhood", "company": "Robinhood"},
+    {"board": "flexport", "company": "Flexport"},
+    {"board": "attentive", "company": "Attentive"},
+    {"board": "chime", "company": "Chime"}
   ],
   "lever": [
-    {"slug": "spotify", "company": "Spotify"},
-    {"slug": "plaid", "company": "Plaid"}
+    {"slug": "spotify", "company": "Spotify"}
+  ],
+  "ashby": [
+    {"board": "ramp", "company": "Ramp"},
+    {"board": "notion", "company": "Notion"},
+    {"board": "linear", "company": "Linear"},
+    {"board": "openai", "company": "OpenAI"}
   ]
 }

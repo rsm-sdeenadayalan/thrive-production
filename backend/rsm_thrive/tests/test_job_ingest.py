@@ -14,6 +14,17 @@ def _row(external_id="1", title="Data Analyst", description="SQL and Tableau"):
             "description": description, "posted_at": None}
 
 
+class CountingEmbeddings(FakeEmbeddings):
+    """Wraps FakeEmbeddings so tests can assert how many texts were embedded."""
+
+    def __init__(self):
+        self.calls = 0
+
+    def embed(self, texts: list) -> list:
+        self.calls += len(texts)
+        return super().embed(texts)
+
+
 class ExplodingSource(JobSource):
     name = "boom"
 
@@ -66,3 +77,29 @@ class TestIngest:
         assert result["ingested"] == 1
         assert JobPosting.objects.count() == 1
         assert JobPosting.objects.get().external_id == "2"
+
+    def test_unchanged_content_skips_reembedding(self):
+        embeddings = CountingEmbeddings()
+        ingest_from([FakeJobSource([_row()])], embeddings=embeddings)
+        first_calls = embeddings.calls
+        first_hash = JobPosting.objects.get().content_hash
+        assert first_calls == 1
+        assert first_hash != ""
+
+        ingest_from([FakeJobSource([_row()])], embeddings=embeddings)
+        posting = JobPosting.objects.get()
+        assert embeddings.calls == first_calls  # no new embed calls
+        assert posting.content_hash == first_hash
+        assert posting.active
+
+    def test_changed_description_reembeds_and_updates_hash(self):
+        embeddings = CountingEmbeddings()
+        ingest_from([FakeJobSource([_row()])], embeddings=embeddings)
+        first_hash = JobPosting.objects.get().content_hash
+
+        ingest_from([FakeJobSource([_row(description="SQL, Tableau, and Python")])],
+                    embeddings=embeddings)
+        posting = JobPosting.objects.get()
+        assert embeddings.calls == 2
+        assert posting.content_hash != first_hash
+        assert posting.description == "SQL, Tableau, and Python"

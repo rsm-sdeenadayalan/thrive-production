@@ -109,6 +109,67 @@ class LeverSource(JobSource):
         return rows
 
 
+class AshbySource(JobSource):
+    name = "ashby"
+
+    def __init__(self, board, company, session=None):
+        self.board = board
+        self.company = company
+        self._session = session
+
+    def fetch(self):
+        session = _session_or_requests(self._session)
+        url = f"https://api.ashbyhq.com/posting-api/job-board/{self.board}"
+        response = session.get(url, timeout=20)
+        response.raise_for_status()
+        rows = []
+        for job in response.json().get("jobs", []):
+            if not job.get("isListed", True):
+                continue
+            rows.append({
+                "external_id": str(job["id"]),
+                "title": job.get("title", ""),
+                "company": self.company,
+                "location": job.get("location", "") or "",
+                "url": job.get("jobUrl", ""),
+                "description": strip_html(job.get("descriptionHtml", "")),
+                "posted_at": parse_datetime(job.get("publishedAt") or "") or None,
+            })
+        return rows
+
+
+class WorkableSource(JobSource):
+    name = "workable"
+
+    def __init__(self, account, company, session=None):
+        self.account = account
+        self.company = company
+        self._session = session
+
+    def fetch(self):
+        session = _session_or_requests(self._session)
+        url = f"https://apply.workable.com/api/v1/widget/accounts/{self.account}"
+        response = session.get(url, timeout=20)
+        response.raise_for_status()
+        rows = []
+        for job in response.json().get("jobs", []):
+            parts = [p for p in (job.get("city"), job.get("country")) if p]
+            location = ", ".join(parts) or job.get("location", "") or ""
+            published = job.get("published_on")
+            posted_at = (parse_datetime(f"{published}T00:00:00+00:00")
+                         if published else None)
+            rows.append({
+                "external_id": str(job["shortcode"]),
+                "title": job.get("title", ""),
+                "company": self.company,
+                "location": location,
+                "url": job.get("url", ""),
+                "description": strip_html(job.get("description", "")),
+                "posted_at": posted_at,
+            })
+        return rows
+
+
 @lru_cache(maxsize=1)
 def _companies():
     return json.loads(_COMPANIES_PATH.read_text())
@@ -120,4 +181,8 @@ def configured_sources(session=None):
                for e in config.get("greenhouse", [])]
     sources += [LeverSource(e["slug"], e["company"], session=session)
                 for e in config.get("lever", [])]
+    sources += [AshbySource(e["board"], e["company"], session=session)
+                for e in config.get("ashby", [])]
+    sources += [WorkableSource(e["account"], e["company"], session=session)
+                for e in config.get("workable", [])]
     return sources
