@@ -57,11 +57,14 @@
  * asserted by `check:interaction` ("editing did not move the grid") and by
  * `check:layout` on every route and viewport.
  *
- * The alternative is three rows, which would fit. It is not taken here because it
- * is a visible change to Home's densest card and belongs to whoever owns that
- * decision, not to this constant. Flagged in HANDOFF.
+ * DECIDED 2026-08-24, by the product owner's visual-polish pass: three rows.
+ * Four rows always overflowed the cap once rows became editable (see above),
+ * and after the bordered-card + inset passes the overflow clipped the Done
+ * heading mid-letter at the card's bottom edge — a visible blemish on Home's
+ * densest card. Three bordered rows plus the Done heading fit the 300px cap
+ * with nothing cut; the trade is one more row behind "Show N more".
  */
-export const COLLAPSED_TASK_ROWS = 4;
+export const COLLAPSED_TASK_ROWS = 3;
 
 /**
  * Course cards shown before "show N more".
