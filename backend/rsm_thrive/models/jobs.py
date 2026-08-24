@@ -20,6 +20,7 @@ class JobPosting(models.Model):
     active = models.BooleanField(default=True)
     skills = models.JSONField(default=list)
     embedding = models.JSONField(default=list)
+    content_hash = models.CharField(max_length=64, blank=True, default="")
 
     class Meta:
         constraints = [models.UniqueConstraint(
@@ -43,3 +44,18 @@ class MatchReport(models.Model):
     class Meta:
         constraints = [models.UniqueConstraint(
             fields=["user", "posting", "resume_version"], name="uniq_match_report")]
+
+
+class PostingInteraction(models.Model):
+    """Per-student like/dismiss state on a posting."""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+                             related_name="posting_interactions")
+    posting = models.ForeignKey(JobPosting, on_delete=models.CASCADE,
+                                related_name="interactions")
+    liked = models.BooleanField(default=False)
+    dismissed = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(
+            fields=["user", "posting"], name="uniq_posting_interaction")]

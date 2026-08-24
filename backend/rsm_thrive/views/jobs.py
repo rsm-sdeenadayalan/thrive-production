@@ -2,8 +2,8 @@ import logging
 
 from django.views.decorators.http import require_http_methods
 
-from rsm_thrive.http import api_login_required, json_error, json_ok
-from rsm_thrive.models import JobPosting
+from rsm_thrive.http import api_login_required, json_error, json_ok, profile_required
+from rsm_thrive.models import JobPosting, PostingInteraction
 from rsm_thrive.serializers.jobs import serialize_job, serialize_report
 from rsm_thrive.services.jobs.report import generate_report
 from rsm_thrive.services.jobs.search import profile_of, role_benchmark, search_postings
@@ -73,3 +73,32 @@ def job_report(request, job_id):
         return json_error("llm_unavailable",
                           "The match report service is unavailable right now.", 503)
     return json_ok({"report": serialize_report(report)})
+
+
+def _toggle_interaction(request, job_id, field):
+    if request.method != "POST":
+        return json_error("method_not_allowed", "Use POST.", 405)
+    posting = _own_posting(job_id)
+    if posting is None:
+        return json_error("unknown_job", f"No job {job_id}.", 404)
+    interaction, _created = PostingInteraction.objects.get_or_create(
+        user=request.user, posting=posting)
+    setattr(interaction, field, not getattr(interaction, field))
+    interaction.save(update_fields=[field, "updated_at"])
+    return json_ok({
+        "jobId": job_id,
+        "liked": interaction.liked,
+        "dismissed": interaction.dismissed,
+    })
+
+
+@api_login_required
+@profile_required
+def job_like(request, job_id):
+    return _toggle_interaction(request, job_id, "liked")
+
+
+@api_login_required
+@profile_required
+def job_dismiss(request, job_id):
+    return _toggle_interaction(request, job_id, "dismissed")
