@@ -51,7 +51,27 @@ const useNode =
 	(globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
 		?.ADAPTER === 'node';
 
+/*
+ * Team-demo tunnel mode, opt-in via THRIVE_TUNNEL_HOST (set by
+ * scripts/team-demo.sh, never in normal dev). Cookies are host-scoped, so a
+ * remote viewer needs the app AND the Django dev-login on ONE public
+ * hostname: the dev server proxies /api to Django and accepts the tunnel's
+ * Host header. Unset, nothing below changes the config.
+ */
+const tunnelHost = (
+	globalThis as { process?: { env?: Record<string, string | undefined> } }
+).process?.env?.THRIVE_TUNNEL_HOST;
+const tunnelApi =
+	(globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
+		?.THRIVE_API_ORIGIN ?? 'http://localhost:8002';
+
 export default defineConfig({
+	server: tunnelHost
+		? {
+				allowedHosts: [tunnelHost],
+				proxy: { '/api': { target: tunnelApi, changeOrigin: false } }
+			}
+		: undefined,
 	plugins: [
 		tailwindcss(),
 		sveltekit({

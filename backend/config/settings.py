@@ -18,7 +18,13 @@ if _env_file.exists():
 
 SECRET_KEY = os.environ.get("THRIVE_SECRET_KEY", "dev-only-insecure")
 DEBUG = os.environ.get("THRIVE_DEBUG", "1") == "1"
-ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
+# Extra hosts (comma-separated) let a temporary tunnel or preview host reach
+# the API; the localhost defaults always stay so normal dev never breaks.
+ALLOWED_HOSTS = ["127.0.0.1", "localhost"] + [
+    host.strip()
+    for host in os.environ.get("THRIVE_EXTRA_HOSTS", "").split(",")
+    if host.strip()
+]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
