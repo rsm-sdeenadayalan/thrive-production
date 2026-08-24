@@ -57,7 +57,11 @@
 		</a>
 	</header>
 
-	<div class="grid gap-4 lg:grid-cols-[2fr_1fr]">
+	<!-- `items-start`: the benchmark panel is one short card and the left column
+	     is three stacked ones, and the grid default `stretch` was pulling the
+	     panel's border down to match their combined height -- a card with a wall
+	     of blank space beneath its last skill bar. -->
+	<div class="grid items-start gap-4 lg:grid-cols-[2fr_1fr]">
 		<div class="min-w-0 space-y-4">
 			<section aria-labelledby="jobs-detail-description" class="thrive-panel space-y-2 p-3">
 				<h2 id="jobs-detail-description" class="text-base font-medium text-ink">

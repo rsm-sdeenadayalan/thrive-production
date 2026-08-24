@@ -178,7 +178,12 @@
 			the same one the eye follows and there is no arrangement that only works
 			on a wide screen.
 		-->
-		<div class="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-3">
+		<!-- `items-start`, not the grid default `stretch`: the form (or, once
+		     booked, the short confirmation) is routinely shorter than the month
+		     grid plus "Your day" beside it, and stretching left it a bordered card
+		     with a wall of blank space beneath its own content -- most visible right
+		     after confirming, when the panel collapses to a few lines. -->
+		<div class="grid items-start grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-3">
 			<section class="thrive-panel min-w-0 p-3 lg:p-2.5">
 				{#key active.advisor.id}
 					<BookingPanel

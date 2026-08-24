@@ -103,7 +103,10 @@
 		</div>
 	{/if}
 
-	<div class="mt-1 flex flex-wrap items-center gap-2">
+	<!-- No extra `mt-*` here -- the article's own `flex flex-col gap-2.5` already
+	     spaces every direct child evenly; adding one only on this row gave it 4px
+	     more headroom than the matched/missing-skills blocks got. -->
+	<div class="flex flex-wrap items-center gap-2">
 		<form method="POST" action="?/like">
 			<input type="hidden" name="jobId" value={entry.id} />
 			<input type="hidden" name="tab" value={tab} />

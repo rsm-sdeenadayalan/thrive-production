@@ -62,6 +62,16 @@
 		data.results.length === 0 ? feedEmptyState(data.tab, data.q) : null
 	);
 
+	/**
+	 * Whether the benchmark rides along beside the list.
+	 *
+	 * Named rather than repeated: the same condition decides whether the grid
+	 * gets a second column at all, so the list can span the full width when
+	 * there is nothing to share it with instead of sitting in a fixed `2fr`
+	 * track with dead space where the panel would have gone.
+	 */
+	const showBenchmark = $derived(data.q.trim().length > 0 && Boolean(data.benchmark));
+
 	let uploading = $state(false);
 	let uploadError = $state<string | null>(null);
 </script>
@@ -90,7 +100,10 @@
 				class="min-h-11 w-full rounded-sm border-[1.5px] border-line-strong bg-surface px-2.5 text-sm text-ink placeholder:text-muted-ink"
 			/>
 		</div>
-		<Button type="submit" variant="primary">
+		<!-- `min-h-11` to match the search input beside it -- the same pairing
+		     `ChatWindow`'s composer and `ItemDetail`'s export/delete row use, so a
+		     button next to a full-height field is never the short one in the row. -->
+		<Button type="submit" variant="primary" class="min-h-11">
 			<Search aria-hidden="true" class="size-4" />
 			{copy.search.button}
 		</Button>
@@ -266,7 +279,16 @@
 	{:else if emptyState === 'liked-tab-empty'}
 		<EmptyState icon={Heart} message={feedCopy.empty.likedTabEmpty} />
 	{:else}
-		<div class="grid gap-4 lg:grid-cols-[2fr_1fr]">
+		<!--
+			`items-start`, not the grid default `stretch`: with a benchmark this
+			panel is almost always shorter than the results list, and stretching it
+			to match left a card with a wall of blank space below its last skill bar.
+
+			Without one, `showBenchmark` drops the second column's track entirely
+			(rather than leaving it an empty `1fr`) so the list takes the full
+			width instead of sitting narrower than the page for no reason.
+		-->
+		<div class={cn('grid items-start gap-4', showBenchmark && 'lg:grid-cols-[2fr_1fr]')}>
 			<ul aria-label={copy.title} class="space-y-3">
 				{#each data.results as entry (entry.id)}
 					<li>
@@ -275,7 +297,7 @@
 				{/each}
 			</ul>
 
-			{#if data.q.trim().length > 0 && data.benchmark}
+			{#if showBenchmark && data.benchmark}
 				<BenchmarkPanel benchmark={data.benchmark} />
 			{/if}
 		</div>
