@@ -114,8 +114,10 @@ ABC (`fetch() -> list[dict]`), four of them backing the shipped
 - An aggregator source (Adzuna/JSearch) slots in later behind the same ABC
   once a free API key exists (backlog).
 
-All four are configured per company in `rsm_thrive/data/jobs/companies.json`
-under the `greenhouse`/`lever`/`ashby`/`workable` keys.
+Sources are configured per company in `rsm_thrive/data/jobs/companies.json`
+under the `greenhouse`/`lever`/`ashby`/`workable` keys. Greenhouse, Lever,
+and Ashby boards are configured today; `WorkableSource` is code-ready but has
+no boards listed yet.
 
 **Ingest** (`ingest_from` in `rsm_thrive/services/jobs/ingest.py`) is
 idempotent per `(source, external_id)`: it fetches each configured source,
