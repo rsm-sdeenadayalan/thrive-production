@@ -1,4 +1,5 @@
 <script lang="ts">
+	import RichMessage from '$lib/components/ask/RichMessage.svelte';
 	import Tag from '$lib/components/ui/Tag.svelte';
 	import type { MatchReport } from '$lib/data';
 	import { competencyLabel } from '$lib/jobs';
@@ -27,7 +28,17 @@
 		<span class="thrive-numeric text-lg font-semibold text-ink">{report.score}</span>
 	</div>
 
-	<p class="max-w-measure text-sm text-body">{report.verdict}</p>
+	<!--
+		A `<div>`, not a `<p>`, for the same reason `ChatWindow`'s THRIVE-side
+		bubble is: `report.verdict` is Claude output too, and `RichMessage` may
+		render a `<ol>` or `<blockquote>` into it, which an HTML parser would
+		pop straight out of an enclosing `<p>` rather than nest inside one.
+		`text-sm` and `text-body` are inherited by whatever `RichMessage` renders,
+		so a plain-sentence verdict still looks exactly as it did before.
+	-->
+	<div class="max-w-measure text-sm text-body">
+		<RichMessage body={report.verdict} />
+	</div>
 
 	<div class="grid gap-3 sm:grid-cols-2">
 		<div class="min-w-0">

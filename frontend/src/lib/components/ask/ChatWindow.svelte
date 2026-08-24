@@ -5,6 +5,7 @@
 
 	import { goto } from '$app/navigation';
 	import { showsDayLabel, type ChatMessageView, type ConversationDetailView } from '$lib/ask';
+	import RichMessage from '$lib/components/ask/RichMessage.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import { messages } from '$lib/messages';
 	import type { AskDestination } from '$lib/data';
@@ -212,6 +213,10 @@
 
 {#snippet bubble(message: ChatMessageView, stamped: boolean)}
 	{@const mine = message.role === 'student'}
+	{@const bubbleClass = cn(
+		'inline-block rounded-md border px-2.5 py-2 text-left text-sm break-words',
+		mine ? 'border-line-strong bg-primary text-on-primary' : 'border-line bg-surface text-body'
+	)}
 
 	<div class={cn('flex', mine ? 'justify-end' : 'justify-start')}>
 		<!--
@@ -225,19 +230,32 @@
 		<div
 			class={cn('min-w-0 max-w-[min(85%,var(--thrive-chat-measure))]', mine && 'text-right')}
 		>
-			<p
-				class={cn(
-					'inline-block rounded-md border px-2.5 py-2 text-left text-sm break-words',
-					mine
-						? 'border-line-strong bg-primary text-on-primary'
-						: 'border-line bg-surface text-body'
-				)}
-			>
-				<!-- Who spoke, in words. On screen it is carried by the side of the
-				     column and the fill; neither of those reaches a screen reader. -->
-				<span class="sr-only">{mine ? copy.chat.youSaid : copy.chat.thriveSaid}</span>
-				{message.body}
-			</p>
+			<!--
+				Student side stays a `<p>` holding a plain text node, exactly as
+				before -- it never carries Markdown.
+
+				THRIVE's side is a `<div>`, not a `<p>`, even though it renders
+				identically (both are `inline-block`, and Tailwind's preflight zeroes
+				default margins on both). A reply can contain a `<ol>` or
+				`<blockquote>`, and the HTML parser closes an open `<p>` the instant a
+				block-level child like that appears inside it -- which would silently
+				pop the list OUT of the bubble as a sibling rather than nest it, taking
+				the border and background with the now-empty `<p>` and leaving the
+				actual reply unstyled beside it. A `<div>` has no such rule.
+			-->
+			{#if mine}
+				<p class={bubbleClass}>
+					<!-- Who spoke, in words. On screen it is carried by the side of the
+					     column and the fill; neither of those reaches a screen reader. -->
+					<span class="sr-only">{copy.chat.youSaid}</span>
+					{message.body}
+				</p>
+			{:else}
+				<div class={bubbleClass}>
+					<span class="sr-only">{copy.chat.thriveSaid}</span>
+					<RichMessage body={message.body} />
+				</div>
+			{/if}
 
 			{#if stamped}
 				<span class="thrive-numeric mt-0.5 block text-3xs text-muted-ink">
