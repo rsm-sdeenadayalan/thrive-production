@@ -38,12 +38,14 @@
 			<Icon aria-hidden="true" class="size-5 text-primary" />
 		</span>
 		<div class="min-w-0">
-			<!-- font-bold set here, at the call site. MIGRATION.md section 9 defect 4:
+			<!-- PAGE TITLE. `text-3xl font-bold`, matching every built route's h1 --
+			     see the ladder note in app.css. MIGRATION.md section 9 defect 4:
 			     twelve of thirteen page titles in the Next app render at 400, because
 			     weight came out of the type scale on 08-15 and the h1s were never
 			     updated. This component serves seven routes, so it was seven of the
-			     twelve on its own. -->
-			<h1 class="text-xl font-bold text-ink">{item.label}</h1>
+			     twelve on its own; the 2026-08-24 sweep fixed the size that was left
+			     behind alongside the weight. -->
+			<h1 class="text-3xl font-bold text-ink">{item.label}</h1>
 			<p class="mt-0.5 text-sm text-muted-ink">{item.description}</p>
 		</div>
 	</div>

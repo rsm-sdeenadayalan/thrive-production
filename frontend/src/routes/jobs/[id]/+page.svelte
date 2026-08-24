@@ -37,7 +37,9 @@
 <div class="mx-auto w-full max-w-page space-y-6 lg:space-y-4">
 	<header class="mx-auto w-full max-w-5xl">
 		<p class="thrive-eyebrow">{copy.eyebrow}</p>
-		<h1 class="mt-1 text-2xl font-bold text-ink">{data.job.title}</h1>
+		<!-- PAGE TITLE. `text-3xl font-bold`, matching every other route's h1 --
+		     see the ladder note in app.css. -->
+		<h1 class="mt-1 text-3xl font-bold text-ink">{data.job.title}</h1>
 		<p class="mt-0.5 text-sm text-body">{data.job.company} · {data.job.location}</p>
 		{#if data.job.postedAtLabel}
 			<p class="mt-0.5 text-3xs text-muted-ink">{copy.card.posted(data.job.postedAtLabel)}</p>
@@ -58,7 +60,7 @@
 	<div class="grid gap-4 lg:grid-cols-[2fr_1fr]">
 		<div class="min-w-0 space-y-4">
 			<section aria-labelledby="jobs-detail-description" class="thrive-panel space-y-2 p-3">
-				<h2 id="jobs-detail-description" class="text-sm font-medium text-ink">
+				<h2 id="jobs-detail-description" class="text-base font-medium text-ink">
 					{data.job.title}
 				</h2>
 				<p class="max-w-measure text-sm text-body">{data.job.description}</p>
@@ -66,7 +68,7 @@
 
 			{#if data.job.skills.length > 0}
 				<section aria-labelledby="jobs-detail-skills" class="thrive-panel space-y-2 p-3">
-					<h2 id="jobs-detail-skills" class="text-sm font-medium text-ink">
+					<h2 id="jobs-detail-skills" class="text-base font-medium text-ink">
 						{copy.detail.skillsHeading}
 					</h2>
 					<ul class="flex flex-wrap gap-1">
@@ -78,7 +80,7 @@
 			{/if}
 
 			<section aria-labelledby={copy.report.headingId} class="thrive-panel space-y-3 p-3">
-				<h2 id={copy.report.headingId} class="text-sm font-medium text-ink">
+				<h2 id={copy.report.headingId} class="text-base font-medium text-ink">
 					{copy.report.heading}
 				</h2>
 

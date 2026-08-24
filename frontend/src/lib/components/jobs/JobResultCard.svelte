@@ -40,7 +40,7 @@
 
 		{#if result.score !== null}
 			<div class="shrink-0 text-right">
-				<p class="thrive-numeric text-lg font-semibold text-primary">{result.score}</p>
+				<p class="thrive-numeric text-lg font-bold text-primary">{result.score}</p>
 				<p class="text-3xs text-muted-ink">{copy.matchScore}</p>
 			</div>
 		{/if}
@@ -48,7 +48,7 @@
 
 	{#if result.matchedSkills.length > 0}
 		<div class="min-w-0">
-			<p class="text-3xs font-medium text-muted-ink uppercase">{copy.skillsHave}</p>
+			<p class="thrive-eyebrow">{copy.skillsHave}</p>
 			<ul class="mt-1 flex flex-wrap gap-1">
 				{#each result.matchedSkills as skill (skill)}
 					<li><Tag tone="neutral">{skill}</Tag></li>
@@ -59,7 +59,7 @@
 
 	{#if result.missingSkills.length > 0}
 		<div class="min-w-0">
-			<p class="text-3xs font-medium text-muted-ink uppercase">{copy.skillsBuild}</p>
+			<p class="thrive-eyebrow">{copy.skillsBuild}</p>
 			<ul class="mt-1 flex flex-wrap gap-1">
 				{#each result.missingSkills as skill (skill)}
 					<li><Tag tone="quiet">{skill}</Tag></li>

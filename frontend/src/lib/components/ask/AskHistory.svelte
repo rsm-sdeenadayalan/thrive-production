@@ -175,7 +175,7 @@
 								: 'border-line border-l-line bg-surface hover:border-line-strong hover:bg-primary-soft'
 						)}
 					>
-						<span class="line-clamp-2 text-2xs text-ink">{conversation.title}</span>
+						<span class="line-clamp-2 text-2xs font-medium text-ink">{conversation.title}</span>
 
 						<!-- When and how long. Both values, both on the numeric face, so a
 						     column of them lines up. -->

@@ -112,8 +112,9 @@
 
 	const CHOICE_ACTIVE = 'border-primary bg-primary-soft text-primary-hover';
 
-	/** Small, uppercase, and in ink: this names a control group, so it is a label. */
-	const FIELD_LABEL = 'mb-1.5 block text-2xs uppercase text-ink';
+	/** Names a control group -- the one eyebrow treatment, same as every other
+	 *  small all-caps label in the app. Was its own ad-hoc uppercase combo. */
+	const FIELD_LABEL = 'thrive-eyebrow mb-1.5 block';
 
 	let mode = $state<ModeFilter>('any');
 	let chosenId = $state<string | null>(null);
@@ -159,7 +160,7 @@
 			</span>
 
 			<div class="min-w-0">
-				<h3 id={confirmCopy.headingId} class="text-lg font-medium text-ink">
+				<h3 id={confirmCopy.headingId} class="text-lg font-bold text-ink">
 					{confirmCopy.heading}
 				</h3>
 

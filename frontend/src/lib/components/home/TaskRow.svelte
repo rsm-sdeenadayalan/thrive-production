@@ -327,7 +327,7 @@
 					for={checkboxId}
 					data-done={done}
 					class={cn(
-						'thrive-strike cursor-pointer text-sm break-words',
+						'thrive-strike cursor-pointer text-sm font-medium break-words',
 						done ? 'text-muted-ink' : 'text-ink'
 					)}
 				>
@@ -502,10 +502,7 @@
 			{#if editOpen}
 				<div class="mx-2 mb-2 space-y-2 rounded-md border border-line bg-sunken p-2.5">
 					<div>
-						<label
-							for={`${editId}-title`}
-							class="mb-1 block text-3xs font-medium text-muted-ink uppercase"
-						>
+						<label for={`${editId}-title`} class="thrive-eyebrow mb-1 block">
 							{messages.taskEditing.titleField}
 						</label>
 						<input
@@ -533,7 +530,7 @@
 					</div>
 
 					<div>
-						<span class="mb-1 block text-3xs font-medium text-muted-ink uppercase">
+						<span class="thrive-eyebrow mb-1 block">
 							{messages.taskEditing.priorityField}
 						</span>
 						<PriorityPicker {task} current={task.priority} />

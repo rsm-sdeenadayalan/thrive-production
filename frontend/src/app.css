@@ -2,9 +2,13 @@
 
 /* Fonts, self-hosted via @fontsource. Latin subset and weight-pinned to match
    what the Next app loaded through next/font:
-     DM Sans        400 prose, 500 row titles and emphasis, 700 headings
-     JetBrains Mono 400, 500 -- mono marks machine truth and never carries a
-                    heading, so it has no use for 700.
+     DM Sans        400 prose, 500 row titles and emphasis, 700 headings.
+                    The ONLY face any component renders -- see `.thrive-numeric`
+                    below, which used to be JetBrains Mono and is not any more.
+     JetBrains Mono 400, 500 -- kept loaded for `/swatch`'s own code samples
+                    only (`font-mono`, exempt from the component sweep). No
+                    component may reach for it; `font-mono` in a component is
+                    what designSystem.spec.ts fails on.
    @fontsource ships `font-display: swap` in each of these files already.
    Self-hosted on purpose: no Google Fonts link anywhere. */
 @import '@fontsource/dm-sans/latin-400.css';
@@ -497,37 +501,35 @@
 
   /* Typography stack. Both faces are self-hosted via @fontsource above; these
      two variables are what the Next app's next/font call produced, kept under
-     the same names so the --font-sans / --font-mono chains below are unchanged.
+     the same names so the --font-sans / --font-mono chains below are unchanged
+     -- `--font-mono` still exists as a token because `/swatch` reaches for
+     `font-mono` on its own code samples, which is the one exempt call site.
 
-     THE TWO-FACE RULE, tightened 2026-08-22:
+     ONE FACE, tightened again 2026-08-24:
 
-         DM Sans for everything. JetBrains Mono for NUMBERS ONLY.
+         DM Sans for everything. No component ever renders JetBrains Mono.
 
-     The previous wording ended "...compact dates, status eyebrows, and any
-     label that is a system value rather than something a person wrote", and
-     that last clause is what went wrong. Almost any label can be argued into
-     being "a system value", so mono spread to eyebrows, view switchers, filter
-     chips, stream names and tags. The app has two faces and read as though it
-     had more than two, because mono had stopped marking anything -- a face
-     used for a third of the interface is not an accent, it is a second body
-     font.
+     The 2026-08-22 pass narrowed a looser rule to "DM Sans for everything,
+     JetBrains Mono for NUMBERS ONLY" -- clock times, counts, percentages,
+     fractions, IDs. That was still wrong, just less wrong: every one of those
+     values sits mid-sentence in running copy ("in 3 days", "9:30 AM", "2 of 10
+     done"), and a second typeface switching in and out inside a sentence is
+     the exact thing a student flagged as "fonts are all non-uniform" -- an app
+     with one face for words and a different one for the numbers beside them
+     does not read as disciplined, it reads as inconsistent, just in smaller
+     doses than mono-everywhere did.
 
-     Mono KEEPS: clock times, counts, unit totals, percentages, fractions,
-     IDs -- values a person SCANS or compares, where a digit lining up under
-     another digit is the point.
-
-     Mono LOSES: anything made of words. Eyebrows ("CALENDAR · FALL 2026"),
-     view switchers, chips, tags, "next up", stream and filter names. Dates
-     written out in prose ("Thursday, August 20") are words and take DM Sans;
-     the time inside one ("11:00 AM") is a value and stays mono.
-
-     The test, when it is genuinely unclear: would you ever want this to line
-     up in a column with the thing above it? Column -> mono. Sentence -> sans.
+     What NUMBERS keep, and it is the whole reason `.thrive-numeric` still
+     exists rather than being deleted: `font-variant-numeric: tabular-nums`,
+     a real DM Sans feature. Digits still line up in a column and a countdown
+     chip still holds its width as "in 3 days" becomes "in 10 days" -- the
+     face bought nothing that tabular figures were not already buying.
 
      Components ask for the treatment, not the face: `.thrive-numeric` and
      `.thrive-eyebrow` in @layer components. A component that writes
      `font-mono` directly is asserting a font, which is the design system's
-     call and not its own. */
+     call and not its own -- and as of this pass there is no component-level
+     use of `font-mono` for that call to make. */
   --font-dm-sans: 'DM Sans';
   --font-jetbrains-mono: 'JetBrains Mono';
 
@@ -695,7 +697,75 @@
 
      Consequence, deliberate: a call site that sets no weight renders 400.
      Only 400/500/700 load, so `font-semibold` (600) synthesises -- do not
-     use it. */
+     use it.
+
+     ── THE LADDER, enforced by the 2026-08-24 typography sweep ──────────────
+     A student flagged "fonts are all non-uniform". The type SCALE above was
+     never the problem -- the roles reaching for it had drifted, one call site
+     at a time, the same way the two-face rule drifted before it (see
+     `.thrive-numeric`). This is the fix, stated once so a reviewer can hold a
+     new call site against it instead of against whatever the nearest existing
+     one happened to do:
+
+       PAGE TITLE       `text-3xl font-bold text-ink`, on the page's one <h1>.
+                         Home's "Good afternoon, ..." IS a page title -- it was
+                         found at `text-xl` (a stub-page accident, see
+                         MIGRATION.md section 9 defect 4) alongside three other
+                         h1s each at a different size. All four, plus the job
+                         detail page's h1, now match `/appointments`, `/ask`
+                         and `/jobs`.
+
+       SECTION HEADING  `text-lg font-bold text-ink`. `SectionCard` and
+                         `SectionHeading`'s own heading slot, `CalendarHeader`,
+                         `ItemDetail`'s dialog title. The "Tasks" / "My
+                         Classes" tier -- one panel, one subject.
+
+       SUBHEADING       `text-base font-medium text-ink`. A heading ONE step
+                         inside a section: `MyDayPane`'s "My Day",
+                         `MonthBrowser`'s "Browse the month", a job posting's
+                         "Description" / "Skills you have" / "Generate a match
+                         report", `BenchmarkPanel`, an agenda day group, the
+                         Ask destination header. These were found split across
+                         `text-sm` AND `text-base` for no reason tied to
+                         content -- one series, moved onto `text-base`.
+
+       ITEM TITLE       The subject of one row in a list. Two widths, because
+                         a card and a row are different amounts of room, not
+                         different roles:
+                           card  `text-base font-medium text-ink` -- CourseCard,
+                                 EventRow, ServiceCard, JobResultCard,
+                                 JobFeedCard.
+                           row   `text-sm font-medium text-ink` -- TaskRow,
+                                 ItemRow, TodaysClasses, MyDayPane's list.
+                         A narrower, explicitly `compact` variant (ItemRow's
+                         week column, the stat-pill popover, the Ask history
+                         rail) may drop a step further -- those are named
+                         exceptions for a fixed-width column, not a second
+                         reading of the same role, and they still carry 500.
+
+       BODY             `text-sm text-body`, 400. Prose, descriptions,
+                         standing sentences.
+
+       META / CAPTION   `text-3xs text-muted-ink` (occasionally `text-2xs` or
+                         `text-xs` where the line carries more, e.g. a blurb).
+                         Dates, counts, sublabels -- never the thing a row is
+                         about, always a fact about it.
+
+       EYEBROW          `.thrive-eyebrow`, and ONLY that class. Any label that
+                         is uppercase and small is an eyebrow, full stop --
+                         form field labels ("DUE DATE", "PRIORITY") included.
+                         Assembling the same look from `text-3xs uppercase
+                         text-muted-ink` by hand at a second call site is what
+                         let the eyebrow treatment drift in the first place;
+                         see the class itself for why it is bundled. The
+                         brand wordmark ("THRIVE" in `TopBar` / `SideRail`) is
+                         the one deliberate exception -- a logotype, not a
+                         label, which is why it keeps `text-ink` rather than
+                         muted.
+
+     A role that genuinely needs a step (MatchRing's big value, a countdown
+     chip) is a judgment call, not a loophole -- but the same role still has
+     to look identical on every page it appears on. */
   --text-3xs: 0.75rem; /* 12 -- meta, counts, timers */
   --text-3xs--line-height: 1rem; /* 16 */
 
@@ -1030,11 +1100,22 @@
 
   /* MACHINE TRUTH. Clock times, counts, unit totals, percentages, fractions,
      IDs -- values a person scans or compares.
-     Tabular by construction: the reason these are mono is that digits line up,
-     and a proportional-figure mono defeats the point. This is also why a row
-     does not reflow as "in 3 days" becomes "in 10 days". */
+
+     SANS, NOT MONO, as of the 2026-08-24 typography pass. Every one of these
+     values sits mid-sentence in running copy -- "in 3 days", "9:30 AM", "2 of
+     10 done" -- and a second typeface switching in and out inside a sentence
+     is exactly what reads as "this app uses inconsistent fonts", which is a
+     worse failure than the one the mono face was solving. THRIVE has one
+     family; JetBrains Mono is no longer loaded for body use at all.
+
+     TABULAR FIGURES ARE KEPT, and they are the entire reason this class still
+     exists rather than being deleted outright: `font-variant-numeric:
+     tabular-nums` is a real OpenType feature in DM Sans, not a mono-only
+     trick, so digits still line up in a column and a countdown chip still
+     holds its width as "in 3 days" becomes "in 10 days". Losing the face
+     costs nothing the class was actually for. */
   .thrive-numeric {
-    font-family: var(--font-mono);
+    font-family: var(--font-sans);
     font-variant-numeric: tabular-nums;
   }
 

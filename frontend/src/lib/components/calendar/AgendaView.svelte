@@ -98,7 +98,7 @@
 		{#each groups as group (group.key)}
 			<section aria-labelledby={`agenda-${group.key}`} class="thrive-panel">
 				<div class="flex items-baseline justify-between gap-2">
-					<h3 id={`agenda-${group.key}`} class="text-sm font-medium text-ink">
+					<h3 id={`agenda-${group.key}`} class="text-base font-medium text-ink">
 						{group.heading}
 					</h3>
 					<span class="thrive-numeric text-3xs text-muted-ink">{group.items.length}</span>
@@ -132,7 +132,7 @@
 		{#if undatedTodos.length > 0}
 			<section aria-labelledby="agenda-undated" class="thrive-panel">
 				<div class="flex items-baseline justify-between gap-2">
-					<h3 id="agenda-undated" class="text-sm font-medium text-ink">
+					<h3 id="agenda-undated" class="text-base font-medium text-ink">
 						{copy.undatedTitle}
 					</h3>
 					<span class="thrive-numeric text-3xs text-muted-ink">{undatedTodos.length}</span>

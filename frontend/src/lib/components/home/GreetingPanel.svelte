@@ -61,10 +61,12 @@
 
 <section aria-labelledby={messages.home.greeting.headingId}>
 	<div class="flex flex-wrap items-baseline justify-between gap-x-3">
-		<!-- Weight at the call site. MIGRATION.md section 9 defect 4: twelve of
-		     thirteen page titles in the Next app render at 400 because weight came
-		     out of the type scale and the h1s were never updated. This is one. -->
-		<h1 id={messages.home.greeting.headingId} class="text-xl font-bold text-ink">
+		<!-- PAGE TITLE. `text-3xl font-bold`, matching every other route's h1 --
+		     see the ladder note in app.css. This was `text-xl` until the
+		     2026-08-24 typography sweep: a leftover from MIGRATION.md section 9
+		     defect 4 (weight came out of the type scale, size drifted with it),
+		     and the one page title a student sees every single visit. -->
+		<h1 id={messages.home.greeting.headingId} class="text-3xl font-bold text-ink">
 			{messages.home.greeting.line(greeting, firstName)}
 		</h1>
 

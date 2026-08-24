@@ -78,7 +78,7 @@
 	</button>
 {:else}
 	<form onsubmit={submit} class="mt-3 rounded-md border border-line bg-sunken p-2.5">
-		<label for="add-task-title" class="block text-3xs text-muted-ink uppercase">
+		<label for="add-task-title" class="thrive-eyebrow block">
 			{messages.taskEditing.addTitleField}
 		</label>
 		<!-- The one field worth focusing: the form only exists once the student has
@@ -95,7 +95,7 @@
 
 		<div class="mt-2 grid grid-cols-2 gap-2">
 			<div>
-				<label for="add-task-due" class="block text-3xs text-muted-ink uppercase">
+				<label for="add-task-due" class="thrive-eyebrow block">
 					{messages.taskEditing.addDueField}
 				</label>
 				<input
@@ -107,7 +107,7 @@
 			</div>
 
 			<div>
-				<label for="add-task-priority" class="block text-3xs text-muted-ink uppercase">
+				<label for="add-task-priority" class="thrive-eyebrow block">
 					{messages.taskEditing.addPriorityField}
 				</label>
 				<select
@@ -122,7 +122,7 @@
 			</div>
 		</div>
 
-		<label for="add-task-label" class="mt-2 block text-3xs text-muted-ink uppercase">
+		<label for="add-task-label" class="thrive-eyebrow mt-2 block">
 			{messages.taskEditing.addLabelField}
 			<span class="normal-case">{messages.taskEditing.addLabelOptional}</span>
 		</label>

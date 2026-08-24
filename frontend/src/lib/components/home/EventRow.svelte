@@ -106,7 +106,7 @@
 			<!-- Wraps rather than truncates: an event title is the row's subject, and
 			     half of one is not a shorter version of it. `min-w-32` lets the tags
 			     wrap below on a narrow row instead of crushing the title. -->
-			<h3 class="line-clamp-2 min-w-32 flex-1 text-base break-words text-ink">
+			<h3 class="line-clamp-2 min-w-32 flex-1 text-base font-medium break-words text-ink">
 				{event.title}
 			</h3>
 

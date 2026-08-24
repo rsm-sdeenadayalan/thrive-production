@@ -300,8 +300,13 @@ REQUIRED_CSS = [
     (r"\.thrive-numeric\s*\{", "`.thrive-numeric` is declared"),
     (r"\.thrive-eyebrow\s*\{", "`.thrive-eyebrow` is declared"),
     (
-        r"\.thrive-numeric\s*\{[^}]*var\(--font-mono\)",
-        "`.thrive-numeric` uses the mono face",
+        # Retired 2026-08-24: a value sitting mid-sentence in running copy
+        # ("in 3 days", "9:30 AM") switching to a second typeface was itself
+        # the "fonts are all non-uniform" complaint. `.thrive-numeric` is DM
+        # Sans now, same as everything else -- see the ladder note in app.css.
+        # Tabular figures (checked below) are what the class was actually for.
+        r"\.thrive-numeric\s*\{[^}]*var\(--font-sans\)",
+        "`.thrive-numeric` uses the sans face",
     ),
     (
         r"\.thrive-numeric\s*\{[^}]*tabular-nums",

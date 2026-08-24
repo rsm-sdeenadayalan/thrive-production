@@ -22,7 +22,7 @@
 
 <section aria-labelledby={copy.headingId} class="thrive-panel space-y-2.5 p-3">
 	<div>
-		<h2 id={copy.headingId} class="text-sm font-medium text-ink">{copy.heading}</h2>
+		<h2 id={copy.headingId} class="text-base font-medium text-ink">{copy.heading}</h2>
 		<p class="text-3xs text-muted-ink">{copy.sampleSize(benchmark.sampleSize)}</p>
 	</div>
 

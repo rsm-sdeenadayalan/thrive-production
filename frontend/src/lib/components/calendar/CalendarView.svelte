@@ -428,7 +428,9 @@
 		<!-- The one header row. `items-start` because the switcher wraps its own
 		     controls at narrow widths and the title should stay on the top line. -->
 		<div class="flex flex-wrap items-start justify-between gap-2">
-			<h1 class="text-xl font-bold text-ink">{copy.title}</h1>
+			<!-- PAGE TITLE. `text-3xl font-bold`, matching every other route's h1 --
+			     see the ladder note in app.css. -->
+			<h1 class="text-3xl font-bold text-ink">{copy.title}</h1>
 
 			<div class="flex flex-wrap items-center gap-2">
 				<ViewSwitcher {prefs} />

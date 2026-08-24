@@ -102,7 +102,7 @@
 				{/each}
 			</div>
 
-			<label for={inputId} class="mt-2.5 block text-3xs text-muted-ink uppercase">
+			<label for={inputId} class="thrive-eyebrow mt-2.5 block">
 				{messages.taskEditing.duePick}
 			</label>
 			<input

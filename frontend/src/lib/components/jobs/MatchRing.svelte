@@ -56,5 +56,5 @@
 			class={tone === 'primary' ? 'text-primary' : 'text-muted-ink'}
 		/>
 	</svg>
-	<span class="thrive-numeric absolute text-sm font-semibold text-ink">{value}</span>
+	<span class="thrive-numeric absolute text-sm font-bold text-ink">{value}</span>
 </div>

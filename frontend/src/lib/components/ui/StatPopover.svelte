@@ -228,7 +228,7 @@
 							class="thrive-row group flex w-full min-h-11 items-start gap-2 px-2 py-1.5 text-left lg:min-h-9"
 						>
 							<span class="min-w-0 flex-1">
-								<span class="block text-xs break-words text-ink">{item.title}</span>
+								<span class="block text-xs font-medium break-words text-ink">{item.title}</span>
 								<span
 									class="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-3xs text-muted-ink"
 								>

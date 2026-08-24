@@ -55,7 +55,7 @@
 							{row.time}
 						</span>
 						<span class="min-w-0 flex-1">
-							<span class="block text-sm break-words text-ink">{row.title}</span>
+							<span class="block text-sm font-medium break-words text-ink">{row.title}</span>
 							<span class="block truncate text-2xs font-medium text-muted-ink">
 								{row.location}
 							</span>

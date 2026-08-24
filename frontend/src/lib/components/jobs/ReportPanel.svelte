@@ -25,7 +25,7 @@
 <div class="space-y-3">
 	<div class="flex flex-wrap items-center gap-2.5">
 		<Tag tone={competencyTone[report.competency]} dot>{competencyLabel(report.competency)}</Tag>
-		<span class="thrive-numeric text-lg font-semibold text-ink">{report.score}</span>
+		<span class="thrive-numeric text-lg font-bold text-ink">{report.score}</span>
 	</div>
 
 	<!--
@@ -42,7 +42,7 @@
 
 	<div class="grid gap-3 sm:grid-cols-2">
 		<div class="min-w-0">
-			<h3 class="text-3xs font-medium text-muted-ink uppercase">{copy.matchedHeading}</h3>
+			<h3 class="thrive-eyebrow">{copy.matchedHeading}</h3>
 			{#if report.matchedSkills.length > 0}
 				<ul class="mt-1 flex flex-wrap gap-1">
 					{#each report.matchedSkills as skill (skill)}
@@ -55,7 +55,7 @@
 		</div>
 
 		<div class="min-w-0">
-			<h3 class="text-3xs font-medium text-muted-ink uppercase">{copy.gapsHeading}</h3>
+			<h3 class="thrive-eyebrow">{copy.gapsHeading}</h3>
 			{#if report.gaps.length > 0}
 				<ul class="mt-1 flex flex-wrap gap-1">
 					{#each report.gaps as skill (skill)}

@@ -78,7 +78,7 @@
 	<form method="GET" role="search" class="flex flex-wrap items-end gap-2.5">
 		<input type="hidden" name="tab" value={data.tab} />
 		<div class="min-w-0 flex-1">
-			<label for="jobs-query" class="mb-1.5 block text-2xs text-ink uppercase">
+			<label for="jobs-query" class="thrive-eyebrow mb-1.5 block">
 				{copy.search.label}
 			</label>
 			<input
@@ -156,7 +156,7 @@
 					<input type="hidden" name="minScore" value={data.minScore} />
 				{/if}
 				<div class="min-w-0">
-					<label for="jobs-resume" class="mb-1.5 block text-2xs text-ink uppercase">
+					<label for="jobs-resume" class="thrive-eyebrow mb-1.5 block">
 						{copy.profileBanner.hasResume.fileLabel}
 					</label>
 					<input
@@ -228,7 +228,7 @@
 					<input type="hidden" name="minScore" value={data.minScore} />
 				{/if}
 				<div class="min-w-0">
-					<label for="jobs-resume" class="mb-1.5 block text-2xs text-ink uppercase">
+					<label for="jobs-resume" class="thrive-eyebrow mb-1.5 block">
 						{copy.profileBanner.fileLabel}
 					</label>
 					<input

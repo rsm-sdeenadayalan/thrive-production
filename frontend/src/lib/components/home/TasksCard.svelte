@@ -439,7 +439,7 @@
 					{#each groups as group (group.key)}
 						{@const droppable = isDatedGroup(group.key)}
 						<section aria-label={group.heading}>
-							<h3 class="mb-1 text-2xs font-medium text-ink uppercase">{group.heading}</h3>
+							<h3 class="thrive-eyebrow mb-1">{group.heading}</h3>
 
 							<!-- The group is its own drop zone, so a row can be dropped in the empty
 							     area below the last one and still land in this group. "Needs a date"
@@ -531,7 +531,7 @@
 
 		{#if board.done.length > 0}
 			<section aria-label={messages.taskGroups.done}>
-				<h3 class="mb-1 text-2xs font-medium text-muted-ink uppercase">
+				<h3 class="thrive-eyebrow mb-1">
 					{messages.taskGroups.done}<span class="thrive-numeric">
 						{messages.common.countSuffix(board.done.length)}
 					</span>

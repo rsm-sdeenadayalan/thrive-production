@@ -235,16 +235,20 @@
 	<!-- ── Fonts ────────────────────────────────────────────────────────── -->
 	<section class="thrive-panel space-y-5">
 		<h2 class="text-lg font-bold text-ink">
-			Two faces — sans for words, mono for numbers
+			One face — DM Sans, tabular figures for numbers
 		</h2>
 		<p class="max-w-measure text-xs text-body">
-			Tightened 2026-08-22. The old rule ended “…and any label that is a system value”, and
-			almost any label can be argued into that, so mono spread to eyebrows, switchers, chips
-			and tags. A face used for a third of the interface is not an accent, it is a second body
-			font.
+			Tightened again 2026-08-24. The 2026-08-22 pass narrowed the mono face to numbers
+			only; a student typography pass found that mid-sentence font switching — “in 3
+			days”, “9:30 AM” — was itself the “inconsistent fonts” complaint, so `.thrive-numeric`
+			dropped the mono face entirely. What it keeps is `font-variant-numeric: tabular-nums`,
+			a real DM Sans feature, so a column of digits still lines up and a countdown chip still
+			holds its width. JetBrains Mono is still loaded, but only for this page's own
+			<code class="font-mono">code</code> samples.
 		</p>
 
-		<!-- The rule, worked. Left is a value, right is words. -->
+		<!-- The rule, worked. Left is a value (tabular), right is words. Same face
+		     either side now -- the "why" column is what still differs. -->
 		<div class="space-y-2">
 			<p class="thrive-eyebrow">the rule, side by side</p>
 			<div class="overflow-x-auto">
@@ -252,10 +256,10 @@
 					<thead>
 						<tr class="border-b border-line">
 							<th class="py-1.5 pr-4 text-2xs font-medium text-ink">
-								mono — a value
+								tabular — a value
 							</th>
 							<th class="py-1.5 pr-4 text-2xs font-medium text-ink">
-								sans — words
+								prose — words
 							</th>
 							<th class="py-1.5 text-2xs font-medium text-ink">why</th>
 						</tr>
@@ -279,7 +283,7 @@
 			</p>
 		</div>
 
-		<!-- What lost mono this pass. -->
+		<!-- What lost mono, across both passes. -->
 		<div class="space-y-2 border-t border-hairline-soft pt-4">
 			<p class="thrive-eyebrow">demoted — these were mono and are not any more</p>
 			<div class="flex flex-wrap gap-2">
@@ -288,19 +292,20 @@
 				{/each}
 			</div>
 			<p class="max-w-measure text-3xs text-muted-ink">
-				All words. Eyebrows, view switchers, stream and filter chips, “next up”, class and
-				task tags.
+				2026-08-22: eyebrows, view switchers, stream and filter chips, “next up”, class and
+				task tags. 2026-08-24: the numbers themselves. Every one of these is DM Sans now.
 			</p>
 		</div>
 
-		<!-- The two treatments a component actually reaches for. -->
+		<!-- The one treatment a component actually reaches for, for a value. -->
 		<div class="grid gap-3 border-t border-hairline-soft pt-4 sm:grid-cols-2">
 			<div class="space-y-1">
 				<p class="thrive-eyebrow">.thrive-numeric</p>
 				<p class="thrive-numeric text-base text-ink">0123456789 · 12/34 · 38/52</p>
 				<p class="text-3xs text-muted-ink">
-					Carries the mono face <em>and</em> tabular figures, so
-					<code class="font-mono">tabular-nums</code> is not a separate thing to remember.
+					DM Sans, same as everything else, plus
+					<code class="font-mono">tabular-nums</code> so digits line up and a countdown
+					chip holds its width.
 				</p>
 			</div>
 			<div class="space-y-1">

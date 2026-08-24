@@ -48,7 +48,7 @@
 			<!-- Two lines, not an ellipsis. At 320px this column is about 135px wide
 			     and "Machine Learning for Business" needs 220px, so a single-line
 			     truncate hid the one thing the card is named for. -->
-			<h3 class="mt-1 line-clamp-2 text-base break-words text-ink">{course.title}</h3>
+			<h3 class="mt-1 line-clamp-2 text-base font-medium break-words text-ink">{course.title}</h3>
 			<p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-3xs text-muted-ink">
 				<span class="truncate">{course.instructor}</span>
 				<span aria-hidden="true">·</span>

@@ -83,7 +83,7 @@
 
 	{#if entry.matchedSkills.length > 0}
 		<div class="min-w-0">
-			<p class="text-3xs font-medium text-muted-ink uppercase">{copy.skillsHave}</p>
+			<p class="thrive-eyebrow">{copy.skillsHave}</p>
 			<ul class="mt-1 flex flex-wrap gap-1">
 				{#each entry.matchedSkills.slice(0, MAX_MATCHED_SKILLS) as skill (skill)}
 					<li><Tag tone="neutral">{skill}</Tag></li>
@@ -94,7 +94,7 @@
 
 	{#if entry.missingSkills.length > 0}
 		<div class="min-w-0">
-			<p class="text-3xs font-medium text-muted-ink uppercase">{copy.skillsBuild}</p>
+			<p class="thrive-eyebrow">{copy.skillsBuild}</p>
 			<ul class="mt-1 flex flex-wrap gap-1">
 				{#each entry.missingSkills.slice(0, MAX_MISSING_SKILLS) as skill (skill)}
 					<li><Tag tone="quiet">{skill}</Tag></li>

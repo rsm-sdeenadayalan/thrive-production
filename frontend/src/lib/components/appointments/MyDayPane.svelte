@@ -128,7 +128,7 @@
 
 					<span class="min-w-0 flex-1">
 						<span class="flex flex-wrap items-center gap-1.5">
-							<span class="min-w-0 text-sm break-words text-ink">{item.title}</span>
+							<span class="min-w-0 text-sm font-medium break-words text-ink">{item.title}</span>
 							<!-- Through `Tag`, not the `categoryTag` class map: every chip in
 							     THRIVE comes from the one component, and only two categories
 							     ever reach this pane. -->
