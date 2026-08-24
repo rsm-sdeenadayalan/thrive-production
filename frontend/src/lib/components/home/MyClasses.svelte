@@ -26,7 +26,9 @@
 	description={messages.home.myClasses.description(rows.length)}
 	href="/classes"
 >
-	<div id="my-classes-list" class="space-y-3">
+	<!-- `space-y-2`: the same list gap `EventRow`, `TodaysClasses` and `TaskRow`
+	     now share, so every Home card reads as one card language. -->
+	<div id="my-classes-list" class="space-y-2">
 		{#each collapse.visible as row (row.course.id)}
 			<CourseCard course={row.course} nextDue={row.nextDue} scheduleLabel={row.scheduleLabel} />
 		{/each}

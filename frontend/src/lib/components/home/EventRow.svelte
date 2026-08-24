@@ -75,11 +75,22 @@
 	const joined = $derived(isEventJoined(event.id, eventJoins()));
 </script>
 
+<!--
+	The card treatment is plain utilities, not `.thrive-panel`: the panel's
+	`data-flush` variant existed for a box nested inside another panel with no
+	edge of its own, but this row sits in a `divide-y` list where Tailwind's
+	divide-color rule (a UTILITY, same layer-priority argument as the note on
+	`.thrive-panel` above) was winning over `data-flush`'s transparent border on
+	three of four sides -- an accidental, cascade-order-dependent outline rather
+	than a deliberate one. Every action item on Home now draws the SAME explicit
+	border/radius/surface, this row included, so the outline is no longer a side
+	effect of `divide-y`. See `UpcomingEvents` for the matching switch to
+	`space-y-2`.
+-->
 <article
 	id={rowId}
 	tabindex="-1"
-	data-flush="true"
-	class="thrive-panel flex items-start gap-2.5 p-2 transition-colors duration-(--motion-fast) ease-standard hover:bg-bg"
+	class="flex items-start gap-2.5 rounded-lg border border-hairline bg-surface p-2 transition-colors duration-(--motion-fast) ease-standard hover:bg-bg"
 >
 	<!-- Date block. A calendar-tear shape reads faster than a date string. The day
 	     number is a value, the month abbreviation is a word. -->

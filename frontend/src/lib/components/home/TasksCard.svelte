@@ -446,7 +446,7 @@
 							     gets none: there is nothing to write. -->
 							<div
 								role="list"
-								class="min-h-4 space-y-1"
+								class="min-h-4 space-y-2"
 								ondragover={(event) => {
 									if (!drag || !droppable) return;
 									event.preventDefault();
@@ -508,7 +508,7 @@
 					{:else}
 					<!-- Collapsed: flat, and no reorder. Every row still states its own urgency
 					     in its labels, so no information is lost with the headings. -->
-					<div role="list" class="space-y-1">
+					<div role="list" class="space-y-2">
 						{#each openCollapse.visible as row (row.task.id)}
 							<TaskRow task={row.task} due={row.due} done={false} onToggle={toggle}>
 								{#snippet dueEditor()}
@@ -540,7 +540,7 @@
 				     while collapsed, which is exactly what "expands nothing yet" means. -->
 				<div id="tasks-done-list">
 					{#if doneCollapse.visible.length > 0}
-						<div role="list" class="space-y-1">
+						<div role="list" class="space-y-2">
 							{#each doneCollapse.visible as row (row.task.id)}
 								<!-- No due editor and no reorder on a done row: the date has stopped
 								     being a deadline and position in a record does not mean anything. -->

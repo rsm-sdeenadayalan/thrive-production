@@ -176,12 +176,17 @@
 			{/if}
 
 			<!-- tabindex -1 makes this focusable programmatically but keeps it out of
-			     the tab order, which is what a focus landing spot wants. -->
+			     the tab order, which is what a focus landing spot wants.
+
+			     `space-y-2`, not `divide-y`: each `EventRow` now carries its own
+			     border, so a divider line between rows would double it up. The gap
+			     is the one every other Home list of action items uses -- see
+			     `TaskRow`'s and `CourseCard`'s callers. -->
 			<div
 				bind:this={listEl}
 				id="upcoming-events-list"
 				tabindex="-1"
-				class="divide-y divide-hairline outline-none"
+				class="space-y-2 outline-none"
 			>
 				{#each collapse.visible as entry (entry.event.id)}
 					<EventRow

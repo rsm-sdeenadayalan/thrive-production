@@ -42,10 +42,12 @@
 		{#if rows.length === 0}
 			<EmptyState icon={CalendarDays} message={messages.home.todaysClasses.empty} />
 		{:else}
-			<ul class="space-y-1">
+			<!-- `space-y-2` and `rounded-lg`: the same gap and radius every action
+			     item on Home now uses -- see `TaskRow`, `CourseCard` and `EventRow`. -->
+			<ul class="space-y-2">
 				{#each collapse.visible as row (row.id)}
 					<li
-						class="flex items-baseline gap-2.5 rounded-md border border-hairline bg-surface px-2 py-1.5"
+						class="flex items-baseline gap-2.5 rounded-lg border border-hairline bg-surface px-2 py-1.5"
 					>
 						<!-- A clock time is a value: mono, and tabular so the column of
 						     times lines up down the card. -->

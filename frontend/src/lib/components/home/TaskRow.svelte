@@ -246,312 +246,327 @@
 
 	`data-priority` stays: it is still read by the sr-only label below, and by
 	anything that groups or filters rows, even though nothing paints it any more.
+
+	## The border is a WRAPPER, not a `.thrive-row` edit
+
+	Home's action items all draw the same `rounded-lg border border-hairline
+	bg-surface` card now -- see `EventRow` and `CourseCard`. `.thrive-row` itself
+	says "No border, no wash" and fills with `sunken` on hover, which a border
+	and an opaque surface added to the SAME element would fight: a plain `bg-*`
+	utility sits in the utilities layer, which wins over `.thrive-row:hover`'s
+	component-layer fill regardless of the pseudo-class, so the hover state would
+	stop painting. Wrapping instead keeps `.thrive-row` completely unedited and
+	untouched at the call site -- the border lives on an outer div with no
+	padding of its own, and the existing `px-2 py-1.5` below still sets the
+	visible inset, so the card's padding matches the others exactly.
 -->
-<div
-	id={rowId}
-	role="listitem"
-	tabindex="-1"
-	data-done={done}
-	data-priority={priority}
-	draggable={reorder ? true : undefined}
-	ondragstart={reorder?.onDragStart}
-	ondragover={reorder?.onDragOver}
-	ondrop={reorder?.onDrop}
-	class={cn(
-		'thrive-row group relative',
-		/* The drop indicator: a rule where the row would land, drawn ON the row
-		   rather than as an inserted gap so nothing reflows mid-drag. A list that
-		   reflows under the cursor is what makes a drag feel like it is fighting
-		   back. */
-		reorder?.dropBefore &&
-			'before:absolute before:-top-1 before:right-0 before:left-0 before:h-1 before:rounded-pill before:bg-primary'
-	)}
->
-	<!-- Wraps below `sm`, so the controls take their own line and the title keeps
-	     the full width. See the note on defect 3 above. -->
-	<div class="flex flex-wrap items-start gap-x-2 gap-y-1 px-2 py-1.5 sm:flex-nowrap lg:py-1">
-		<!-- `mt-0.5` aligns the box with the first line of the title rather than the
-		     centre of a two-line block. -->
-		<input
-			id={checkboxId}
-			type="checkbox"
-			class="thrive-checkbox mt-0.5"
-			checked={done}
-			onchange={() => onToggle(task)}
-		/>
-
-		<!--
-			`min-w-0` is half the fix for defect 3: without it this child refuses to
-			shrink below its longest word and pushes the row wider than its container.
-
-			A COLUMN rather than a baseline row is the other half.
-
-			6a laid the title and its chips out on one wrapping line, with the title
-			`flex-1 min-w-0`. That reads as "the chips wrap when they run out of room",
-			but it does the opposite: `flex-1` on a `min-w-0` item means the TITLE is
-			what gives way, so the chips keep their width and the title shrinks toward
-			nothing. It survived 6a because a read-only row carried two small tags.
-
-			Adding the due chip is what exposed it. Measured at 375px before this
-			change: the title box was 90px wide, wrapping "Submit peer review" over
-			THREE lines at six characters a line -- defect 3, arriving by a slightly
-			different route than the original.
-
-			So the title gets a line of its own. Measured after: 303px and ONE line at
-			375px, 339px and one line at 1512px.
-		-->
-		<div class="flex min-w-0 flex-1 basis-full flex-col gap-1 sm:basis-auto">
-			<!-- The title IS the checkbox's label, which is what makes the tick target
-			     large without the box itself having to grow. -->
-			<label
-				for={checkboxId}
-				data-done={done}
-				class={cn(
-					'thrive-strike cursor-pointer text-sm break-words',
-					done ? 'text-muted-ink' : 'text-ink'
-				)}
-			>
-				{task.title}
-			</label>
+<div class="rounded-lg border border-hairline bg-surface">
+	<div
+		id={rowId}
+		role="listitem"
+		tabindex="-1"
+		data-done={done}
+		data-priority={priority}
+		draggable={reorder ? true : undefined}
+		ondragstart={reorder?.onDragStart}
+		ondragover={reorder?.onDragOver}
+		ondrop={reorder?.onDrop}
+		class={cn(
+			'thrive-row group relative',
+			/* The drop indicator: a rule where the row would land, drawn ON the row
+			   rather than as an inserted gap so nothing reflows mid-drag. A list that
+			   reflows under the cursor is what makes a drag feel like it is fighting
+			   back. */
+			reorder?.dropBefore &&
+				'before:absolute before:-top-1 before:right-0 before:left-0 before:h-1 before:rounded-pill before:bg-primary'
+		)}
+	>
+		<!-- Wraps below `sm`, so the controls take their own line and the title keeps
+		     the full width. See the note on defect 3 above. -->
+		<div class="flex flex-wrap items-start gap-x-2 gap-y-1 px-2 py-1.5 sm:flex-nowrap lg:py-1">
+			<!-- `mt-0.5` aligns the box with the first line of the title rather than the
+			     centre of a two-line block. -->
+			<input
+				id={checkboxId}
+				type="checkbox"
+				class="thrive-checkbox mt-0.5"
+				checked={done}
+				onchange={() => onToggle(task)}
+			/>
 
 			<!--
-				The chips and the date on ONE line, which is the Next source's
-				arrangement and worth about 27px a row.
+				`min-w-0` is half the fix for defect 3: without it this child refuses to
+				shrink below its longest word and pushes the row wider than its container.
 
-				Stacking them as separate lines is the obvious reading of "the title has
-				its own line", and it made a desktop row 83px: title, chips, date. Four
-				of those plus the Done heading is 469px inside a 300px body, so the
-				collapsed card scrolled to show the four rows it is tuned to show. On one
-				line the row is 56px and four of them fit the cap as they did in 6a.
+				A COLUMN rather than a baseline row is the other half.
 
-				They belong together anyway: the chip says WHAT state the deadline is in
-				and the text says WHEN it is. Two readings of one fact, on one line.
+				6a laid the title and its chips out on one wrapping line, with the title
+				`flex-1 min-w-0`. That reads as "the chips wrap when they run out of room",
+				but it does the opposite: `flex-1` on a `min-w-0` item means the TITLE is
+				what gives way, so the chips keep their width and the title shrinks toward
+				nothing. It survived 6a because a read-only row carried two small tags.
+
+				Adding the due chip is what exposed it. Measured at 375px before this
+				change: the title box was 90px wide, wrapping "Submit peer review" over
+				THREE lines at six characters a line -- defect 3, arriving by a slightly
+				different route than the original.
+
+				So the title gets a line of its own. Measured after: 303px and ONE line at
+				375px, 339px and one line at 1512px.
 			-->
-			<p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-3xs text-muted-ink">
-				{#each labels as label (label.text)}
-					<Tag tone={label.tone}>{label.text}</Tag>
-				{/each}
+			<div class="flex min-w-0 flex-1 basis-full flex-col gap-1 sm:basis-auto">
+				<!-- The title IS the checkbox's label, which is what makes the tick target
+				     large without the box itself having to grow. -->
+				<label
+					for={checkboxId}
+					data-done={done}
+					class={cn(
+						'thrive-strike cursor-pointer text-sm break-words',
+						done ? 'text-muted-ink' : 'text-ink'
+					)}
+				>
+					{task.title}
+				</label>
 
-				<!-- A button where the date is editable, a plain chip where it is not. -->
-				{#if dueEditor}{@render dueEditor()}{/if}
-
-				<span>{due.fullLabel}</span>
-				<!-- `countdown` is a value and holds its width so the row does not
-				     reflow as "in 3 days" becomes "in 10 days". -->
-				{#if due.countdown}
-					<span aria-hidden="true">·</span>
-					<span class="thrive-numeric">{due.countdown}</span>
-				{/if}
-				{#if task.subtasks.length > 0}
-					<span aria-hidden="true">·</span>
-					<span class="thrive-numeric">
-						{task.subtasks.filter((subtask) => subtask.done).length}/{task.subtasks.length}
-					</span>
-				{/if}
-				<!-- The wash and the left border are the visual carrier; this is the one
-				     that survives with colour turned off. -->
-				{#if priority !== 'none'}
-					<span class="sr-only">{rowPriorityLabel[priority]}</span>
-				{/if}
-			</p>
-		</div>
-
-		<!-- Every control here is always visible and always 44px, on every pointer
-		     type. An earlier pass hid the note button until hover, which on a phone
-		     meant the only way to add a note was invisible.
-
-		     "Always visible" means: whenever it is rendered at all. Two are
-		     conditional and neither is conditional on the POINTER -- reorder needs
-		     the groups (see TasksCard), and copy needs somewhere to copy TO.
-
-		     `ms-auto` anchors the strip to the RIGHT, which is what makes the two
-		     always-present controls pixel-stable as the conditional ones come and go.
-
-		     Above `sm` the strip was already right-anchored, by the `flex-1` content
-		     column beside it -- measured, Edit sits at the same x with two controls or
-		     three. Below `sm` the strip wraps to its own line, where it was
-		     LEFT-aligned, so removing the leading Copy control slid Edit and Add-a-note
-		     49px left. Expanding a card did the same thing in reverse, since that adds
-		     two reorder controls ahead of them.
-
-		     So the invariant is now: a conditional control appears and disappears at
-		     the strip's leading edge, and nothing already on screen moves.
-
-		     `self-center`, against the row's own `items-start`: the checkbox needs
-		     `items-start` so it sits on the title's first line rather than the middle
-		     of a two-line block, but that same rule would pin the icon strip to the
-		     TOP of a tall row -- title wrapped to two lines, three chips wrapping to
-		     their own line -- leaving visible empty air below the icons. Centring
-		     just this child keeps both true at once. -->
-		<div class="ms-auto flex shrink-0 items-center gap-0.5 self-center">
-			{#if FEATURES.floatingTodo}
 				<!--
-					Copy, not move, and never a link: the row stays here, and the two lists
-					go their own ways from this moment on.
+					The chips and the date on ONE line, which is the Next source's
+					arrangement and worth about 27px a row.
 
-					## Gated on the flag that owns the destination
+					Stacking them as separate lines is the obvious reading of "the title has
+					its own line", and it made a desktop row 83px: title, chips, date. Four
+					of those plus the Done heading is 469px inside a 300px body, so the
+					collapsed card scrolled to show the four rows it is tuned to show. On one
+					line the row is 56px and four of them fit the cap as they did in 6a.
 
-					The quick list lives in the floating To-do panel, which is behind
-					`FEATURES.floatingTodo`. With the flag off, the copy still works and
-					still persists to `thrive:quicklist` -- and the student has no way to
-					see the thing they just copied. An action whose result is invisible
-					reads as broken, which is the same reasoning that withholds a "View
-					all" pointing at a parked route.
-
-					Nothing is deleted: the store, `addQuickItem`, the tests and the toast
-					all stay, and flipping one word brings the button back. Visibility only.
-
-					Note the consequence, so it is not a surprise later: with this hidden,
-					`showToast` has NO caller, so the `Toast` mounted in `AppShell` can
-					never fire. That is coherent rather than dead code -- the toast exists
-					for exactly this action and returns with it on the same flag -- but it
-					does mean the toast is currently unexercised by anything but its tests.
+					They belong together anyway: the chip says WHAT state the deadline is in
+					and the text says WHEN it is. Two readings of one fact, on one line.
 				-->
-				<button
-					type="button"
-					onclick={copyToList}
-					class={cn(glyph, glyphQuiet, 'hover:text-primary')}
-				>
-					<ListPlus aria-hidden="true" class="size-4" />
-					<span class="sr-only">{messages.taskEditing.copyToList(task.title)}</span>
-				</button>
-			{/if}
+				<p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-3xs text-muted-ink">
+					{#each labels as label (label.text)}
+						<Tag tone={label.tone}>{label.text}</Tag>
+					{/each}
 
-			{#if reorder}
-				<!-- Dragging is pointer-only, so reordering gets real buttons too.
-				     Without them the whole feature would be closed to keyboard users and
-				     to anyone on a touch device, where HTML5 drag does not fire. -->
-				<button
-					type="button"
-					disabled={!reorder.onMoveUp}
-					onclick={() => reorder?.onMoveUp?.()}
-					class={cn(
-						glyph,
-						glyphQuiet,
-						'hover:text-ink disabled:opacity-40 disabled:hover:border-transparent disabled:hover:bg-transparent'
-					)}
-				>
-					<ChevronUp aria-hidden="true" class="size-4" />
-					<span class="sr-only">{messages.taskEditing.moveUp(task.title, reorder.position)}</span>
-				</button>
-				<button
-					type="button"
-					disabled={!reorder.onMoveDown}
-					onclick={() => reorder?.onMoveDown?.()}
-					class={cn(
-						glyph,
-						glyphQuiet,
-						'hover:text-ink disabled:opacity-40 disabled:hover:border-transparent disabled:hover:bg-transparent'
-					)}
-				>
-					<ChevronDown aria-hidden="true" class="size-4" />
-					<span class="sr-only">{messages.taskEditing.moveDown(task.title, reorder.position)}</span>
-				</button>
-			{/if}
+					<!-- A button where the date is editable, a plain chip where it is not. -->
+					{#if dueEditor}{@render dueEditor()}{/if}
 
-			<button
-				type="button"
-				aria-expanded={editOpen}
-				aria-controls={editId}
-				onclick={() => (editOpen ? commitTitle() : openEditor())}
-				class={cn(glyph, editOpen ? glyphActive : cn(glyphQuiet, 'hover:text-ink'))}
-			>
-				<Pencil aria-hidden="true" class="size-4" />
-				<span class="sr-only">{messages.taskEditing.edit(task.title)}</span>
-			</button>
-
-			<button
-				type="button"
-				aria-expanded={noteOpen}
-				aria-controls={noteId}
-				onclick={() => (noteOpen = !noteOpen)}
-				class={cn(glyph, noteOpen || hasNote ? glyphActive : cn(glyphQuiet, 'hover:text-ink'))}
-			>
-				<StickyNote aria-hidden="true" class="size-4" />
-				<span class="sr-only">
-					{hasNote
-						? messages.taskEditing.editNote(task.title)
-						: messages.taskEditing.addNote(task.title)}
-				</span>
-			</button>
-		</div>
-	</div>
-
-	<!-- Edit in place: rename and re-prioritise without leaving the page. -->
-	<div id={editId}>
-		{#if editOpen}
-			<div class="mx-2 mb-2 space-y-2 rounded-md border border-line bg-sunken p-2.5">
-				<div>
-					<label
-						for={`${editId}-title`}
-						class="mb-1 block text-3xs font-medium text-muted-ink uppercase"
-					>
-						{messages.taskEditing.titleField}
-					</label>
-					<input
-						id={`${editId}-title`}
-						bind:value={draft}
-						name="task-title"
-						autocomplete="off"
-						onblur={onTitleBlur}
-						onkeydown={(event) => {
-							if (event.key === 'Enter') {
-								event.preventDefault();
-								commitTitle();
-							}
-							if (event.key === 'Escape') {
-								// Abandon the draft, keep the stored title. The opposite of
-								// TaskNotes, and deliberately: a title has an original to
-								// restore to, and prose does not.
-								event.stopPropagation();
-								cancelEdit();
-							}
-						}}
-						class="w-full rounded-sm border-[1.5px] border-line-strong bg-surface px-2 py-1.5 text-sm text-ink"
-					/>
-					<p class="mt-1 text-3xs text-muted-ink">{messages.taskEditing.titleHint}</p>
-				</div>
-
-				<div>
-					<span class="mb-1 block text-3xs font-medium text-muted-ink uppercase">
-						{messages.taskEditing.priorityField}
-					</span>
-					<PriorityPicker {task} current={task.priority} />
-				</div>
-
-				<div class="flex gap-2">
-					<button
-						type="button"
-						onclick={commitTitle}
-						class="min-h-11 rounded-sm border border-line-strong bg-primary px-2.5 text-2xs font-medium text-on-primary transition-colors duration-(--motion-fast) ease-standard hover:bg-primary-hover lg:min-h-9"
-					>
-						{messages.taskEditing.save}
-						<span class="sr-only">{messages.taskEditing.saveSubject(task.title)}</span>
-					</button>
-					<button
-						type="button"
-						data-abandon-edit="true"
-						onpointerdown={() => (abandoning = true)}
-						onclick={cancelEdit}
-						class="min-h-11 rounded-sm border-2 border-line bg-surface px-2.5 text-2xs font-medium text-body transition-colors duration-(--motion-fast) ease-standard hover:border-line-strong lg:min-h-9"
-					>
-						{messages.taskEditing.cancel}
-						<span class="sr-only">{messages.taskEditing.cancelSubject(task.title)}</span>
-					</button>
-				</div>
+					<span>{due.fullLabel}</span>
+					<!-- `countdown` is a value and holds its width so the row does not
+					     reflow as "in 3 days" becomes "in 10 days". -->
+					{#if due.countdown}
+						<span aria-hidden="true">·</span>
+						<span class="thrive-numeric">{due.countdown}</span>
+					{/if}
+					{#if task.subtasks.length > 0}
+						<span aria-hidden="true">·</span>
+						<span class="thrive-numeric">
+							{task.subtasks.filter((subtask) => subtask.done).length}/{task.subtasks.length}
+						</span>
+					{/if}
+					<!-- The wash and the left border are the visual carrier; this is the one
+					     that survives with colour turned off. -->
+					{#if priority !== 'none'}
+						<span class="sr-only">{rowPriorityLabel[priority]}</span>
+					{/if}
+				</p>
 			</div>
-		{/if}
-	</div>
 
-	<div id={noteId}>
-		{#if noteOpen}
-			<TaskNotes
-				taskId={task.id}
-				taskTitle={task.title}
-				note={note.value}
-				onSave={(next) => note.save(next)}
-				onClose={() => (noteOpen = false)}
-			/>
-		{/if}
+			<!-- Every control here is always visible and always 44px, on every pointer
+			     type. An earlier pass hid the note button until hover, which on a phone
+			     meant the only way to add a note was invisible.
+
+			     "Always visible" means: whenever it is rendered at all. Two are
+			     conditional and neither is conditional on the POINTER -- reorder needs
+			     the groups (see TasksCard), and copy needs somewhere to copy TO.
+
+			     `ms-auto` anchors the strip to the RIGHT, which is what makes the two
+			     always-present controls pixel-stable as the conditional ones come and go.
+
+			     Above `sm` the strip was already right-anchored, by the `flex-1` content
+			     column beside it -- measured, Edit sits at the same x with two controls or
+			     three. Below `sm` the strip wraps to its own line, where it was
+			     LEFT-aligned, so removing the leading Copy control slid Edit and Add-a-note
+			     49px left. Expanding a card did the same thing in reverse, since that adds
+			     two reorder controls ahead of them.
+
+			     So the invariant is now: a conditional control appears and disappears at
+			     the strip's leading edge, and nothing already on screen moves.
+
+			     `self-center`, against the row's own `items-start`: the checkbox needs
+			     `items-start` so it sits on the title's first line rather than the middle
+			     of a two-line block, but that same rule would pin the icon strip to the
+			     TOP of a tall row -- title wrapped to two lines, three chips wrapping to
+			     their own line -- leaving visible empty air below the icons. Centring
+			     just this child keeps both true at once. -->
+			<div class="ms-auto flex shrink-0 items-center gap-0.5 self-center">
+				{#if FEATURES.floatingTodo}
+					<!--
+						Copy, not move, and never a link: the row stays here, and the two lists
+						go their own ways from this moment on.
+
+						## Gated on the flag that owns the destination
+
+						The quick list lives in the floating To-do panel, which is behind
+						`FEATURES.floatingTodo`. With the flag off, the copy still works and
+						still persists to `thrive:quicklist` -- and the student has no way to
+						see the thing they just copied. An action whose result is invisible
+						reads as broken, which is the same reasoning that withholds a "View
+						all" pointing at a parked route.
+
+						Nothing is deleted: the store, `addQuickItem`, the tests and the toast
+						all stay, and flipping one word brings the button back. Visibility only.
+
+						Note the consequence, so it is not a surprise later: with this hidden,
+						`showToast` has NO caller, so the `Toast` mounted in `AppShell` can
+						never fire. That is coherent rather than dead code -- the toast exists
+						for exactly this action and returns with it on the same flag -- but it
+						does mean the toast is currently unexercised by anything but its tests.
+					-->
+					<button
+						type="button"
+						onclick={copyToList}
+						class={cn(glyph, glyphQuiet, 'hover:text-primary')}
+					>
+						<ListPlus aria-hidden="true" class="size-4" />
+						<span class="sr-only">{messages.taskEditing.copyToList(task.title)}</span>
+					</button>
+				{/if}
+
+				{#if reorder}
+					<!-- Dragging is pointer-only, so reordering gets real buttons too.
+					     Without them the whole feature would be closed to keyboard users and
+					     to anyone on a touch device, where HTML5 drag does not fire. -->
+					<button
+						type="button"
+						disabled={!reorder.onMoveUp}
+						onclick={() => reorder?.onMoveUp?.()}
+						class={cn(
+							glyph,
+							glyphQuiet,
+							'hover:text-ink disabled:opacity-40 disabled:hover:border-transparent disabled:hover:bg-transparent'
+						)}
+					>
+						<ChevronUp aria-hidden="true" class="size-4" />
+						<span class="sr-only">{messages.taskEditing.moveUp(task.title, reorder.position)}</span>
+					</button>
+					<button
+						type="button"
+						disabled={!reorder.onMoveDown}
+						onclick={() => reorder?.onMoveDown?.()}
+						class={cn(
+							glyph,
+							glyphQuiet,
+							'hover:text-ink disabled:opacity-40 disabled:hover:border-transparent disabled:hover:bg-transparent'
+						)}
+					>
+						<ChevronDown aria-hidden="true" class="size-4" />
+						<span class="sr-only">{messages.taskEditing.moveDown(task.title, reorder.position)}</span>
+					</button>
+				{/if}
+
+				<button
+					type="button"
+					aria-expanded={editOpen}
+					aria-controls={editId}
+					onclick={() => (editOpen ? commitTitle() : openEditor())}
+					class={cn(glyph, editOpen ? glyphActive : cn(glyphQuiet, 'hover:text-ink'))}
+				>
+					<Pencil aria-hidden="true" class="size-4" />
+					<span class="sr-only">{messages.taskEditing.edit(task.title)}</span>
+				</button>
+
+				<button
+					type="button"
+					aria-expanded={noteOpen}
+					aria-controls={noteId}
+					onclick={() => (noteOpen = !noteOpen)}
+					class={cn(glyph, noteOpen || hasNote ? glyphActive : cn(glyphQuiet, 'hover:text-ink'))}
+				>
+					<StickyNote aria-hidden="true" class="size-4" />
+					<span class="sr-only">
+						{hasNote
+							? messages.taskEditing.editNote(task.title)
+							: messages.taskEditing.addNote(task.title)}
+					</span>
+				</button>
+			</div>
+		</div>
+
+		<!-- Edit in place: rename and re-prioritise without leaving the page. -->
+		<div id={editId}>
+			{#if editOpen}
+				<div class="mx-2 mb-2 space-y-2 rounded-md border border-line bg-sunken p-2.5">
+					<div>
+						<label
+							for={`${editId}-title`}
+							class="mb-1 block text-3xs font-medium text-muted-ink uppercase"
+						>
+							{messages.taskEditing.titleField}
+						</label>
+						<input
+							id={`${editId}-title`}
+							bind:value={draft}
+							name="task-title"
+							autocomplete="off"
+							onblur={onTitleBlur}
+							onkeydown={(event) => {
+								if (event.key === 'Enter') {
+									event.preventDefault();
+									commitTitle();
+								}
+								if (event.key === 'Escape') {
+									// Abandon the draft, keep the stored title. The opposite of
+									// TaskNotes, and deliberately: a title has an original to
+									// restore to, and prose does not.
+									event.stopPropagation();
+									cancelEdit();
+								}
+							}}
+							class="w-full rounded-sm border-[1.5px] border-line-strong bg-surface px-2 py-1.5 text-sm text-ink"
+						/>
+						<p class="mt-1 text-3xs text-muted-ink">{messages.taskEditing.titleHint}</p>
+					</div>
+
+					<div>
+						<span class="mb-1 block text-3xs font-medium text-muted-ink uppercase">
+							{messages.taskEditing.priorityField}
+						</span>
+						<PriorityPicker {task} current={task.priority} />
+					</div>
+
+					<div class="flex gap-2">
+						<button
+							type="button"
+							onclick={commitTitle}
+							class="min-h-11 rounded-sm border border-line-strong bg-primary px-2.5 text-2xs font-medium text-on-primary transition-colors duration-(--motion-fast) ease-standard hover:bg-primary-hover lg:min-h-9"
+						>
+							{messages.taskEditing.save}
+							<span class="sr-only">{messages.taskEditing.saveSubject(task.title)}</span>
+						</button>
+						<button
+							type="button"
+							data-abandon-edit="true"
+							onpointerdown={() => (abandoning = true)}
+							onclick={cancelEdit}
+							class="min-h-11 rounded-sm border-2 border-line bg-surface px-2.5 text-2xs font-medium text-body transition-colors duration-(--motion-fast) ease-standard hover:border-line-strong lg:min-h-9"
+						>
+							{messages.taskEditing.cancel}
+							<span class="sr-only">{messages.taskEditing.cancelSubject(task.title)}</span>
+						</button>
+					</div>
+				</div>
+			{/if}
+		</div>
+
+		<div id={noteId}>
+			{#if noteOpen}
+				<TaskNotes
+					taskId={task.id}
+					taskTitle={task.title}
+					note={note.value}
+					onSave={(next) => note.save(next)}
+					onClose={() => (noteOpen = false)}
+				/>
+			{/if}
+		</div>
 	</div>
 </div>

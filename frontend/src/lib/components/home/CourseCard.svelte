@@ -36,7 +36,12 @@
 	);
 </script>
 
-<article data-flush="true" class="thrive-panel flex flex-col gap-2.5 p-3">
+<!--
+	Plain utilities, not `.thrive-panel[data-flush]` -- see the note in
+	`EventRow`. Same border, radius and surface as every other action item on
+	Home now: `rounded-lg border border-hairline bg-surface`.
+-->
+<article class="flex flex-col gap-2.5 rounded-lg border border-hairline bg-surface p-3">
 	<div class="flex items-start justify-between gap-2">
 		<div class="min-w-0">
 			<Tag tone="primary">{course.code}</Tag>
