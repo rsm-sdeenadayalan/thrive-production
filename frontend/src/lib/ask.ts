@@ -15,18 +15,25 @@ import { dayKeyOf } from "$lib/schedule";
  * the server stays the only thing that decides what today is and the whole
  * module is timezone-independent by construction.
  *
- * ## Three destinations, one list
+ * ## Two destinations, one list
  *
  * `ASK_DESTINATIONS` drives the rail, the route validation and the empty
- * states. Same property `nav.ts` has: one list, so a fourth destination is one
+ * states. Same property `nav.ts` has: one list, so a third destination is one
  * edit and a destination cannot exist in the rail while the router refuses it.
+ *
+ * Career lived here until 2026-08-24, when its sub-tab was removed from the
+ * UI in favor of the Career job feed at `/jobs` -- one obvious way to reach
+ * the career tools, not two. `AskDestination` itself (in `$lib/data`) still
+ * includes `"career"`: the backend career bot and its API-facing tests are
+ * untouched, only the UI's list of reachable destinations shrank. Leaving
+ * `"career"` off this list is what makes `isAskDestination("career")` false
+ * and `/ask/career` a clean 404 rather than a route that still half-works.
  */
 
-/** The three surfaces, in rail order. */
+/** The two surfaces, in rail order. */
 export const ASK_DESTINATIONS: readonly AskDestination[] = [
   "resources",
   "courses",
-  "career",
 ] as const;
 
 /** The one a bare `/ask` lands on. */

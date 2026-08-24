@@ -844,7 +844,7 @@ export const messages = {
 		eyebrow: 'career',
 		title: 'Your career feed',
 		intro:
-			'Postings ranked against your resume, search, save, and apply from one feed. Postings come from public company job boards, refreshed by a periodic ingest run -- not a live feed of every opening the moment it posts.',
+			"Postings from top company job boards, ranked against your resume. Upload your resume once and every job gets a personal match score -- like the ones you want, dismiss the rest, and apply on the company's site.",
 
 		search: {
 			label: 'Job title, company, or skill',
@@ -904,7 +904,16 @@ export const messages = {
 			}
 		},
 
+		/**
+		 * The resume panel, in its two shapes.
+		 *
+		 * Both post to the SAME `?/upload` action -- the backend keeps only the
+		 * latest upload and deletes the rest, so there is no separate "replace"
+		 * endpoint to call, only different copy over the same form depending on
+		 * whether a resume is already on file.
+		 */
 		profileBanner: {
+			/** No resume yet -- the prominent banner. */
 			message: 'Upload your resume to rank results against your skills.',
 			fileLabel: 'Resume file',
 			upload: 'Upload resume',
@@ -912,7 +921,17 @@ export const messages = {
 			/** The guard before the file ever reaches the server. */
 			empty: 'Choose a file first.',
 			/** The provider failing for a reason nobody has thought about. */
-			error: 'Something went wrong uploading your resume. Try again.'
+			error: 'Something went wrong uploading your resume. Try again.',
+
+			/** A resume is already on file -- the compact row that keeps upload reachable. */
+			hasResume: {
+				message: 'Your feed is personalized to your uploaded resume.',
+				fileLabel: 'Replace resume (PDF)',
+				upload: 'Replace resume',
+				uploading: 'Replacing…',
+				/** Says plainly what the backend does, so a re-upload is never a surprise. */
+				note: 'Uploading a new resume replaces the previous one and refreshes every match score.'
+			}
 		},
 
 		benchmark: {
@@ -983,12 +1002,12 @@ export const messages = {
 		/**
 		 * Names the split, and says the honest thing about it in the same breath.
 		 *
-		 * The three destinations exist because they will be wired to different
+		 * The two destinations exist because they will be wired to different
 		 * material, and a student choosing between them deserves to know that none of
 		 * them can answer yet rather than finding out one question in.
 		 */
 		intro:
-			'Three places to ask, depending on what you need. None of them are connected to real material yet — the saved conversations below are examples of what this will hold.',
+			'Two places to ask, depending on what you need. None of them are connected to real material yet — the saved conversations below are examples of what this will hold.',
 
 		/**
 		 * The live counterpart of `intro`, shown once the backend is actually
@@ -999,11 +1018,15 @@ export const messages = {
 		 * connected would be a lie the student has no way to catch.
 		 */
 		introLive:
-			"Three places to ask, depending on what you need. Answers come from the program's own material — conversations are saved to your account.",
+			"Two places to ask, depending on what you need. Answers come from the program's own material — conversations are saved to your account.",
 
 		/**
-		 * The three destinations. Keyed by `AskDestination`, so a fourth is a
-		 * compile error here rather than a blank panel on screen.
+		 * Keyed by `AskDestination`, so a destination missing its copy is a compile
+		 * error here rather than a blank panel on screen. `AskDestination` still
+		 * includes `"career"` for the backend career bot (see `$lib/ask`'s note on
+		 * `ASK_DESTINATIONS`), so its entry stays even though the sub-tab that once
+		 * showed it is gone -- `ChatWindow` can only ever be handed the two
+		 * destinations the UI still routes to.
 		 *
 		 * Each carries a `blurb` for the rail and a full empty state, because an
 		 * empty chat box tells a student nothing about what this particular

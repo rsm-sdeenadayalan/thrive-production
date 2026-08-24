@@ -70,11 +70,11 @@ export const load: PageServerLoad = async ({ params, url }) => {
 	/*
 	 * A conversation opened under the wrong destination is a 404 too.
 	 *
-	 * `/ask/career?c=conv-002` names a real conversation in the wrong section, and
-	 * rendering it would put a Course Recommender exchange under the Career
-	 * heading with the Career rail highlighted -- a page quietly contradicting its
-	 * own URL. The three destinations are separate surfaces, and this is where
-	 * that is enforced rather than assumed.
+	 * `/ask/resources?c=conv-002` names a real conversation in the wrong section,
+	 * and rendering it would put a Course Recommender exchange under the
+	 * Resources heading with the Resources rail highlighted -- a page quietly
+	 * contradicting its own URL. The destinations are separate surfaces, and
+	 * this is where that is enforced rather than assumed.
 	 */
 	if (conversation.destination !== destination) {
 		error(404, messages.ask.notFound.conversation);

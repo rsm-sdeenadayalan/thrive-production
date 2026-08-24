@@ -29,9 +29,17 @@
 	 * ## The upload result is kept local, same reasoning as `BookingPanel`
 	 *
 	 * Every branch of `enhance`'s callback ends in something on screen: a
-	 * redirect navigates by hand (which re-runs `load`, so the banner, the tab
-	 * counts and every card's like/dismiss state update themselves), a `fail()`
-	 * renders its message, and anything else gets the generic sentence.
+	 * redirect navigates by hand (which re-runs `load`, so the resume panel, the
+	 * tab counts and every card's like/dismiss state update themselves), a
+	 * `fail()` renders its message, and anything else gets the generic sentence.
+	 *
+	 * ## The resume panel is always on screen, in one of two shapes
+	 *
+	 * `data.profileAvailable` used to gate the whole panel -- a student with a
+	 * resume on file never saw a way to change it again. The backend now keeps
+	 * only the latest upload and deletes the rest, so a replace is always cheap
+	 * and safe, and the panel says so: the same `?/upload` action, a prominent
+	 * banner before a resume exists and a compact row once one does.
 	 */
 	let { data }: { data: PageData } = $props();
 
@@ -105,7 +113,82 @@
 		{/each}
 	</nav>
 
-	{#if !data.profileAvailable}
+	{#if data.profileAvailable}
+		<!-- A resume is already on file. Compact, and upload stays reachable at
+		     every visit rather than only on the first one -- the requirement this
+		     panel exists for. -->
+		<div data-tone="paper" class="thrive-panel flex flex-wrap items-center justify-between gap-2.5 p-2.5">
+			<p class="text-2xs text-body">{copy.profileBanner.hasResume.message}</p>
+
+			<form
+				method="POST"
+				action="?/upload"
+				enctype="multipart/form-data"
+				class="flex flex-wrap items-end gap-2.5"
+				use:enhance={() => {
+					uploading = true;
+					uploadError = null;
+
+					return async ({ result }) => {
+						uploading = false;
+
+						if (result.type === 'redirect') {
+							// Back to the same feed, now scored against the new resume.
+							await goto(result.location, { invalidateAll: true });
+							return;
+						}
+
+						if (result.type === 'failure') {
+							uploadError = String(
+								(result.data as { error?: string } | undefined)?.error ?? ''
+							);
+							return;
+						}
+
+						// Neither a redirect nor a `fail()` -- must still say something.
+						uploadError = copy.profileBanner.error;
+					};
+				}}
+			>
+				<input type="hidden" name="tab" value={data.tab} />
+				<input type="hidden" name="q" value={data.q} />
+				{#if data.minScore !== undefined}
+					<input type="hidden" name="minScore" value={data.minScore} />
+				{/if}
+				<div class="min-w-0">
+					<label for="jobs-resume" class="mb-1.5 block text-2xs text-ink uppercase">
+						{copy.profileBanner.hasResume.fileLabel}
+					</label>
+					<input
+						id="jobs-resume"
+						type="file"
+						name="file"
+						accept="application/pdf"
+						required
+						class="block text-2xs text-body"
+					/>
+				</div>
+				<Button type="submit" variant="ghost" size="sm" disabled={uploading}>
+					{#if uploading}
+						<LoaderCircle aria-hidden="true" class="size-3.5 animate-spin" />
+					{/if}
+					{uploading ? copy.profileBanner.hasResume.uploading : copy.profileBanner.hasResume.upload}
+				</Button>
+			</form>
+
+			<p class="w-full text-3xs text-muted-ink">{copy.profileBanner.hasResume.note}</p>
+
+			{#if uploadError}
+				<p
+					role="alert"
+					class="w-full rounded-sm border border-urgent bg-urgent-soft px-2.5 py-1.5 text-2xs text-urgent"
+				>
+					{uploadError}
+				</p>
+			{/if}
+		</div>
+	{:else}
+		<!-- No resume yet -- the prominent banner. -->
 		<div data-tone="sunken" class="thrive-panel space-y-2.5 p-3">
 			<p class="text-sm text-body">{copy.profileBanner.message}</p>
 
@@ -152,6 +235,7 @@
 						id="jobs-resume"
 						type="file"
 						name="file"
+						accept="application/pdf"
 						required
 						class="block text-2xs text-body"
 					/>

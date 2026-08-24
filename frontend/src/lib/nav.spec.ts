@@ -82,7 +82,7 @@ describe("a nav item's children", () => {
 	const ask = primaryNav.find((item) => item.href === "/ask");
 
 	it("hang off Ask THRIVE", () => {
-		expect(ask?.children).toHaveLength(3);
+		expect(ask?.children).toHaveLength(2);
 	});
 
 	it("are real routes nested under their parent's href", () => {
@@ -119,9 +119,16 @@ describe("isBuiltRoute", () => {
 	});
 
 	it("accepts a child destination", () => {
-		// `/ask/career` is as real a page as `/calendar`. A card linking to one must
-		// not have its link withheld because the route happens to be nested.
-		expect(isBuiltRoute("/ask/career")).toBe(true);
+		// `/ask/courses` is as real a page as `/calendar`. A card linking to one
+		// must not have its link withheld because the route happens to be nested.
+		expect(isBuiltRoute("/ask/courses")).toBe(true);
+	});
+
+	it("rejects the removed Career sub-tab", () => {
+		// `/ask/career` was a child here until 2026-08-24. The career bot itself
+		// stays (see `$lib/ask`), but the route is gone from the nav, so a card
+		// must not treat it as built.
+		expect(isBuiltRoute("/ask/career")).toBe(false);
 	});
 
 	it("rejects every parked route", () => {

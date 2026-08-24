@@ -57,8 +57,8 @@ function conversation(
 }
 
 describe("the destination list", () => {
-  it("is the three, in rail order", () => {
-    expect(ASK_DESTINATIONS).toEqual(["resources", "courses", "career"]);
+  it("is the two, in rail order", () => {
+    expect(ASK_DESTINATIONS).toEqual(["resources", "courses"]);
   });
 
   it("has the default among them", () => {
@@ -67,7 +67,7 @@ describe("the destination list", () => {
     expect(ASK_DESTINATIONS).toContain(DEFAULT_DESTINATION);
   });
 
-  it("accepts exactly those three slugs", () => {
+  it("accepts exactly those two slugs", () => {
     for (const slug of ASK_DESTINATIONS) {
       expect(isAskDestination(slug)).toBe(true);
     }
@@ -81,6 +81,13 @@ describe("the destination list", () => {
     expect(isAskDestination("recommender")).toBe(false);
     expect(isAskDestination("")).toBe(false);
     expect(isAskDestination("__proto__")).toBe(false);
+  });
+
+  it("refuses the removed Career sub-tab", () => {
+    // The career bot itself stays -- `AskDestination` (in `$lib/data`) still
+    // includes `"career"` for the backend and its API-facing tests -- but the
+    // UI sub-tab is gone, so the segment must 404 like any other unknown one.
+    expect(isAskDestination("career")).toBe(false);
   });
 });
 
@@ -324,7 +331,7 @@ describe("the conversation providers", () => {
     expect(stamps).toEqual([...stamps].sort((a, b) => b - a));
   });
 
-  it("covers all three destinations, so no rail section is empty by accident", async () => {
+  it("covers every UI destination, so no rail section is empty by accident", async () => {
     const data = await freshData();
     const conversations = await data.getConversations();
 

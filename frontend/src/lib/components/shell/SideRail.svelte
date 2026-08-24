@@ -53,8 +53,8 @@
 	 * than `hidden` or `display:none`, which browsers treat inconsistently for
 	 * focus. There is nothing to `tabindex="-1"` because there is nothing there.
 	 *
-	 * **It opens itself when a child is current**, so landing on `/ask/career`
-	 * from a link shows the group already open with Career marked. That is
+	 * **It opens itself when a child is current**, so landing on `/ask/courses`
+	 * from a link shows the group already open with Course Recommender marked. That is
 	 * `$derived` from the URL rather than an effect writing state: the URL is the
 	 * source of truth and an effect would let the two disagree for a tick.
 	 *
@@ -97,7 +97,7 @@
 	{@const open = group && isOpen(item)}
 	{@const childCurrent = group && hasCurrentChild(item)}
 	<!-- A parent whose CHILD is current is not itself current. `isActiveRoute`
-	     matches by prefix, so `/ask` is "active" on `/ask/career` -- but painting
+	     matches by prefix, so `/ask` is "active" on `/ask/courses` -- but painting
 	     both rows solid navy would say the student is in two places, and putting
 	     `aria-current="page"` on both would tell a screen reader the same lie. The
 	     parent takes full ink instead: the containing section, not the position. -->

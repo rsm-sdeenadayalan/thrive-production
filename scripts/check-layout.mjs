@@ -136,11 +136,11 @@ const TARGETS = [
 	 */
 	{ route: '/ask/resources?c=conv-001', label: '/ask conversation' },
 	/*
-	 * The career destination too, so a per-destination regression cannot hide. Its
-	 * example conversation is the shortest of the three, and its empty state is the
-	 * one with the longest example questions.
+	 * The Course Recommender destination too, so a per-destination regression
+	 * cannot hide. Its empty state carries the longest example questions of the
+	 * two.
 	 */
-	{ route: '/ask/career', label: '/ask career' },
+	{ route: '/ask/courses', label: '/ask courses' },
 	{ route: '/classes', label: '/classes' },
 	{ route: '/syllabi', label: '/syllabi' },
 	{ route: '/assignments', label: '/assignments' },

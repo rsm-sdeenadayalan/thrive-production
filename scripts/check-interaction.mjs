@@ -2826,9 +2826,9 @@ try {
 	const destinationLinks = '[data-nav="rail"] a[href^="/ask/"]';
 
 	check(
-		'the nav rail offers all three destinations',
-		(await ask.locator(destinationLinks).count()) === 3,
-		'Resources, Course Recommender, Career — as a group under Ask THRIVE'
+		'the nav rail offers all destinations',
+		(await ask.locator(destinationLinks).count()) === 2,
+		'Resources, Course Recommender — as a group under Ask THRIVE'
 	);
 	check(
 		'the group is a disclosure with a real aria-expanded',
@@ -2845,7 +2845,7 @@ try {
 		await ask.evaluate(() => {
 			const toggle = document.querySelector('[data-nav="rail"] button[aria-controls]');
 			const list = document.getElementById(toggle?.getAttribute('aria-controls') ?? '');
-			return list !== null && list.querySelectorAll('a').length === 3;
+			return list !== null && list.querySelectorAll('a').length === 2;
 		}),
 		'landing on a destination directly shows the group open'
 	);
@@ -2884,17 +2884,17 @@ try {
 
 	check(
 		'the disclosure is keyboard operable',
-		(await ask.locator(destinationLinks).count()) === 3,
+		(await ask.locator(destinationLinks).count()) === 2,
 		'Enter on the toggle reopens the group'
 	);
 
-	await ask.click(`${destinationLinks}[href="/ask/career"]`);
-	await ask.waitForURL('**/ask/career');
+	await ask.click(`${destinationLinks}[href="/ask/courses"]`);
+	await ask.waitForURL('**/ask/courses');
 	await ask.waitForTimeout(SETTLE);
 
 	check(
 		'choosing a destination is reflected in the URL',
-		ask.url().endsWith('/ask/career'),
+		ask.url().endsWith('/ask/courses'),
 		ask.url()
 	);
 	check(
@@ -2903,7 +2903,7 @@ try {
 			() =>
 				document
 					.querySelector('[data-nav="rail"] a[aria-current="page"]')
-					?.getAttribute('href') === '/ask/career'
+					?.getAttribute('href') === '/ask/courses'
 		),
 		'aria-current on the child, not on the group'
 	);
@@ -2911,9 +2911,9 @@ try {
 		'each destination has its own empty state rather than a blank box',
 		await ask.evaluate(() => {
 			const log = document.querySelector('[role="log"]');
-			return /job search/i.test(log?.textContent ?? '');
+			return /electives/i.test(log?.textContent ?? '');
 		}),
-		'the Career copy, not a shared one'
+		'the Course Recommender copy, not a shared one'
 	);
 
 	await ask.goBack();
@@ -3226,7 +3226,7 @@ try {
 	);
 	check(
 		'the destinations are still reachable where there is no nav rail',
-		(await askPhone.locator('nav[aria-label="Ask about"] a').count()) === 3,
+		(await askPhone.locator('nav[aria-label="Ask about"] a').count()) === 2,
 		'a page-level band, `lg:hidden`, driven by the SAME nav children'
 	);
 	check(

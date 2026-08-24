@@ -1,6 +1,5 @@
 import type House from '@lucide/svelte/icons/house';
 import BookOpen from '@lucide/svelte/icons/book-open';
-import Briefcase from '@lucide/svelte/icons/briefcase';
 import BriefcaseBusiness from '@lucide/svelte/icons/briefcase-business';
 import CalendarCheck from '@lucide/svelte/icons/calendar-check';
 import CalendarDays from '@lucide/svelte/icons/calendar-days';
@@ -34,10 +33,10 @@ export interface NavItem {
 	 *
 	 * ## Why children rather than a fifth top-level item per destination
 	 *
-	 * Ask THRIVE's three surfaces are one destination a student picks a subject
-	 * inside, not three things to navigate between. Four rail items plus three more
-	 * would have been seven, which is the eleven-item nav this project already
-	 * trimmed once.
+	 * Ask THRIVE's two surfaces are one destination a student picks a subject
+	 * inside, not separate things to navigate between. Four rail items plus two
+	 * more is six, well inside the eleven-item nav this project already trimmed
+	 * once.
 	 *
 	 * ## The rule that keeps this from splintering
 	 *
@@ -100,7 +99,7 @@ export const primaryNav: NavItem[] = [
 		icon: Sparkles,
 		description: 'Ask a question, or get class and job suggestions',
 		/*
-		 * The three subjects, which used to live in a second rail on the page.
+		 * The two subjects, which used to live in a second rail on the page.
 		 *
 		 * They are here because they are NAVIGATION -- each is a route with its own
 		 * URL, its own empty state and its own saved conversations -- and navigation
@@ -110,6 +109,12 @@ export const primaryNav: NavItem[] = [
 		 * `/ask` itself redirects to the first of these. So the parent is a real
 		 * destination AND a group, which is what lets one tap on a phone still go
 		 * somewhere useful.
+		 *
+		 * A third child, Career, lived here until 2026-08-24: the career bot itself
+		 * stays (see `$lib/data`'s `AskDestination` and its API-facing tests), but
+		 * the sub-tab is gone from the UI, folded into the Career job feed at
+		 * `/jobs` instead. `$lib/ask`'s `ASK_DESTINATIONS` no longer lists it, so
+		 * `/ask/career` 404s cleanly rather than crashing.
 		 */
 		children: [
 			{
@@ -123,12 +128,6 @@ export const primaryNav: NavItem[] = [
 				label: 'Course Recommender',
 				icon: GraduationCap,
 				description: 'Which classes and electives fit where you are going'
-			},
-			{
-				href: '/ask/career',
-				label: 'Career',
-				icon: Briefcase,
-				description: 'Job search, interviews, and the awkward parts of both'
 			}
 		]
 	}
@@ -269,9 +268,9 @@ export const allNav: NavItem[] = flattenNav([...primaryNav, ...parkedNav]);
  * flag: make the failure impossible rather than something to remember.
  */
 export function isBuiltRoute(href: string): boolean {
-	// Flattened, so a child destination counts as built. `/ask/career` is as real a
-	// page as `/calendar`, and a card linking to one must not be withheld because
-	// the route happens to be nested.
+	// Flattened, so a child destination counts as built. `/ask/courses` is as real
+	// a page as `/calendar`, and a card linking to one must not be withheld
+	// because the route happens to be nested.
 	return flattenNav(primaryNav).some((item) => item.href === href);
 }
 
