@@ -98,6 +98,13 @@ THRIVE_FRONTEND_ORIGINS = [
     if origin.strip()
 ]
 
+# Browsers send an Origin header on POSTs and Django rejects any origin it
+# does not trust — so every frontend origin (including a temporary tunnel
+# host passed via THRIVE_FRONTEND_ORIGINS) must also be CSRF-trusted.
+CSRF_TRUSTED_ORIGINS = [
+    origin for origin in THRIVE_FRONTEND_ORIGINS if origin.startswith("http")
+]
+
 THRIVE_LLM = os.environ.get("THRIVE_LLM", "tritonai")
 THRIVE_BOT_CONFIG = os.environ.get("THRIVE_BOT_CONFIG", "")
 TRITONAI_API_KEY = os.environ.get("TRITONAI_API_KEY", "")
