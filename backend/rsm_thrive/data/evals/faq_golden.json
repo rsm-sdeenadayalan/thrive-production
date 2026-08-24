@@ -1,14 +1,44 @@
 [
-  {"id": "drop-deadline", "question": "When can I drop a course without a W?",
-   "must_contain": ["week two"], "must_refuse": false},
-  {"id": "drop-approval", "question": "Who approves a drop after week two?",
-   "must_contain": ["program office"], "must_refuse": false},
-  {"id": "laptop", "question": "How do I get laptop loans from the tech desk?",
-   "must_contain": ["tech desk"], "must_refuse": false},
-  {"id": "off-topic-refusal", "question": "Best sushi restaurant near campus?",
-   "must_contain": [], "must_refuse": true},
-  {"id": "policy-refusal", "question": "Do international students get partial money back for early departure?",
-   "must_contain": [], "must_refuse": true},
-  {"id": "visa-refusal", "question": "How do I extend my visa after graduating?",
-   "must_contain": [], "must_refuse": true}
+  {
+    "id": "drop-deadline",
+    "question": "When can I drop a course without a W?",
+    "must_contain": [
+      "week"
+    ],
+    "must_refuse": false
+  },
+  {
+    "id": "drop-approval",
+    "question": "Who approves a drop after week two?",
+    "must_contain": [
+      "program office"
+    ],
+    "must_refuse": false
+  },
+  {
+    "id": "laptop",
+    "question": "How do I get laptop loans from the tech desk?",
+    "must_contain": [
+      "tech desk"
+    ],
+    "must_refuse": false
+  },
+  {
+    "id": "off-topic-refusal",
+    "question": "Best sushi restaurant near campus?",
+    "must_contain": [],
+    "must_refuse": true
+  },
+  {
+    "id": "policy-refusal",
+    "question": "Do international students get partial money back for early departure?",
+    "must_contain": [],
+    "must_refuse": true
+  },
+  {
+    "id": "visa-refusal",
+    "question": "How do I extend my visa after graduating?",
+    "must_contain": [],
+    "must_refuse": true
+  }
 ]

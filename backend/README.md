@@ -25,7 +25,7 @@ control the backend:
   retrieval.
 - `TRITONAI_API_KEY` — required when `THRIVE_LLM=tritonai` (or unset). Used
   for both chat completions (`TRITONAI_MODEL`, default
-  `claude-opus-4-6-v1`) and embeddings (`TRITONAI_EMBED_MODEL`). Get a key
+  `claude-sonnet-4-6`) and embeddings (`TRITONAI_EMBED_MODEL`). Get a key
   from https://tritonai-api.ucsd.edu/ with your UCSD login — this may
   require campus network access (or VPN) off-campus. `THRIVE_LLM=fake` is
   unchanged for tests and needs no key. Copy `backend/.env.example` to

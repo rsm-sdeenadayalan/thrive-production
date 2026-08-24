@@ -2,7 +2,7 @@
 
 `TritonAiLLM` is the working default — UCSD's TritonAI proxy
 (https://tritonai-api.ucsd.edu/v1), OpenAI-compatible, model
-`claude-opus-4-6-v1`. Retries are same-model only (429/5xx), no
+`claude-sonnet-4-6` (live-verified 2026-08-23; ids drift — the portal's models page is the source of truth). Retries are same-model only (429/5xx), no
 model fallback: TritonAI is the single sanctioned backend, so a
 failure here is meant to surface honestly and feed the existing
 degraded/503 paths rather than silently swap models. `FakeLLM` is
@@ -90,7 +90,7 @@ class TritonAiLLM(LLM):
         key = api_key or getattr(settings, "TRITONAI_API_KEY", "")
         if not key:
             raise RuntimeError("TRITONAI_API_KEY is not set.")
-        self._model = model or getattr(settings, "TRITONAI_MODEL", "claude-opus-4-6-v1")
+        self._model = model or getattr(settings, "TRITONAI_MODEL", "claude-sonnet-4-6")
         self._client = OpenAI(api_key=key, base_url=BASE_URL)
         self._sleep = sleep
 

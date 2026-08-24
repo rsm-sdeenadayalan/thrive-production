@@ -1,0 +1,11 @@
+{
+  "faq": {
+    "min_similarity": 0.35
+  },
+  "career": {
+    "min_similarity": 0.35
+  },
+  "electives": {
+    "min_similarity": 0.3
+  }
+}

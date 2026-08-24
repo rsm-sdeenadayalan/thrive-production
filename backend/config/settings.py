@@ -95,6 +95,6 @@ THRIVE_FRONTEND_ORIGINS = [
 THRIVE_LLM = os.environ.get("THRIVE_LLM", "tritonai")
 THRIVE_BOT_CONFIG = os.environ.get("THRIVE_BOT_CONFIG", "")
 TRITONAI_API_KEY = os.environ.get("TRITONAI_API_KEY", "")
-TRITONAI_MODEL = os.environ.get("TRITONAI_MODEL", "claude-opus-4-6-v1")
+TRITONAI_MODEL = os.environ.get("TRITONAI_MODEL", "claude-sonnet-4-6")
 # Placeholder — verify via list_models at the TritonAI portal and correct.
-TRITONAI_EMBED_MODEL = os.environ.get("TRITONAI_EMBED_MODEL", "embed-default")
+TRITONAI_EMBED_MODEL = os.environ.get("TRITONAI_EMBED_MODEL", "api-tgpt-embeddings")
