@@ -182,8 +182,23 @@
 				{/if}
 
 				{#if item.detail}
-					<!-- A course code or a room. Words, so no numeric treatment. -->
-					<span class="truncate text-3xs text-muted-ink">{item.detail}</span>
+					<!-- A course code or a room, and only one of those is a Tag.
+
+					     `detail` is overloaded: for a task or an assignment it is the
+					     course code -- the exact fact Home renders as a filled `primary`
+					     chip on the task row and the class card -- and for everything else
+					     (a class meeting, an event, an appointment) it is a location, which
+					     is not a status and was never meant to shout.
+
+					     Routing the course-code cases through `Tag` is what makes "MGT 253"
+					     the same navy chip here as it is on Home, instead of plain grey
+					     words that read as a lower-priority fact than the identical chip
+					     one tab over. -->
+					{#if item.category === 'task' || item.category === 'assignment'}
+						<Tag tone="primary">{item.detail}</Tag>
+					{:else}
+						<span class="truncate text-3xs text-muted-ink">{item.detail}</span>
+					{/if}
 				{/if}
 
 				{#if item.label}

@@ -208,14 +208,6 @@
 		showToast(messages.taskEditing.copied(task.title));
 	}
 
-	/** Priority is carried by a left edge and a wash, never by colour alone. */
-	const priorityStyles: Record<typeof priority, string> = {
-		urgent: 'border-l-urgent bg-urgent-soft',
-		soon: 'border-l-watch bg-watch-soft',
-		later: 'border-l-later bg-later-soft',
-		none: 'border-l-transparent'
-	};
-
 	/** One glyph button, so five of them cannot drift apart. */
 	const glyph =
 		'grid size-11 shrink-0 place-items-center rounded-sm border-2 transition-colors duration-(--motion-fast) ease-standard';
@@ -234,6 +226,26 @@
 
 	**Every caller must render TaskRow inside a `role="list"`.** /assignments is the
 	next one.
+
+	## No per-priority wash or left edge
+
+	An earlier version painted `urgent`/`soon`/`later` as a tinted background plus
+	a coloured left border, on top of `.thrive-row`'s own comment that priority is
+	NOT carried by colour at this layer. Four adjacent rows in four different
+	tints did not read as "one list with some rows more urgent" -- it read as an
+	uneven, ad-hoc surface, which is exactly the opposite of what a state colour
+	is for. Worse, a tint the same hue family as its OWN chip (`bg-watch-soft`
+	under a solid `watch` "Due soon" chip) lowered the chip's contrast against its
+	immediate surroundings instead of making it stand out.
+
+	The chip already says the state, in words and in the one loud colour THRIVE
+	spends on status (`Tag`, solid fill, measured in the contrast gate). Every row
+	is now the same transparent-at-rest, sunken-on-hover surface `.thrive-row`
+	already describes, and the state lives entirely in the chip -- one visual
+	carrier instead of three fighting each other.
+
+	`data-priority` stays: it is still read by the sr-only label below, and by
+	anything that groups or filters rows, even though nothing paints it any more.
 -->
 <div
 	id={rowId}
@@ -246,8 +258,7 @@
 	ondragover={reorder?.onDragOver}
 	ondrop={reorder?.onDrop}
 	class={cn(
-		'thrive-row group relative border-l-2',
-		priorityStyles[priority],
+		'thrive-row group relative',
 		/* The drop indicator: a rule where the row would land, drawn ON the row
 		   rather than as an inserted gap so nothing reflows mid-drag. A list that
 		   reflows under the cursor is what makes a drag feel like it is fighting
@@ -364,8 +375,15 @@
 		     two reorder controls ahead of them.
 
 		     So the invariant is now: a conditional control appears and disappears at
-		     the strip's leading edge, and nothing already on screen moves. -->
-		<div class="ms-auto flex shrink-0 items-center gap-0.5">
+		     the strip's leading edge, and nothing already on screen moves.
+
+		     `self-center`, against the row's own `items-start`: the checkbox needs
+		     `items-start` so it sits on the title's first line rather than the middle
+		     of a two-line block, but that same rule would pin the icon strip to the
+		     TOP of a tall row -- title wrapped to two lines, three chips wrapping to
+		     their own line -- leaving visible empty air below the icons. Centring
+		     just this child keeps both true at once. -->
+		<div class="ms-auto flex shrink-0 items-center gap-0.5 self-center">
 			{#if FEATURES.floatingTodo}
 				<!--
 					Copy, not move, and never a link: the row stays here, and the two lists

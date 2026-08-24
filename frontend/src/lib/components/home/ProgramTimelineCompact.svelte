@@ -78,18 +78,30 @@
 				<!-- The term under the bar rather than inside it. Inside, the label
 				     would sit on three different fills and would need a different
 				     colour on each to stay legible. Under it, every label is on the
-				     panel surface, so one contrast pair covers all six states.
+				     panel surface, so one contrast pair covers all six states --
+				     including the current one.
+
+				     THAT INCLUDES CURRENT, DELIBERATELY. An earlier pass set the
+				     current phase's label in `text-ink` while the other five stayed
+				     `text-muted-ink`, which put two dark, same-weight, identical
+				     strings on screen at once: the term this section's own opening
+				     line already states as "TERM · you are here", repeated in bold
+				     immediately below it. Read quickly -- which a screenshot review
+				     is -- that reads as one label duplicated rather than six labels
+				     naming a timeline, because the five quiet ones recede and the
+				     one loud one is the exact word already sitting above the bar.
+
+				     The pip already carries "this is where you are": a solid fill in
+				     a stroke, at the 3:1 a meaningful graphic owes, plus `aria-current`
+				     on the `<li>`. The label row's only job is naming six terms, so it
+				     stays one quiet colour for all six and lets the fill be the one
+				     place "current" is said.
 
 				     Two spellings, swapped by CSS rather than by measuring: six full
 				     terms cannot fit across a phone. `aria-hidden` on both because the
 				     spoken label below already says the term in full. -->
-				<span
-					aria-hidden="true"
-					class={cn(
-						'block truncate text-center text-3xs',
-						phase.status === 'current' ? 'text-ink' : 'text-muted-ink'
-					)}
-				>
+				<span aria-hidden="true" class="block truncate text-center text-3xs text-muted-ink">
+
 					<span class="sm:hidden">{abbreviateTerm(phase.term)}</span>
 					<span class="max-sm:hidden">{phase.term}</span>
 				</span>

@@ -99,8 +99,17 @@
 
 <section aria-labelledby={headingId} class={cn('thrive-panel flex flex-col p-3', className)}>
 	<!-- The header sits on its own ruled band. A card with a heading, a rule and a
-	     body reads as a labelled box rather than a stack of text. -->
-	<div class="-mx-3 -mt-3 mb-3 shrink-0 border-b border-line bg-sunken px-3 py-2">
+	     body reads as a labelled box rather than a stack of text.
+
+	     `rounded-t-xl` matches the panel's own corner radius. The band is pulled
+	     flush to the panel's edges by the negative margin above, so without this
+	     its square top corners sit inside the panel's rounded ones and paint a
+	     bg-sunken wedge into what should be a curve -- crisp everywhere except
+	     the two corners that most read as "is this box finished". -->
+	<div
+		class="-mx-3 -mt-3 mb-3 shrink-0 rounded-t-xl border-b border-line bg-sunken px-3 py-2"
+	>
+
 		<!--
 			`min-h-11` is a FLOOR so the band cannot shrink when the link is absent.
 
