@@ -5,6 +5,7 @@ from django.views.decorators.http import require_http_methods
 from rsm_thrive.http import api_login_required, json_error, json_ok, profile_required
 from rsm_thrive.models import JobPosting, PostingInteraction
 from rsm_thrive.serializers.jobs import serialize_job, serialize_report
+from rsm_thrive.services.jobs.feed import feed_for
 from rsm_thrive.services.jobs.report import generate_report
 from rsm_thrive.services.jobs.search import profile_of, role_benchmark, search_postings
 from rsm_thrive.services.llm import get_llm
@@ -43,6 +44,46 @@ def jobs_search(request):
         "profileAvailable": outcome["profile_available"],
         "benchmark": outcome["benchmark"],
         "results": results,
+    })
+
+
+def _parse_min_score(raw):
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return 0
+    if value < 0 or value > 100:
+        return 0
+    return value
+
+
+@api_login_required
+def jobs_feed(request):
+    if request.method != "GET":
+        return json_error("method_not_allowed", "Use GET.", 405)
+    outcome = feed_for(
+        request.user,
+        query=request.GET.get("q", ""),
+        tab=request.GET.get("tab", "recommended"),
+        min_score=_parse_min_score(request.GET.get("min_score")),
+    )
+    results = [
+        {
+            "job": serialize_job(entry["posting"]),
+            "score": entry["score"],
+            "reportScore": entry["report_score"],
+            "competency": entry["competency"],
+            "matchedSkills": entry["matched_skills"],
+            "missingSkills": entry["missing_skills"],
+            "liked": entry["liked"],
+            "dismissed": entry["dismissed"],
+        }
+        for entry in outcome["results"]
+    ]
+    return json_ok({
+        "results": results,
+        "counts": outcome["counts"],
+        "profileAvailable": outcome["profile_available"],
     })
 
 

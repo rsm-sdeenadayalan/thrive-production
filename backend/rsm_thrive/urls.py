@@ -27,6 +27,7 @@ urlpatterns = [
     path("events/<str:event_id>/join", overlay.join_event, name="event-join"),
     path("health", health.health, name="health"),
     path("jobs", jobs.jobs_search, name="jobs-search"),
+    path("jobs/feed", jobs.jobs_feed, name="jobs-feed"),
     path("jobs/<str:job_id>", jobs.job_detail, name="job-detail"),
     path("jobs/<str:job_id>/dismiss", jobs.job_dismiss, name="job-dismiss"),
     path("jobs/<str:job_id>/like", jobs.job_like, name="job-like"),

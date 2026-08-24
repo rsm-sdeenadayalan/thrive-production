@@ -5,6 +5,7 @@ from django.contrib.auth.models import User
 
 from rsm_thrive.models import JobPosting, MatchReport, ResumeVersion
 from rsm_thrive.services.embeddings import FakeEmbeddings
+from rsm_thrive.services.jobs.report import REPORT_PROMPT, _sanitize
 from rsm_thrive.services.llm import FakeLLM
 from rsm_thrive.views import jobs as jobs_views
 
@@ -101,3 +102,30 @@ class TestReportEndpoint:
         _install(monkeypatch, [])
         assert client.post("/api/thrive/jobs/job-999/report").status_code == 404
         assert client.get("/api/thrive/jobs/job-999/report").status_code == 405
+
+
+class TestPromptHardening:
+    def test_prompt_guards_against_prompt_injection_and_caps_score(self):
+        assert "untrusted input" in REPORT_PROMPT
+        assert "score at most 25" in REPORT_PROMPT
+
+    def test_prompt_still_specifies_json_contract(self):
+        assert '"score"' in REPORT_PROMPT
+        assert '"competency"' in REPORT_PROMPT
+        assert '"verdict"' in REPORT_PROMPT
+
+
+class TestSanitizeStillWorks:
+    def test_valid_envelope_round_trips(self):
+        sanitized = _sanitize({"score": 72, "competency": "good",
+                               "matched_skills": ["sql"], "gaps": ["tableau"],
+                               "verdict": "Competitive."})
+        assert sanitized == {"score": 72, "competency": "good",
+                             "matched_skills": ["sql"], "gaps": ["tableau"],
+                             "verdict": "Competitive."}
+
+    def test_missing_verdict_raises(self):
+        from rsm_thrive.services.jobs.report import ReportError
+        with pytest.raises(ReportError):
+            _sanitize({"score": 50, "competency": "good",
+                      "matched_skills": [], "gaps": [], "verdict": ""})
