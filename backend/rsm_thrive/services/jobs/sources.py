@@ -148,7 +148,8 @@ class WorkableSource(JobSource):
 
     def fetch(self):
         session = _session_or_requests(self._session)
-        url = f"https://apply.workable.com/api/v1/widget/accounts/{self.account}"
+        url = (f"https://apply.workable.com/api/v1/widget/accounts/"
+               f"{self.account}?details=true")
         response = session.get(url, timeout=20)
         response.raise_for_status()
         rows = []

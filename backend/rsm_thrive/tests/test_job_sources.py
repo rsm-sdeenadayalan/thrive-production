@@ -110,6 +110,7 @@ class TestWorkable:
         assert "SQL" in row["description"] and "<p>" not in row["description"]
         assert isinstance(row["posted_at"], dt.datetime)
         assert "apply.workable.com/api/v1/widget/accounts/acme" in session.calls[0][0]
+        assert "details=true" in session.calls[0][0]
 
     def test_falls_back_to_location_field(self):
         session = StubSession({"jobs": [{
