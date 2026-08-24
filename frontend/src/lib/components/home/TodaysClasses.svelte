@@ -47,7 +47,7 @@
 			<ul class="space-y-2">
 				{#each collapse.visible as row (row.id)}
 					<li
-						class="flex items-baseline gap-2.5 rounded-lg border border-hairline bg-surface px-2 py-1.5"
+						class="flex items-baseline gap-2.5 rounded-lg border border-hairline bg-surface px-2.5 py-2"
 					>
 						<!-- A clock time is a value: mono, and tabular so the column of
 						     times lines up down the card. -->

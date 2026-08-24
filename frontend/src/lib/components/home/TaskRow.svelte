@@ -257,8 +257,8 @@
 	component-layer fill regardless of the pseudo-class, so the hover state would
 	stop painting. Wrapping instead keeps `.thrive-row` completely unedited and
 	untouched at the call site -- the border lives on an outer div with no
-	padding of its own, and the existing `px-2 py-1.5` below still sets the
-	visible inset, so the card's padding matches the others exactly.
+	padding of its own, and the inner `px-2.5 py-2` below sets the visible
+	inset, so the card's padding matches the others.
 -->
 <div class="rounded-lg border border-hairline bg-surface">
 	<div
@@ -282,8 +282,14 @@
 		)}
 	>
 		<!-- Wraps below `sm`, so the controls take their own line and the title keeps
-		     the full width. See the note on defect 3 above. -->
-		<div class="flex flex-wrap items-start gap-x-2 gap-y-1 px-2 py-1.5 sm:flex-nowrap lg:py-1">
+		     the full width. See the note on defect 3 above.
+
+		     `px-2.5 py-2` matches the breathing room of the sibling cards (EventRow
+		     p-2, CourseCard p-3) now that every action item draws the same border --
+		     the old `py-1.5 lg:py-1` was tuned for borderless rows and read cramped
+		     inside a card. `lg:py-1.5` keeps the desktop card near the four-row
+		     height the collapsed Tasks body is tuned to show. -->
+		<div class="flex flex-wrap items-start gap-x-2 gap-y-1 px-2.5 py-2 sm:flex-nowrap lg:py-1.5">
 			<!-- `mt-0.5` aligns the box with the first line of the title rather than the
 			     centre of a two-line block. -->
 			<input
