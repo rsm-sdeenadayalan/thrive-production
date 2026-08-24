@@ -100,11 +100,15 @@
 				     Two spellings, swapped by CSS rather than by measuring: six full
 				     terms cannot fit across a phone. `aria-hidden` on both because the
 				     spoken label below already says the term in full. -->
-				<span aria-hidden="true" class="block truncate text-center text-3xs text-muted-ink">
-
-					<span class="sm:hidden">{abbreviateTerm(phase.term)}</span>
-					<span class="max-sm:hidden">{phase.term}</span>
-				</span>
+				<!-- With a single phase the label row can only repeat the term the
+				     header just said ("TERM · you are here"), so it earns its place
+				     only when there are at least two terms to tell apart. -->
+				{#if timeline.phases.length > 1}
+					<span aria-hidden="true" class="block truncate text-center text-3xs text-muted-ink">
+						<span class="sm:hidden">{abbreviateTerm(phase.term)}</span>
+						<span class="max-sm:hidden">{phase.term}</span>
+					</span>
+				{/if}
 				<span class="sr-only">
 					{messages.home.timeline.phaseStatus(
 						phase.label,
