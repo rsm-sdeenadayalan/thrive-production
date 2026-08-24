@@ -19,10 +19,13 @@ below only blocks the step named next to it.
    tables to `msba_brain_db`, plus `CREATE EXTENSION vector` (pgvector) for
    the chatbot retrieval index. Is pgvector installed on your Postgres build?
    *Blocks: server data + chatbot corpus (F5/Phase C). Local dev unaffected.*
-4. **Shared ai_service** — OK to use the platform `ai_service`
+4. ~~**Shared ai_service** — OK to use the platform `ai_service`
    (rsm-django-assessment) / shared OAuth provider for the FAQ bot and
    electives recommender? What config/quota should we point at? *Blocks:
-   chatbot LLM calls on the server (Phase C). We have a Gemini fallback.*
+   chatbot LLM calls on the server (Phase C). We have a Gemini fallback.*~~
+   — **superseded** (2026-08-23): backend now runs on TritonAI (UCSD's
+   OpenAI-compatible LLM proxy, `claude-opus-4-6-v1`), so no shared
+   `ai_service` is needed for chatbot LLM calls.
 5. **SMTP** — which relay/settings the fleet uses for outbound mail, for
    appointment calendar invites (ICS) to students and CMC/GSA advisors.
    *Blocks: real emails from the server (F2 side effects in production).*

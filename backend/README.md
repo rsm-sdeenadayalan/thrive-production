@@ -19,11 +19,18 @@ The three destination bots (`resources`/FAQ, `career`, `courses`/electives)
 answer from an ingested corpus of retrieved passages plus an LLM. Two knobs
 control the backend:
 
-- `THRIVE_LLM` — `gemini` (default) or `fake`. `fake` makes `get_llm()` raise,
-  which is the intended way to exercise the degraded/turn-rescue path without
-  an API key; it also switches embeddings to `FakeEmbeddings` for retrieval.
-- `GEMINI_API_KEY` — required when `THRIVE_LLM=gemini` (or unset). Used for
-  both chat completions and embeddings (`gemini-embedding-001`).
+- `THRIVE_LLM` — `tritonai` (default) or `fake`. `fake` makes `get_llm()`
+  raise, which is the intended way to exercise the degraded/turn-rescue path
+  without an API key; it also switches embeddings to `FakeEmbeddings` for
+  retrieval.
+- `TRITONAI_API_KEY` — required when `THRIVE_LLM=tritonai` (or unset). Used
+  for both chat completions (`TRITONAI_MODEL`, default
+  `claude-opus-4-6-v1`) and embeddings (`TRITONAI_EMBED_MODEL`). Get a key
+  from https://tritonai-api.ucsd.edu/ with your UCSD login — this may
+  require campus network access (or VPN) off-campus. `THRIVE_LLM=fake` is
+  unchanged for tests and needs no key. Copy `backend/.env.example` to
+  `backend/.env` and fill in the key for local dev (auto-loaded by
+  `config/settings.py`).
 
 Ingest a corpus directory (`.pdf`/`.md`/`.txt`) and/or the course catalog:
 
@@ -42,11 +49,11 @@ Run the golden FAQ eval against whatever corpus is ingested:
 
 ```bash
 THRIVE_LLM=fake uv run python manage.py eval_bots --llm fake   # deterministic, no API key
-uv run python manage.py eval_bots --llm real                   # needs GEMINI_API_KEY
+uv run python manage.py eval_bots --llm real                   # needs TRITONAI_API_KEY
 ```
 
 `THRIVE_LLM=fake` is required alongside `--llm fake`: without it, retrieval
-still instantiates `GeminiEmbeddings` and needs an API key, even though the
+still instantiates `TritonAiEmbeddings` and needs an API key, even though the
 bot's own LLM calls are faked.
 
 It prints `PASS`/`FAIL` per case in `rsm_thrive/data/evals/faq_golden.json`
@@ -65,14 +72,16 @@ Job search (`GET /api/thrive/jobs?q=`), a job detail view
 (`GET /api/thrive/jobs/<id>`), an LLM match report
 (`POST /api/thrive/jobs/<id>/report`), and resume upload
 (`POST /api/thrive/resume/upload`) round out the career surface. Same two
-knobs as the chatbots — `THRIVE_LLM=fake`/`gemini` and `GEMINI_API_KEY` —
+knobs as the chatbots — `THRIVE_LLM=fake`/`tritonai` and `TRITONAI_API_KEY` —
 govern both endpoints: `fake` makes `get_llm()` raise, so `job_report` and
 `resume_upload` fail honest with a `503 llm_unavailable` rather than a silent
 or fabricated result, and switches embeddings to `FakeEmbeddings` for
-ranking/ingestion. Switching `THRIVE_LLM` (`fake` ↔ real) changes embedding
-dimensions, so re-run `ingest_jobs` after switching — otherwise ranking
-silently degrades to skill overlap (a warning is logged, but postings keep
-their stale, wrong-dimension embeddings until re-ingested).
+ranking/ingestion. Switching `THRIVE_LLM` (`fake` ↔ real) — or switching
+embedding backends generally, e.g. after correcting `TRITONAI_EMBED_MODEL` —
+changes embedding dimensions, so re-run `ingest_corpus`/`ingest_jobs` after
+switching — otherwise ranking/retrieval silently degrades (a dim-mismatch
+warning is logged, but postings/chunks keep their stale, wrong-dimension
+embeddings until re-ingested).
 
 **Sources** (`rsm_thrive/services/jobs/sources.py`) sit behind one `JobSource`
 ABC (`fetch() -> list[dict]`):
@@ -94,7 +103,7 @@ but weren't seen (stale expiry). A source that fails to fetch is skipped —
 its existing postings are left untouched rather than deactivated.
 
 ```bash
-uv run python manage.py ingest_jobs                    # real boards, needs GEMINI_API_KEY for embeddings
+uv run python manage.py ingest_jobs                    # real boards, needs TRITONAI_API_KEY for embeddings
 THRIVE_LLM=fake uv run python manage.py ingest_jobs     # real boards, fake (deterministic) embeddings
 ```
 

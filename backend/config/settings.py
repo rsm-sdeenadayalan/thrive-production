@@ -3,6 +3,19 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Tiny stdlib .env loader (no python-dotenv dependency): backend/.env, if
+# present, seeds os.environ for local dev. Real env vars always win —
+# setdefault never overrides something already exported. Not used/needed in
+# production, where the platform injects env vars directly.
+_env_file = BASE_DIR / ".env"
+if _env_file.exists():
+    for _line in _env_file.read_text().splitlines():
+        _line = _line.strip()
+        if not _line or _line.startswith("#") or "=" not in _line:
+            continue
+        _key, _, _value = _line.partition("=")
+        os.environ.setdefault(_key.strip(), _value.strip())
+
 SECRET_KEY = os.environ.get("THRIVE_SECRET_KEY", "dev-only-insecure")
 DEBUG = os.environ.get("THRIVE_DEBUG", "1") == "1"
 ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
@@ -79,6 +92,9 @@ THRIVE_FRONTEND_ORIGINS = [
     if origin.strip()
 ]
 
-THRIVE_LLM = os.environ.get("THRIVE_LLM", "gemini")
+THRIVE_LLM = os.environ.get("THRIVE_LLM", "tritonai")
 THRIVE_BOT_CONFIG = os.environ.get("THRIVE_BOT_CONFIG", "")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+TRITONAI_API_KEY = os.environ.get("TRITONAI_API_KEY", "")
+TRITONAI_MODEL = os.environ.get("TRITONAI_MODEL", "claude-opus-4-6-v1")
+# Placeholder — verify via list_models at the TritonAI portal and correct.
+TRITONAI_EMBED_MODEL = os.environ.get("TRITONAI_EMBED_MODEL", "embed-default")

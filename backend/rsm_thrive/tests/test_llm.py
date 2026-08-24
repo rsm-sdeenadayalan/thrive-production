@@ -1,9 +1,10 @@
 import json
+import types
 
 import pytest
 
 from rsm_thrive.services.bot_config import bot_config, load_bot_config
-from rsm_thrive.services.llm import FakeLLM, GeminiClient, parse_llm_json
+from rsm_thrive.services.llm import FakeLLM, TritonAiLLM, parse_llm_json
 
 
 class TestParseLlmJson:
@@ -42,48 +43,57 @@ class TestFakeLLM:
             fake.chat("sys", [])
 
 
-class TestGeminiRetries:
-    """GeminiClient's retry ladder, with the SDK faked out entirely."""
+class TestTritonRetries:
+    """TritonAiLLM's retry ladder (same-model only, no fallback), SDK faked out."""
 
     def _client(self, script, sleeps):
-        """script: list of ('ok', text) | ('err', code) consumed per API call."""
-        client = GeminiClient.__new__(GeminiClient)
-        client._models = ["m-primary", "m-fallback"]
+        """script: list of ('ok', text) | ('err', status_code) consumed per API call."""
+        client = TritonAiLLM.__new__(TritonAiLLM)
+        client._model = "claude-opus-4-6-v1"
         client._sleep = sleeps.append  # records requested waits, no real sleep
 
         class FakeAPIError(Exception):
-            def __init__(self, code):
-                self.code = code
+            def __init__(self, status_code):
+                self.status_code = status_code
 
-        client._api_error = FakeAPIError
-
-        def generate(model, contents, config):
+        def create(**kwargs):
             kind, value = script.pop(0)
             if kind == "err":
                 raise FakeAPIError(value)
-            class R: text = value
-            return R()
+            message = types.SimpleNamespace(content=value)
+            choice = types.SimpleNamespace(message=message)
+            return types.SimpleNamespace(choices=[choice])
 
-        client._generate = generate
+        client._create = create
+        client._status_of = lambda e: getattr(e, "status_code", None)
         return client
 
     def test_retries_503_then_succeeds(self):
         sleeps = []
         client = self._client([("err", 503), ("ok", "answer")], sleeps)
-        assert client._chat_with_retries([], None) == "answer"
+        assert client._chat_with_retries({}) == "answer"
         assert sleeps == [3]
 
-    def test_falls_to_next_model_after_exhausting_primary(self):
-        sleeps = []
-        client = self._client(
-            [("err", 503), ("err", 503), ("err", 503), ("ok", "rescued")], sleeps)
-        assert client._chat_with_retries([], None) == "rescued"
-
-    def test_429_waits_longer(self):
+    def test_429_waits_15(self):
         sleeps = []
         client = self._client([("err", 429), ("ok", "x")], sleeps)
-        client._chat_with_retries([], None)
+        client._chat_with_retries({})
         assert sleeps == [15]
+
+    def test_non_retryable_raises_immediately_without_sleeping(self):
+        sleeps = []
+        client = self._client([("err", 400)], sleeps)
+        with pytest.raises(Exception):
+            client._chat_with_retries({})
+        assert sleeps == []
+
+    def test_third_consecutive_503_raises(self):
+        sleeps = []
+        client = self._client(
+            [("err", 503), ("err", 503), ("err", 503)], sleeps)
+        with pytest.raises(Exception):
+            client._chat_with_retries({})
+        assert sleeps == [3, 6]
 
 
 class TestBotConfig:

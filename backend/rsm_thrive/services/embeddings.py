@@ -7,7 +7,6 @@ from abc import ABC, abstractmethod
 
 from django.conf import settings
 
-EMBEDDING_MODEL = "gemini-embedding-001"
 FAKE_DIM = 32
 
 
@@ -36,25 +35,25 @@ class FakeEmbeddings(Embeddings):
         return out
 
 
-class GeminiEmbeddings(Embeddings):
-    def __init__(self, api_key=None):
-        from google import genai  # lazy
+class TritonAiEmbeddings(Embeddings):
+    def __init__(self, api_key=None, model=None):
+        from openai import OpenAI  # lazy: tests never import the SDK
 
-        key = api_key or getattr(settings, "GEMINI_API_KEY", "")
+        key = api_key or getattr(settings, "TRITONAI_API_KEY", "")
         if not key:
-            raise RuntimeError("GEMINI_API_KEY is not set.")
-        self._client = genai.Client(api_key=key)
+            raise RuntimeError("TRITONAI_API_KEY is not set.")
+        self._model = model or getattr(settings, "TRITONAI_EMBED_MODEL", "embed-default")
+        self._client = OpenAI(api_key=key, base_url="https://tritonai-api.ucsd.edu/v1")
 
     def embed(self, texts: list) -> list:
-        result = self._client.models.embed_content(
-            model=EMBEDDING_MODEL, contents=texts)
-        return [list(e.values) for e in result.embeddings]
+        resp = self._client.embeddings.create(model=self._model, input=texts)
+        return [d.embedding for d in resp.data]
 
 
 def get_embeddings() -> Embeddings:
-    if getattr(settings, "THRIVE_LLM", "gemini") == "fake":
+    if getattr(settings, "THRIVE_LLM", "tritonai") == "fake":
         return FakeEmbeddings()
-    return GeminiEmbeddings()
+    return TritonAiEmbeddings()
 
 
 def cosine(a: list, b: list) -> float:

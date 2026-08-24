@@ -1,9 +1,12 @@
 """LLM backends behind one small interface.
 
-`GeminiClient` is the working default (free tier, retry + sibling-model
-fallback, ported from the prior Rady Recommender project). `FakeLLM` is the
-test double. When Vincent grants `ai_service` access (VINCENT-ASKS #4), an
-`AiServiceLLM` subclass slots in here without touching any bot.
+`TritonAiLLM` is the working default — UCSD's TritonAI proxy
+(https://tritonai-api.ucsd.edu/v1), OpenAI-compatible, model
+`claude-opus-4-6-v1`. Retries are same-model only (429/5xx), no
+model fallback: TritonAI is the single sanctioned backend, so a
+failure here is meant to surface honestly and feed the existing
+degraded/503 paths rather than silently swap models. `FakeLLM` is
+the test double.
 """
 
 import json
@@ -16,10 +19,7 @@ from django.conf import settings
 
 logger = logging.getLogger("rsm_thrive.llm")
 
-GEMINI_MODEL = "gemini-flash-latest"
-# Tried in order when the primary is overloaded (503) or rate-limited (429):
-# separate models have separate free-tier quotas.
-GEMINI_FALLBACKS = ["gemini-3.5-flash", "gemini-flash-lite-latest"]
+BASE_URL = "https://tritonai-api.ucsd.edu/v1"
 
 
 class LLM(ABC):
@@ -78,70 +78,63 @@ def parse_llm_json(text: str) -> dict:
     return {"reply": text, "action": "chat"}
 
 
-class GeminiClient(LLM):
-    """Gemini backend (GEMINI_API_KEY), with 429/5xx retries and model fallback."""
+class TritonAiLLM(LLM):
+    """TritonAI backend (TRITONAI_API_KEY), OpenAI-compatible, with 429/5xx retries.
 
-    def __init__(self, api_key=None, model=None, fallback_models=None,
-                 sleep=time.sleep):
-        from google import genai  # lazy: tests never import the SDK
-        from google.genai.errors import APIError
+    Same-model retry only — deliberate, no fallback model list.
+    """
 
-        key = api_key or getattr(settings, "GEMINI_API_KEY", "")
+    def __init__(self, api_key=None, model=None, sleep=time.sleep):
+        from openai import OpenAI  # lazy: tests never import the SDK
+
+        key = api_key or getattr(settings, "TRITONAI_API_KEY", "")
         if not key:
-            raise RuntimeError("GEMINI_API_KEY is not set.")
-        self._client = genai.Client(api_key=key)
-        self._api_error = APIError
+            raise RuntimeError("TRITONAI_API_KEY is not set.")
+        self._model = model or getattr(settings, "TRITONAI_MODEL", "claude-opus-4-6-v1")
+        self._client = OpenAI(api_key=key, base_url=BASE_URL)
         self._sleep = sleep
-        self._models = [model or GEMINI_MODEL] + list(
-            GEMINI_FALLBACKS if fallback_models is None else fallback_models)
 
-    def _generate(self, model, contents, config):
-        return self._client.models.generate_content(
-            model=model, contents=contents, config=config)
+    def _create(self, **kwargs):
+        return self._client.chat.completions.create(**kwargs)
+
+    def _status_of(self, exc):
+        return getattr(exc, "status_code", None)
 
     def chat(self, system: str, messages: list, json_mode: bool = False) -> str:
-        from google.genai import types
+        full_messages = [{"role": "system", "content": system}] + list(messages)
+        kwargs = {
+            "model": self._model,
+            "messages": full_messages,
+            "temperature": 0.4,
+            "max_tokens": 4000,
+        }
+        if json_mode:
+            kwargs["response_format"] = {"type": "json_object"}
+        return self._chat_with_retries(kwargs)
 
-        contents = [
-            types.Content(
-                role="user" if m["role"] == "user" else "model",
-                parts=[types.Part(text=m["content"])],
-            )
-            for m in messages
-        ]
-        config = types.GenerateContentConfig(
-            system_instruction=system,
-            response_mime_type="application/json" if json_mode else None,
-        )
-        return self._chat_with_retries(contents, config)
-
-    def _chat_with_retries(self, contents, config) -> str:
+    def _chat_with_retries(self, kwargs) -> str:
         last_err = None
-        for i, model in enumerate(self._models):
-            for attempt in range(3):
-                try:
-                    resp = self._generate(model, contents, config)
-                    return resp.text or ""
-                except self._api_error as e:
-                    last_err = e
-                    code = getattr(e, "code", None)
-                    if code == 429 and attempt < 2:
-                        self._sleep(15 * (attempt + 1))
-                        continue
-                    if code in (500, 503) and attempt < 2:
-                        self._sleep(3 * (attempt + 1))
-                        continue
-                    break  # this model is out; try the next
-            if i < len(self._models) - 1:
-                logger.warning("model %s unavailable, falling back to %s",
-                               model, self._models[i + 1])
+        for attempt in range(3):
+            try:
+                resp = self._create(**kwargs)
+                return resp.choices[0].message.content or ""
+            except Exception as e:
+                last_err = e
+                status = self._status_of(e)
+                if status == 429 and attempt < 2:
+                    self._sleep(15 * (attempt + 1))
+                    continue
+                if status in (500, 502, 503) and attempt < 2:
+                    self._sleep(3 * (attempt + 1))
+                    continue
+                raise
         raise last_err
 
 
 def get_llm() -> LLM:
     """The configured backend. Views hold this behind an injectable seam."""
-    backend = getattr(settings, "THRIVE_LLM", "gemini")
+    backend = getattr(settings, "THRIVE_LLM", "tritonai")
     if backend == "fake":
         raise RuntimeError(
             "THRIVE_LLM=fake requires the test to inject a FakeLLM explicitly.")
-    return GeminiClient()
+    return TritonAiLLM()
