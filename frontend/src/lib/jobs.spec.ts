@@ -2,13 +2,17 @@ import { describe, expect, it } from "vitest";
 
 import {
   competencyLabel,
+  feedEmptyState,
   jobsEmptyState,
+  ringPercent,
   shareWidth,
+  toJobFeedEntryView,
   toJobPostingDetailView,
   toJobResultView,
 } from "$lib/jobs";
 import type {
   JobCompetency,
+  JobFeedEntry,
   JobPostingDetail,
   JobSearchEntry,
 } from "$lib/data";
@@ -35,6 +39,30 @@ function entry(overrides: Partial<JobSearchEntry> = {}): JobSearchEntry {
     score: 82,
     matchedSkills: ["SQL"],
     missingSkills: ["Excel"],
+    ...overrides,
+  };
+}
+
+function feedEntry(overrides: Partial<JobFeedEntry> = {}): JobFeedEntry {
+  return {
+    job: {
+      id: "job-1",
+      title: "Data Analyst",
+      company: "Bloom Analytics",
+      location: "San Diego, CA",
+      url: "https://example.com/jobs/1",
+      source: "LinkedIn",
+      skills: ["SQL", "Excel"],
+      postedAt: "2026-08-11T09:00:00-07:00",
+      snippet: "Own weekly reporting.",
+    },
+    score: 62,
+    reportScore: null,
+    competency: null,
+    matchedSkills: ["SQL"],
+    missingSkills: ["Excel"],
+    liked: false,
+    dismissed: false,
     ...overrides,
   };
 }
@@ -168,5 +196,84 @@ describe("competencyLabel", () => {
   it("gives each competency its own word", () => {
     const labels = all.map(competencyLabel);
     expect(new Set(labels).size).toBe(all.length);
+  });
+});
+
+describe("toJobFeedEntryView", () => {
+  it("falls back to the hybrid score and flags it as an estimate with no report", () => {
+    const view = toJobFeedEntryView(feedEntry({ score: 62, reportScore: null }), true);
+    expect(view.score).toBe(62);
+    expect(view.scoreKind).toBe("estimate");
+  });
+
+  it("prefers the cached report score over the hybrid score when both exist", () => {
+    const view = toJobFeedEntryView(
+      feedEntry({ score: 62, reportScore: 88, competency: "strong" }),
+      true,
+    );
+    expect(view.score).toBe(88);
+    expect(view.scoreKind).toBe("report");
+    expect(view.competency).toBe("strong");
+  });
+
+  it("hides the score entirely when there is no profile to score against", () => {
+    const view = toJobFeedEntryView(feedEntry({ reportScore: 88 }), false);
+    expect(view.score).toBeNull();
+    // scoreKind still describes what backed the (hidden) number.
+    expect(view.scoreKind).toBe("report");
+  });
+
+  it("carries the like/dismiss state and the posted date label through", () => {
+    const view = toJobFeedEntryView(feedEntry({ liked: true, dismissed: false }), true);
+    expect(view.liked).toBe(true);
+    expect(view.dismissed).toBe(false);
+    expect(view.postedLabel).toBe("Aug 11");
+    expect(view.url).toBe("https://example.com/jobs/1");
+  });
+
+  it("is null for a posting with no posted date", () => {
+    const view = toJobFeedEntryView(
+      feedEntry({ job: { ...feedEntry().job, postedAt: null } }),
+      true,
+    );
+    expect(view.postedLabel).toBeNull();
+  });
+});
+
+describe("feedEmptyState", () => {
+  it("is 'liked-tab-empty' for an empty liked tab, regardless of query", () => {
+    expect(feedEmptyState("liked", "")).toBe("liked-tab-empty");
+    expect(feedEmptyState("liked", "data analyst")).toBe("liked-tab-empty");
+  });
+
+  it("is 'no-matches-for-query' when a search on recommended/all comes back empty", () => {
+    expect(feedEmptyState("recommended", "underwater basket weaving")).toBe(
+      "no-matches-for-query",
+    );
+    expect(feedEmptyState("all", "underwater basket weaving")).toBe(
+      "no-matches-for-query",
+    );
+  });
+
+  it("treats whitespace-only input the same as no query", () => {
+    expect(feedEmptyState("all", "   ")).toBe("no-jobs-at-all");
+  });
+
+  it("is 'no-jobs-at-all' with no query and nothing in the tab", () => {
+    expect(feedEmptyState("recommended", "")).toBe("no-jobs-at-all");
+    expect(feedEmptyState("all", "")).toBe("no-jobs-at-all");
+  });
+});
+
+describe("ringPercent", () => {
+  it("passes an in-range score through unchanged", () => {
+    expect(ringPercent(0)).toBe(0);
+    expect(ringPercent(72)).toBe(72);
+    expect(ringPercent(100)).toBe(100);
+  });
+
+  it("clamps out-of-range input rather than printing a nonsense ring", () => {
+    expect(ringPercent(140)).toBe(100);
+    expect(ringPercent(-10)).toBe(0);
   });
 });

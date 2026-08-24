@@ -48,6 +48,10 @@ import type {
   DegreeProgress,
   Event,
   JobCompetency,
+  JobFeedEntry,
+  JobFeedResult,
+  JobFeedTab,
+  JobInteractionState,
   JobPosting,
   JobPostingDetail,
   JobSearchEntry,
@@ -729,6 +733,105 @@ function mockUploadResume(_file: File): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Job feed
+// ---------------------------------------------------------------------------
+//
+// SIMULATED, same disclaimer as job search above. There is no cached LLM
+// report layer behind this mock -- every entry's `reportScore`/`competency`
+// stay null, so the feed always falls back to the hybrid `score`, the same
+// case `toJobFeedEntryView` handles for a real student who has not generated
+// a report yet.
+//
+// Like/dismiss state lives in one module-level Map, keyed by job id, mutated
+// in place by `mockLikeJob`/`mockDismissJob`. Same shape as the booking and
+// resume stores above: a plain module-scope object every importer shares,
+// wiped only on restart -- the reason `providers.spec.ts` reaches for
+// `freshData()` rather than a `resetJobFeedState` export.
+
+const jobInteractions = new Map<string, { liked: boolean; dismissed: boolean }>();
+
+function interactionFor(jobId: string): { liked: boolean; dismissed: boolean } {
+  return jobInteractions.get(jobId) ?? { liked: false, dismissed: false };
+}
+
+/** Same term-overlap filter and fake-relevance scoring as `mockSearchJobs`. */
+function scoredFeedCandidates(query: string): JobFeedEntry[] {
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+
+  const matches = mockJobs.filter((job) => {
+    if (terms.length === 0) return true;
+    const haystack = `${job.title} ${job.company} ${job.skills.join(" ")}`.toLowerCase();
+    return terms.some((term) => haystack.includes(term));
+  });
+
+  return matches
+    .map((job) => {
+      const { matchedSkills, missingSkills } = splitSkills(job);
+      const { liked, dismissed } = interactionFor(job.id);
+      return {
+        job: toPosting(job),
+        score: 55 + matchedSkills.length * 9,
+        reportScore: null,
+        competency: null,
+        matchedSkills,
+        missingSkills,
+        liked,
+        dismissed,
+      };
+    })
+    .sort((a, b) => b.score - a.score)
+    .map((entry, index) => ({ ...entry, score: Math.max(35, entry.score - index) }));
+}
+
+const FEED_TABS = new Set<JobFeedTab>(["recommended", "liked", "all"]);
+
+/**
+ * Same split as the Django feed: `min_score` filters against `entries` first
+ * (falling back to the hybrid score when there is no report), and the three
+ * tab counts are taken from what survives that filter, not from the whole
+ * candidate set.
+ */
+function mockGetJobFeed(
+  params: { tab?: JobFeedTab; q?: string; minScore?: number } = {},
+): Promise<JobFeedResult> {
+  const tab = params.tab && FEED_TABS.has(params.tab) ? params.tab : "recommended";
+  const minScore = params.minScore ?? 0;
+
+  const entries = scoredFeedCandidates(params.q ?? "").filter(
+    (entry) => (entry.reportScore ?? entry.score) >= minScore,
+  );
+
+  const recommended = entries.filter((entry) => !entry.dismissed);
+  const liked = entries.filter((entry) => entry.liked);
+  const counts = {
+    recommended: recommended.length,
+    liked: liked.length,
+    all: entries.length,
+  };
+  const results = tab === "liked" ? liked : tab === "all" ? entries : recommended;
+
+  return resolveAfterDelay({ results, counts, profileAvailable: true });
+}
+
+function mockToggleInteraction(
+  jobId: string,
+  field: "liked" | "dismissed",
+): Promise<JobInteractionState> {
+  const current = interactionFor(jobId);
+  const next = { ...current, [field]: !current[field] };
+  jobInteractions.set(jobId, next);
+  return resolveAfterDelay({ jobId, liked: next.liked, dismissed: next.dismissed });
+}
+
+function mockLikeJob(jobId: string): Promise<JobInteractionState> {
+  return mockToggleInteraction(jobId, "liked");
+}
+
+function mockDismissJob(jobId: string): Promise<JobInteractionState> {
+  return mockToggleInteraction(jobId, "dismissed");
+}
+
+// ---------------------------------------------------------------------------
 // Delegation: THRIVE_API_ORIGIN selects the Django implementations.
 // ---------------------------------------------------------------------------
 
@@ -884,4 +987,18 @@ export function generateMatchReport(jobId: string): Promise<MatchReport> {
 
 export function uploadResume(file: File): Promise<void> {
   return apiEnabled() ? api.uploadResume(file) : mockUploadResume(file);
+}
+
+export function getJobFeed(
+  params: { tab?: JobFeedTab; q?: string; minScore?: number } = {},
+): Promise<JobFeedResult> {
+  return apiEnabled() ? api.getJobFeed(params) : mockGetJobFeed(params);
+}
+
+export function likeJob(jobId: string): Promise<JobInteractionState> {
+  return apiEnabled() ? api.likeJob(jobId) : mockLikeJob(jobId);
+}
+
+export function dismissJob(jobId: string): Promise<JobInteractionState> {
+  return apiEnabled() ? api.dismissJob(jobId) : mockDismissJob(jobId);
 }

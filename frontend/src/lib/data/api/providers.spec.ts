@@ -130,3 +130,46 @@ describe("job search providers", () => {
     expect(init.headers["content-type"]).toBeUndefined();
   });
 });
+
+describe("job feed providers", () => {
+  const FEED_PAYLOAD = { results: [], counts: { recommended: 0, liked: 0, all: 0 },
+    profileAvailable: false };
+
+  it("getJobFeed hits the bare endpoint with no params given", async () => {
+    const impl = stubFetch(200, FEED_PAYLOAD);
+    await runWithAuth(AUTH, () => api.getJobFeed({}));
+    expect(impl.mock.calls[0][0]).toBe("http://api.test/api/thrive/jobs/feed");
+  });
+
+  it("getJobFeed encodes tab, q, and minScore as tab/q/min_score", async () => {
+    const impl = stubFetch(200, FEED_PAYLOAD);
+    await runWithAuth(AUTH, () =>
+      api.getJobFeed({ tab: "all", q: "data analyst", minScore: 50 }));
+    expect(impl.mock.calls[0][0]).toBe(
+      "http://api.test/api/thrive/jobs/feed?tab=all&q=data+analyst&min_score=50");
+  });
+
+  it("getJobFeed omits params that were not given", async () => {
+    const impl = stubFetch(200, FEED_PAYLOAD);
+    await runWithAuth(AUTH, () => api.getJobFeed({ tab: "liked" }));
+    expect(impl.mock.calls[0][0]).toBe(
+      "http://api.test/api/thrive/jobs/feed?tab=liked");
+  });
+
+  it("likeJob POSTs to the job's like endpoint and returns the interaction state", async () => {
+    const impl = stubFetch(200, { jobId: "job-1", liked: true, dismissed: false });
+    const result = await runWithAuth(AUTH, () => api.likeJob("job-1"));
+    const [url, init] = impl.mock.calls[0];
+    expect(url).toBe("http://api.test/api/thrive/jobs/job-1/like");
+    expect(init.method).toBe("POST");
+    expect(result).toEqual({ jobId: "job-1", liked: true, dismissed: false });
+  });
+
+  it("dismissJob POSTs to the job's dismiss endpoint and encodes the id", async () => {
+    const impl = stubFetch(200, { jobId: "job 1", liked: false, dismissed: true });
+    await runWithAuth(AUTH, () => api.dismissJob("job 1"));
+    const [url, init] = impl.mock.calls[0];
+    expect(url).toBe("http://api.test/api/thrive/jobs/job%201/dismiss");
+    expect(init.method).toBe("POST");
+  });
+});

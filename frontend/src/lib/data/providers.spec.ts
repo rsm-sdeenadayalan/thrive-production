@@ -831,6 +831,85 @@ describe("the living resume", () => {
 });
 
 // ---------------------------------------------------------------------------
+// The job feed
+// ---------------------------------------------------------------------------
+
+describe("the job feed", () => {
+  it("starts with nothing liked or dismissed, so recommended equals all", async () => {
+    const data = await freshData();
+
+    const feed = await data.getJobFeed({});
+    expect(feed.results.length).toBeGreaterThan(0);
+    expect(feed.results.every((entry) => !entry.liked && !entry.dismissed)).toBe(true);
+    expect(feed.counts.recommended).toBe(feed.counts.all);
+    expect(feed.counts.liked).toBe(0);
+  });
+
+  it("likeJob toggles liked on, then back off, on a second call", async () => {
+    const data = await freshData();
+    const [{ job }] = (await data.getJobFeed({ tab: "all" })).results;
+
+    const liked = await data.likeJob(job.id);
+    expect(liked).toEqual({ jobId: job.id, liked: true, dismissed: false });
+
+    const unliked = await data.likeJob(job.id);
+    expect(unliked).toEqual({ jobId: job.id, liked: false, dismissed: false });
+  });
+
+  it("a liked posting appears in the liked tab and its count", async () => {
+    const data = await freshData();
+    const [{ job }] = (await data.getJobFeed({ tab: "all" })).results;
+
+    await data.likeJob(job.id);
+
+    const liked = await data.getJobFeed({ tab: "liked" });
+    expect(liked.results.map((entry) => entry.job.id)).toEqual([job.id]);
+    expect(liked.counts.liked).toBe(1);
+  });
+
+  it("a dismissed posting drops out of recommended but stays in all", async () => {
+    const data = await freshData();
+    const [{ job }] = (await data.getJobFeed({ tab: "all" })).results;
+
+    await data.dismissJob(job.id);
+
+    const recommended = await data.getJobFeed({ tab: "recommended" });
+    const all = await data.getJobFeed({ tab: "all" });
+    expect(recommended.results.map((entry) => entry.job.id)).not.toContain(job.id);
+    expect(all.results.map((entry) => entry.job.id)).toContain(job.id);
+    expect(recommended.counts).toEqual(all.counts);
+  });
+
+  it("does not leak interaction state from a previous test's module instance", async () => {
+    // The previous two tests each liked/dismissed a posting through their own
+    // `freshData()` module -- this one gets its own Map, same guarantee the
+    // booking store relies on above.
+    const data = await freshData();
+    const feed = await data.getJobFeed({});
+    expect(feed.results.every((entry) => !entry.liked && !entry.dismissed)).toBe(true);
+  });
+
+  it("filters out postings below minScore, and the counts follow", async () => {
+    const data = await freshData();
+    const all = await data.getJobFeed({ tab: "all" });
+    const topScore = Math.max(...all.results.map((entry) => entry.score));
+
+    const filtered = await data.getJobFeed({ tab: "all", minScore: topScore + 1 });
+    expect(filtered.results).toEqual([]);
+    expect(filtered.counts.all).toBe(0);
+  });
+
+  it("defaults an unrecognized tab to recommended", async () => {
+    const data = await freshData();
+    const recommended = await data.getJobFeed({ tab: "recommended" });
+    const bogus = await data.getJobFeed({ tab: "bogus" as never });
+    expect(bogus.results.map((entry) => entry.job.id)).toEqual(
+      recommended.results.map((entry) => entry.job.id),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // The latency knob
 // ---------------------------------------------------------------------------
 

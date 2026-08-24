@@ -519,6 +519,42 @@ export interface MatchReport {
 }
 
 // ---------------------------------------------------------------------------
+// Job feed
+// ---------------------------------------------------------------------------
+
+/** Which slice of the feed a student is looking at. */
+export type JobFeedTab = "recommended" | "liked" | "all";
+
+/**
+ * One posting in the feed: the hybrid search score every entry carries, plus
+ * an optional cached LLM report score/competency layered on top when one
+ * exists for the student's current resume version.
+ */
+export interface JobFeedEntry {
+  job: JobPosting;
+  score: number;
+  reportScore: number | null;
+  competency: JobCompetency | null;
+  matchedSkills: string[];
+  missingSkills: string[];
+  liked: boolean;
+  dismissed: boolean;
+}
+
+export interface JobFeedResult {
+  results: JobFeedEntry[];
+  counts: Record<JobFeedTab, number>;
+  profileAvailable: boolean;
+}
+
+/** What a like/dismiss toggle returns: the posting's new interaction state. */
+export interface JobInteractionState {
+  jobId: string;
+  liked: boolean;
+  dismissed: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // Resources
 // ---------------------------------------------------------------------------
 

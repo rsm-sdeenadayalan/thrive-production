@@ -18,6 +18,9 @@ import type {
 	CourseRequestPrefill,
 	DegreeProgress,
 	Event,
+	JobFeedResult,
+	JobFeedTab,
+	JobInteractionState,
 	JobPostingDetail,
 	JobSearchResult,
 	MatchReport,
@@ -279,4 +282,35 @@ export async function uploadResume(file: File): Promise<void> {
 	const body = new FormData();
 	body.append("file", file);
 	await apiFetch<unknown>("/resume/upload", { method: "POST", body });
+}
+
+// ---------------------------------------------------------------------------
+// Job feed
+// ---------------------------------------------------------------------------
+
+export function getJobFeed(params: {
+	tab?: JobFeedTab;
+	q?: string;
+	minScore?: number;
+}): Promise<JobFeedResult> {
+	const search = new URLSearchParams();
+	if (params.tab !== undefined) search.set("tab", params.tab);
+	if (params.q !== undefined) search.set("q", params.q);
+	if (params.minScore !== undefined) search.set("min_score", String(params.minScore));
+	const qs = search.toString();
+	return apiFetch<JobFeedResult>(`/jobs/feed${qs ? `?${qs}` : ""}`);
+}
+
+export function likeJob(jobId: string): Promise<JobInteractionState> {
+	return apiFetch<JobInteractionState>(
+		`/jobs/${encodeURIComponent(jobId)}/like`,
+		{ method: "POST" },
+	);
+}
+
+export function dismissJob(jobId: string): Promise<JobInteractionState> {
+	return apiFetch<JobInteractionState>(
+		`/jobs/${encodeURIComponent(jobId)}/dismiss`,
+		{ method: "POST" },
+	);
 }

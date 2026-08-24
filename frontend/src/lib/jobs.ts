@@ -1,5 +1,7 @@
 import type {
   JobCompetency,
+  JobFeedEntry,
+  JobFeedTab,
   JobPostingDetail,
   JobSearchEntry,
 } from "$lib/data";
@@ -133,4 +135,81 @@ export function shareWidth(share: number): string {
 /** A competency's word, from the one map that owns the translation. */
 export function competencyLabel(competency: JobCompetency): string {
   return messages.jobs.report.competencyLabels[competency];
+}
+
+// ---------------------------------------------------------------------------
+// Job feed
+// ---------------------------------------------------------------------------
+
+/** One feed entry, with every date already a string and its score resolved. */
+export interface JobFeedEntryView {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  postedLabel: string | null;
+  url: string;
+  /** Null when there is no resume to score against yet. */
+  score: number | null;
+  /** Whether `score` came from a generated report or the search estimate. */
+  scoreKind: "report" | "estimate";
+  competency: JobCompetency | null;
+  matchedSkills: string[];
+  missingSkills: string[];
+  liked: boolean;
+  dismissed: boolean;
+}
+
+/**
+ * A feed entry becomes a view model.
+ *
+ * The displayed score prefers the cached report's score over the hybrid
+ * search score that ranked the feed -- a generated report is the stronger
+ * signal -- and collapses to `null` under the same rule `toJobResultView`
+ * uses: no profile, no number for a card to render.
+ */
+export function toJobFeedEntryView(
+  entry: JobFeedEntry,
+  profileAvailable: boolean,
+): JobFeedEntryView {
+  const resolvedScore = entry.reportScore ?? entry.score;
+  return {
+    id: entry.job.id,
+    title: entry.job.title,
+    company: entry.job.company,
+    location: entry.job.location,
+    postedLabel: entry.job.postedAt ? formatShortDate(entry.job.postedAt) : null,
+    url: entry.job.url,
+    score: profileAvailable ? resolvedScore : null,
+    scoreKind: entry.reportScore === null ? "estimate" : "report",
+    competency: entry.competency,
+    matchedSkills: entry.matchedSkills,
+    missingSkills: entry.missingSkills,
+    liked: entry.liked,
+    dismissed: entry.dismissed,
+  };
+}
+
+/**
+ * Which of the feed's three dead ends applies.
+ *
+ * Unlike `jobsEmptyState`, the feed always has something selected -- there is
+ * no "haven't searched yet" state, only a tab that came back with nothing --
+ * so this takes no result count and callers only reach for it once they
+ * already know the current tab is empty.
+ */
+export type JobFeedEmptyState =
+  | "no-jobs-at-all"
+  | "no-matches-for-query"
+  | "liked-tab-empty";
+
+export function feedEmptyState(tab: JobFeedTab, q: string): JobFeedEmptyState {
+  if (tab === "liked") return "liked-tab-empty";
+  if (q.trim().length > 0) return "no-matches-for-query";
+  return "no-jobs-at-all";
+}
+
+/** A score as a ring's fill percentage: 0-100, clamped against bad input. */
+export function ringPercent(score: number): number {
+  return Math.max(0, Math.min(100, score));
 }
