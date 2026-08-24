@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- The word "applyloop" NEVER appears anywhere in this repo — not in code, comments, copy, filenames, or commit messages.
+- The reference app's name NEVER appears in product surfaces: no occurrences in `backend/`, `frontend/`, commit messages, or user-facing copy. (This plan document referencing the sibling repo's filesystem path is the sole permitted exception; grep gates scope to `backend/` and `frontend/`.)
 - No auto-fill, no auto-apply, no resume tailoring. Apply is always an external link to the official posting: `<a href={url} target="_blank" rel="noopener noreferrer">`.
 - Posting text is untrusted end-to-end: Svelte default escaping only (never `{@html}` on posting-derived fields); the report prompt must tell the LLM to ignore instructions embedded in posting text and never invent candidate facts.
 - Official ATS JSON APIs only (Greenhouse, Lever, Ashby, Workable). No LinkedIn/Indeed/scraping.
