@@ -20,6 +20,15 @@ class ChatMessage(models.Model):
                                      related_name="messages")
     role = models.CharField(max_length=16, choices=ROLE_CHOICES)
     body = models.TextField()
+    # [{"label": str, "send": str}] — choices offered with this reply, rendered
+    # as buttons. Stored rather than recomputed so reopening a conversation
+    # shows the same choices it showed at the time: the question a student was
+    # asked is part of the record, not something to re-derive from a prompt that
+    # may since have changed.
+    quick_replies = models.JSONField(default=list, blank=True)
+    # An interactive form offered with this reply, or null. Same reasoning as
+    # `quick_replies`: what a student was asked is part of the record.
+    form = models.JSONField(null=True, blank=True, default=None)
     sent_at = models.DateTimeField(default=timezone.now)
 
     class Meta:

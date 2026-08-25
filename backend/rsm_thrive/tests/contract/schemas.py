@@ -238,6 +238,35 @@ OVERLAY = {
 # Chat
 # ---------------------------------------------------------------------------
 
+# `quickReplies` is an ADDITIVE extension to the upstream provider contract
+# (docs/upstream/BACKEND.md), not part of it. It stays out of `required` on
+# purpose: a client that has never heard of it still validates and still
+# renders a perfectly usable conversation, because the same choices are always
+# written into `body` as well. The buttons are a shortcut, never the only way
+# to answer — see `planner.quick_replies_for`.
+QUICK_REPLY = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["label", "send"],
+    "properties": {
+        "label": {"type": "string", "minLength": 1},
+        # What gets sent as the student's message when the button is pressed.
+        # A string rather than an opaque id so the transcript reads as though
+        # they typed it, and so the extractor sees ordinary language.
+        "send": {"type": "string", "minLength": 1},
+    },
+}
+
+# Also additive and optional, for the same reason as `quickReplies`: the same
+# question is always in `body`, so a client that ignores this still renders a
+# usable conversation and the student can always type the answer.
+CHAT_FORM = {
+    "type": ["object", "null"],
+    "additionalProperties": True,
+    "required": ["kind"],
+    "properties": {"kind": {"type": "string"}},
+}
+
 CHAT_MESSAGE = {
     "type": "object",
     "additionalProperties": False,
@@ -246,6 +275,8 @@ CHAT_MESSAGE = {
         "id": {"type": "string"},
         "role": {"enum": ["student", "thrive"]},
         "body": {"type": "string"},
+        "quickReplies": {"type": "array", "items": QUICK_REPLY},
+        "form": CHAT_FORM,
         "sentAt": ISO_INSTANT,
     },
 }

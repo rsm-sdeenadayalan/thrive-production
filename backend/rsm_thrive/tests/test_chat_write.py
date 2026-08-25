@@ -43,6 +43,9 @@ class TestCreateConversation:
         roles = [m["role"] for m in payload["messages"]]
         assert roles == ["student", "thrive"]
         assert payload["messages"][1]["body"] == "Keep it to one page."
+        # A plain answer offers no buttons and no form.
+        assert payload["messages"][1]["quickReplies"] == []
+        assert payload["messages"][1]["form"] is None
 
     def test_title_truncates_to_60(self, client, student, fake_llm):
         fake_llm(["ok"])
@@ -137,9 +140,31 @@ class TestSendMessage:
                               "workload": None, "interests": []})])
         response = _post(client, f"/api/thrive/conversations/conv-{conv.pk}/messages",
                          {"body": "recommend me electives"})
-        body = response.json()["messages"][-1]["body"]
-        assert "11 month" in body and "17 month" in body
-        assert "MGTA" not in body
+        last = response.json()["messages"][-1]
+        assert "11 month" in last["body"] and "17 month" in last["body"]
+        assert "MGTA" not in last["body"]
+        # The track question is a closed set: it comes with buttons, not a form.
+        assert {"label": "11 month", "send": "11 month"} in last["quickReplies"]
+        assert {"label": "17 month", "send": "17 month"} in last["quickReplies"]
+        assert last["form"] is None
+
+    def test_electives_skills_step_returns_a_rating_form(self, client, student,
+                                                          fake_llm):
+        """The skills step asks about five areas at once, so it comes as a
+        form rather than a row of buttons — see `planner.rating_form_for`."""
+        conv = self._conversation(student, destination="courses")
+        fake_llm([json.dumps({"track": "11 month", "goals": ["data-scientist"],
+                              "skill_python": None, "skill_sql": None,
+                              "skill_stats": None, "skill_ml": None,
+                              "skill_communication": None, "workload": None,
+                              "interests": []})])
+        response = _post(client, f"/api/thrive/conversations/conv-{conv.pk}/messages",
+                         {"body": "recommend me electives"})
+        last = response.json()["messages"][-1]
+        assert last["quickReplies"] == []
+        assert last["form"]["kind"] == "rating"
+        assert {"key": "skill_python", "label": "Python programming"} in \
+            last["form"]["rows"]
 
 
 class TestMethodGuards:

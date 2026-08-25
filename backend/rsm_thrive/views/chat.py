@@ -74,7 +74,9 @@ def _append_turn(conversation, destination, question):
 
     with transaction.atomic():
         assistant = ChatMessage.objects.create(conversation=conversation,
-                                               role="thrive", body=reply.body)
+                                               role="thrive", body=reply.body,
+                                               quick_replies=reply.quick_replies,
+                                               form=reply.form)
         ChatTurnLog.objects.create(message=assistant, bot=destination,
                                    model_note=reply.model_note,
                                    chunk_ids=reply.chunk_ids,
