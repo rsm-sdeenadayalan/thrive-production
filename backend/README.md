@@ -84,7 +84,7 @@ Ingest a corpus directory (`.pdf`/`.md`/`.txt`) and/or the course catalog.
 separately:
 
 ```bash
-for d in crawled canvas program; do
+for d in crawled canvas program thrive; do
   uv run python manage.py ingest_corpus rsm_thrive/data/corpus/$d
 done
 uv run python manage.py ingest_corpus --catalog
