@@ -89,10 +89,11 @@ def answer_faq(llm, question, history):
 
 
 def answer_career(llm, question, history):
+    # OURS, deliberately. The bots port took only the FAQ bot and the course
+    # recommender; the career bot stays on our own retrieval call, without the
+    # lexical tier its config does not configure.
     config = bot_config("career")
-    hits = retrieve(question, "career", config["top_k"],
-                    config["min_similarity"], config.get("lexical_min"),
-                    config.get("lexical_floor", 0.0))
+    hits = retrieve(question, "career", config["top_k"], config["min_similarity"])
     system = config["system_prompt"]
     if hits:
         system = f"{system}\n\nContext passages:\n\n{build_context(hits)}"
