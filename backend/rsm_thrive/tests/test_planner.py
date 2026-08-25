@@ -187,16 +187,65 @@ class TestBuildPlan:
             assert quarter["unitsPlanned"] == quarter["unitsExpected"]
 
     def test_every_quarter_lists_core_and_elective_labelled(self):
-        """The brief: show the core classes too, marked core vs elective."""
+        """The brief: show the core classes too, marked core vs elective.
+
+        "Required" is the third label, and it means what neither of the others
+        can say: Summer's MGTA 403 and MGTA 464 carry elective CREDIT and are
+        mandatory anyway. See `_entry`.
+        """
         plan = planner.build_plan(ANSWERS)
         for quarter in plan["quarters"]:
             assert quarter["courses"]
             for row in quarter["courses"]:
-                assert row["requirement"] in ("Core", "Elective")
+                assert row["requirement"] in ("Core", "Elective", "Required")
         cores = [r for q in plan["quarters"] for r in q["courses"]
                  if r["requirement"] == "Core"]
         assert {r["code"] for r in cores} == {
             "MGTA 451", "MGTA 452", "MGTA 453", "MGTA 455", "MGTA 444", "MGTA 454"}
+
+    def test_summer_offers_no_choices_at_all(self):
+        """Nothing in Summer is chooseable, on either track.
+
+        The skeleton has never put an elective SLOT in Summer, but the two
+        scheduled courses were labelled "Elective" in the plan a student reads,
+        which invited them to look for a decision that does not exist.
+        """
+        for track in planner.TRACK_SKELETONS:
+            plan = planner.build_plan({**ANSWERS, "track": track})
+            summer = next(q for q in plan["quarters"] if q["key"] == "summer")
+
+            assert not any(row["swappable"] for row in summer["courses"]), track
+            assert "Elective" not in {row["requirement"] for row in summer["courses"]}, track
+            assert {row["requirement"] for row in summer["courses"]} <= {
+                "Core", "Required"}, track
+
+    def test_summers_required_courses_still_count_as_elective_units(self):
+        """The label changed; the arithmetic did not.
+
+        MGTA 403 and MGTA 464 carry ELECTIVE credit in the published plan of
+        study (both plan-of-study captures in the corpus say so). Relabelling
+        them "Required" is about what a student can choose, not about what the
+        registrar counts, and the 22/28 split has to survive it.
+        """
+        plan = planner.build_plan(ANSWERS)
+        summer = next(q for q in plan["quarters"] if q["key"] == "summer")
+
+        required = [r for r in summer["courses"] if r["requirement"] == "Required"]
+        assert {r["code"] for r in required} == {"MGTA 403", "MGTA 464"}
+        # `kind` is what the totals count, and it still says elective.
+        assert all(r["kind"] == "elective" for r in required)
+        assert plan["totals"]["core"] == planner.CORE_UNITS
+        assert plan["totals"]["elective"] == planner.ELECTIVE_UNITS
+        assert plan["totals"]["total"] == planner.TOTAL_UNITS
+
+    def test_the_rendered_summer_says_there_is_nothing_to_choose(self):
+        plan = planner.build_plan(ANSWERS)
+        markdown = planner.render_plan_markdown(plan)
+
+        assert "Everything this quarter is required" in markdown
+        # And says why the totals still show elective units, so the table and
+        # the summary above it do not look like they disagree.
+        assert "count toward your elective units" in markdown
 
     def test_no_course_appears_twice(self):
         for track in planner.TRACK_SKELETONS:

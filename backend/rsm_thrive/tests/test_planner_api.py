@@ -80,7 +80,8 @@ class TestPlanEndpoint:
     def test_every_quarter_reports_core_and_elective_rows(self, student_client):
         plan = _post(student_client, PLAN, {"answers": ANSWERS}).json()
         for quarter in plan["quarters"]:
-            assert {r["requirement"] for r in quarter["courses"]} <= {"Core", "Elective"}
+            assert {r["requirement"] for r in quarter["courses"]} <= {
+                "Core", "Elective", "Required"}
         assert any(r["requirement"] == "Core"
                    for q in plan["quarters"] for r in q["courses"])
 

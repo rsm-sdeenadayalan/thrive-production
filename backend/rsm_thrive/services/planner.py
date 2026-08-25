@@ -501,8 +501,18 @@ def _stretch_notes(course, profile):
 
 
 def _entry(course, kind, *, swappable, reasons=None, cautions=None, note="",
-           stretch=None, on_goal=None):
-    """One row of a quarter, labelled core or elective as the student sees it."""
+           stretch=None, on_goal=None, requirement=None):
+    """One row of a quarter, labelled core or elective as the student sees it.
+
+    `requirement` overrides that label without touching `kind`, which is what
+    the unit arithmetic counts. Summer's MGTA 403 and MGTA 464 are the reason:
+    they carry ELECTIVE credit in the published plan of study, and they are
+    also mandatory — every student takes them and there is nothing to swap
+    them for. Labelling those rows "Elective" told a student they had a choice
+    they do not have; labelling them "Core" would have contradicted the 22/28
+    split printed directly underneath. They are labelled "Required" instead,
+    and the Summer table says plainly which units they count toward.
+    """
     return {
         "courseId": course["id"],
         "code": display_code(course),
@@ -512,7 +522,7 @@ def _entry(course, kind, *, swappable, reasons=None, cautions=None, note="",
         "title": course["title"],
         "units": course["units"],
         "kind": kind,                       # "core" | "elective"
-        "requirement": "Core" if kind == "core" else "Elective",
+        "requirement": requirement or ("Core" if kind == "core" else "Elective"),
         "swappable": swappable,
         "technicalLevel": course.get("technical_level"),
         "workload": course.get("workload"),
@@ -569,10 +579,13 @@ def build_plan(answers, taken_ids=frozenset(), selections=None):
                 rows.append(_entry(
                     course, "core" if is_core else "elective", swappable=False,
                     reasons=["required core course for the MSBA"] if is_core else
-                            ["scheduled elective — the only offering that fits this "
-                             "slot in Summer"],
+                            ["required — every student takes this, there is "
+                             "nothing to choose here"],
                     cautions=prerequisite_cautions(course, answers),
-                    note="" if is_core else "fixed by the published plan of study",
+                    note="" if is_core else ("required by the published plan of "
+                                             "study; counts toward elective units"),
+                    # Not "Elective": nothing about it is chooseable. See `_entry`.
+                    requirement=None if is_core else "Required",
                 ))
                 continue
 
@@ -861,6 +874,24 @@ def render_plan_markdown(plan):
             lines.append(f"| **{row['code']}** | {row['title']} | "
                          f"{row['units']} | {row['requirement']} |")
         lines.append("")
+
+        # A quarter with nothing to choose says so, rather than leaving a
+        # student looking for the decision they are meant to make. Summer is
+        # the case: every course in it is required. The second sentence is
+        # there because two of those courses count as ELECTIVE units in the
+        # published plan of study, so the totals above would otherwise look
+        # like they disagreed with this table.
+        if all(not row["swappable"] and row["courseId"] for row in quarter["courses"]):
+            counts_as_elective = [row for row in quarter["courses"]
+                                  if row["kind"] == "elective"]
+            note = "Everything this quarter is required — there is nothing to choose."
+            if counts_as_elective:
+                codes = " and ".join(f"**{row['code']}**"
+                                     for row in counts_as_elective)
+                note += (f" {codes} still count toward your elective units, which "
+                         f"is how the totals above add up.")
+            lines += [note, ""]
+
         notes = []
         for row in quarter["courses"]:
             if row.get("stretch"):
