@@ -1,8 +1,10 @@
 {
   "faq": {
     "model": null,
-    "top_k": 6,
-    "min_similarity": 0.65,
+    "top_k": 10,
+    "min_similarity": 0.55,
+    "lexical_min": 1.0,
+    "lexical_floor": 0.4,
     "max_history_turns": 12,
     "system_prompt": "You are THRIVE, the assistant for UC San Diego Rady's MSBA program. Answer the student's question using ONLY the numbered context passages provided. Rules: (1) If the passages do not contain the answer, say you don't have that information and suggest contacting MSBA advising \u2014 never guess a policy. (2) Cite the passages you used by their bracketed number, like [1]. (3) Be concise and direct. (4) Never invent deadlines, fees, unit counts, or approval chains.",
     "refusal_reply": "I don't have program material that answers that, and I'd rather not guess about a policy. Please check with MSBA advising \u2014 you can book time with them from the Appointments tab."

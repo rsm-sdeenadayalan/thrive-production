@@ -13,6 +13,12 @@ class BotReply:
     body: str
     chunk_ids: list = field(default_factory=list)
     model_note: str = "llm"
+    # Choices to offer as buttons alongside this reply. Empty for a free-text
+    # answer; a question with a fixed set of answers should not require typing.
+    quick_replies: list = field(default_factory=list)
+    # A small form to offer instead, when one control per item beats a row of
+    # buttons. None for every other reply. See `planner.rating_form_for`.
+    form: dict | None = None
 
 
 def build_context(hits):
@@ -25,13 +31,40 @@ def build_context(hits):
 
 
 def append_sources(body, hits):
+    """Append the sources behind an answer, as links where a URL is known.
+
+    A student who is about to act on a deadline should be able to open the page
+    that states it — "Sources: Registration Fees" is a claim, a link is
+    checkable. Documents ingested without a `source_url` (fixtures, pasted
+    material) still list by title alone.
+
+    One source stays inline; several become a bulleted list. A comma-joined run
+    was fine at three sources and unreadable at ten — a single line holding
+    "Where to Find MSBA Plans of Study, Course Schedules and Syllabi, Analytical
+    Writing Program — awp.ucsd.edu, How to Enroll in Individual Classes at
+    UCSD (Community College and CSU Students) — students.ucsd.edu, ..." cannot
+    be scanned, and worse, the titles themselves contain commas, so the reader
+    cannot tell where one source ends and the next begins. `top_k` for the FAQ
+    bot is 10, so ten is the normal case, not the pathological one.
+
+    The list is Markdown the frontend already renders: `RichMessage` turns `- `
+    lines into a real `<ul>` and parses links inside list items, so this arrives
+    as clickable bullets rather than as literal hyphens.
+    """
     if not hits:
         return body
-    titles = []
+    seen, entries = set(), []
     for chunk, _score in hits:
-        if chunk.document.title not in titles:
-            titles.append(chunk.document.title)
-    return f"{body}\n\nSources: {', '.join(titles)}"
+        document = chunk.document
+        if document.title in seen:
+            continue
+        seen.add(document.title)
+        url = (document.source_url or "").strip()
+        entries.append(f"[{document.title}]({url})" if url else document.title)
+    if len(entries) == 1:
+        return f"{body}\n\nSource: {entries[0]}"
+    listed = "\n".join(f"- {entry}" for entry in entries)
+    return f"{body}\n\nSources:\n{listed}"
 
 
 def _trimmed(history, config):
@@ -40,7 +73,9 @@ def _trimmed(history, config):
 
 def answer_faq(llm, question, history):
     config = bot_config("faq")
-    hits = retrieve(question, "resources", config["top_k"], config["min_similarity"])
+    hits = retrieve(question, "resources", config["top_k"],
+                    config["min_similarity"], config.get("lexical_min"),
+                    config.get("lexical_floor", 0.0))
     if not hits:
         # Deterministic refusal: no context means no answer, and no LLM call
         # means the refusal cannot be argued with. Spec §5's binding rule.
