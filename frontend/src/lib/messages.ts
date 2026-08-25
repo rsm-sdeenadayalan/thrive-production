@@ -631,7 +631,7 @@ export const messages = {
 	appointments: {
 		documentTitle: 'Appointments',
 		eyebrow: 'appointments',
-		title: 'Book time with someone',
+		title: 'Book time for advising',
 		/**
 		 * Names the window, because the calendar's grey days otherwise look like a
 		 * bug rather than a rule.

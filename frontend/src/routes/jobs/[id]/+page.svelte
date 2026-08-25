@@ -35,7 +35,10 @@
 <svelte:head><title>{pageTitle(data.job.title)}</title></svelte:head>
 
 <div class="mx-auto w-full max-w-page space-y-6 lg:space-y-4">
-	<header class="mx-auto w-full max-w-5xl">
+	<!-- No `mx-auto max-w-5xl` here: centring the header inside the wider page
+	     container indented its left edge relative to the content below, the
+	     same misalignment fixed on /jobs and /appointments. -->
+	<header class="w-full">
 		<p class="thrive-eyebrow">{copy.eyebrow}</p>
 		<!-- PAGE TITLE. `text-3xl font-bold`, matching every other route's h1 --
 		     see the ladder note in app.css. -->
