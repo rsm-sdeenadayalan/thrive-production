@@ -1,28 +1,216 @@
 {
   "greenhouse": [
-    {"board": "stripe", "company": "Stripe"},
-    {"board": "airbnb", "company": "Airbnb"},
-    {"board": "databricks", "company": "Databricks"},
-    {"board": "doordashusa", "company": "DoorDash"},
-    {"board": "instacart", "company": "Instacart"},
-    {"board": "datadog", "company": "Datadog"},
-    {"board": "duolingo", "company": "Duolingo"},
-    {"board": "affirm", "company": "Affirm"},
-    {"board": "samsara", "company": "Samsara"},
-    {"board": "gusto", "company": "Gusto"},
-    {"board": "figma", "company": "Figma"},
-    {"board": "robinhood", "company": "Robinhood"},
-    {"board": "flexport", "company": "Flexport"},
-    {"board": "attentive", "company": "Attentive"},
-    {"board": "chime", "company": "Chime"}
+    {
+      "board": "stripe",
+      "company": "Stripe"
+    },
+    {
+      "board": "airbnb",
+      "company": "Airbnb"
+    },
+    {
+      "board": "databricks",
+      "company": "Databricks"
+    },
+    {
+      "board": "doordashusa",
+      "company": "DoorDash"
+    },
+    {
+      "board": "instacart",
+      "company": "Instacart"
+    },
+    {
+      "board": "datadog",
+      "company": "Datadog"
+    },
+    {
+      "board": "duolingo",
+      "company": "Duolingo"
+    },
+    {
+      "board": "affirm",
+      "company": "Affirm"
+    },
+    {
+      "board": "samsara",
+      "company": "Samsara"
+    },
+    {
+      "board": "gusto",
+      "company": "Gusto"
+    },
+    {
+      "board": "figma",
+      "company": "Figma"
+    },
+    {
+      "board": "robinhood",
+      "company": "Robinhood"
+    },
+    {
+      "board": "flexport",
+      "company": "Flexport"
+    },
+    {
+      "board": "attentive",
+      "company": "Attentive"
+    },
+    {
+      "board": "chime",
+      "company": "Chime"
+    },
+    {
+      "board": "anthropic",
+      "company": "Anthropic"
+    },
+    {
+      "board": "zscaler",
+      "company": "Zscaler"
+    },
+    {
+      "board": "cloudflare",
+      "company": "Cloudflare"
+    },
+    {
+      "board": "brex",
+      "company": "Brex"
+    },
+    {
+      "board": "verkada",
+      "company": "Verkada"
+    },
+    {
+      "board": "fivetran",
+      "company": "Fivetran"
+    },
+    {
+      "board": "roblox",
+      "company": "Roblox"
+    },
+    {
+      "board": "pinterest",
+      "company": "Pinterest"
+    },
+    {
+      "board": "scaleai",
+      "company": "Scale AI"
+    },
+    {
+      "board": "coinbase",
+      "company": "Coinbase"
+    },
+    {
+      "board": "lyft",
+      "company": "Lyft"
+    },
+    {
+      "board": "reddit",
+      "company": "Reddit"
+    },
+    {
+      "board": "twilio",
+      "company": "Twilio"
+    },
+    {
+      "board": "asana",
+      "company": "Asana"
+    },
+    {
+      "board": "upstart",
+      "company": "Upstart"
+    },
+    {
+      "board": "mixpanel",
+      "company": "Mixpanel"
+    },
+    {
+      "board": "vercel",
+      "company": "Vercel"
+    },
+    {
+      "board": "sigmacomputing",
+      "company": "Sigma Computing"
+    },
+    {
+      "board": "sofi",
+      "company": "SoFi"
+    },
+    {
+      "board": "faire",
+      "company": "Faire"
+    },
+    {
+      "board": "discord",
+      "company": "Discord"
+    },
+    {
+      "board": "peloton",
+      "company": "Peloton"
+    },
+    {
+      "board": "dropbox",
+      "company": "Dropbox"
+    },
+    {
+      "board": "komodohealth",
+      "company": "Komodo Health"
+    },
+    {
+      "board": "amplitude",
+      "company": "Amplitude"
+    },
+    {
+      "board": "betterment",
+      "company": "Betterment"
+    },
+    {
+      "board": "life360",
+      "company": "Life360"
+    },
+    {
+      "board": "ginkgobioworks",
+      "company": "Ginkgo Bioworks"
+    }
   ],
   "lever": [
-    {"slug": "spotify", "company": "Spotify"}
+    {
+      "slug": "spotify",
+      "company": "Spotify"
+    },
+    {
+      "slug": "palantir",
+      "company": "Palantir"
+    }
   ],
   "ashby": [
-    {"board": "ramp", "company": "Ramp"},
-    {"board": "notion", "company": "Notion"},
-    {"board": "linear", "company": "Linear"},
-    {"board": "openai", "company": "OpenAI"}
+    {
+      "board": "ramp",
+      "company": "Ramp"
+    },
+    {
+      "board": "notion",
+      "company": "Notion"
+    },
+    {
+      "board": "linear",
+      "company": "Linear"
+    },
+    {
+      "board": "openai",
+      "company": "OpenAI"
+    },
+    {
+      "board": "sierra",
+      "company": "Sierra"
+    },
+    {
+      "board": "vanta",
+      "company": "Vanta"
+    },
+    {
+      "board": "perplexity",
+      "company": "Perplexity"
+    }
   ]
 }
