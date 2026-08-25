@@ -879,7 +879,17 @@ export const messages = {
 			 */
 			quickPicks: ['Data Analyst', 'Data Scientist', 'Business Analyst', 'Product Analyst'],
 			/** Saved jobs stay reachable without running a search first. */
-			likedLink: 'See your liked roles'
+			likedLink: 'See your liked roles',
+			/**
+			 * Under the search button. `/jobs/results` scores each top candidate
+			 * with a real assessment rather than a proxy (see `scoreWithLlm` on
+			 * `getJobFeed`) -- a fresh search can take a few extra seconds while
+			 * that runs, and a repeat search against the same resume is instant
+			 * because those assessments are cached. Said plainly rather than
+			 * covered up with a spinner that implies nothing is really happening.
+			 */
+			searchHint:
+				'A fresh search scores your top matches with a full compatibility check, which can take a few extra seconds. Repeat searches are instant.'
 		},
 
 		/**
@@ -1014,6 +1024,10 @@ export const messages = {
 			refineLabel: 'Refine search',
 			refinePlaceholder: 'e.g. Data Analyst',
 			refineButton: 'Search',
+			/** Same honest wait-time note as `setup.searchHint`, repeated here since
+			 *  refining a query re-runs the same scoring pass against new candidates. */
+			refineHint:
+				'A fresh search scores your top matches with a full compatibility check, which can take a few extra seconds.',
 			backToSetup: 'Manage resume',
 			/** One line under the tab bar, naming what THIS tab actually is. */
 			tabHints: {

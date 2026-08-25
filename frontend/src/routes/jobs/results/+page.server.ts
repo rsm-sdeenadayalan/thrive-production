@@ -16,6 +16,19 @@ import type { Actions, PageServerLoad } from "./$types";
  * form and plain links keep the results linkable and shareable exactly as
  * viewed, with no client-side fetch to keep in sync with the address bar.
  *
+ * ## `scoreWithLlm: true` is what makes this page THIS page
+ *
+ * `/jobs` (setup) calls `getJobFeed({})` -- no LLM scoring, just the cheap
+ * hybrid-search proxy, because all it needs is `profileAvailable`. This page
+ * is the one place `scoreWithLlm: true` is ever passed: it tells the backend
+ * to run the real rubric (`generate_report`, cached per resume version) over
+ * the top candidates and use ITS score, not the proxy's, as both the
+ * displayed number and the sort key. A cache hit is free; a fresh search
+ * against a resume version that has never been scored can cost up to
+ * `LLM_SCORE_TOP_N` real LLM calls, which is the one time this page can be
+ * slow -- see `resultsCopy.scoringHint` in `+page.svelte` for the honest copy
+ * that says so, rather than a fake progress bar.
+ *
  * ## Recommended is the only tab `targetResults` touches
  *
  * Liked and All exist specifically so the capping and floor-filtering on
@@ -38,7 +51,7 @@ export const load: PageServerLoad = async ({ url }) => {
 	const minScore = parseMinScore(url.searchParams.get("minScore"));
 
 	const [feed, benchmark] = await Promise.all([
-		getJobFeed({ tab, q, minScore }),
+		getJobFeed({ tab, q, minScore, scoreWithLlm: true }),
 		q.trim().length > 0 ? searchJobs(q).then((result) => result.benchmark) : Promise.resolve<RoleBenchmark | null>(null),
 	]);
 

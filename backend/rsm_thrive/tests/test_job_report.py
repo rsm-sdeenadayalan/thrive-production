@@ -114,6 +114,22 @@ class TestPromptHardening:
         assert '"competency"' in REPORT_PROMPT
         assert '"verdict"' in REPORT_PROMPT
 
+    def test_prompt_weighs_experience_seniority_and_role_equivalence(self):
+        assert "YEARS OF RELEVANT EXPERIENCE" in REPORT_PROMPT
+        assert "SENIORITY FIT" in REPORT_PROMPT
+        assert "ADJACENT-ROLE EQUIVALENCE" in REPORT_PROMPT
+        # Over-qualification must be a named strength, never a scored gap.
+        assert "over-qualified" in REPORT_PROMPT
+        assert "must never be scored as a gap" in REPORT_PROMPT
+        # Adjacent analyst roles vs. roles that only share the word "analyst".
+        assert "business analyst, data analyst, and" in REPORT_PROMPT
+        assert "payroll" in REPORT_PROMPT.lower()
+
+    def test_hard_requirement_floor_is_scoped_to_genuine_hard_requirements(self):
+        assert "genuinely hard requirement" in REPORT_PROMPT
+        assert "score at most 25" in REPORT_PROMPT
+        assert "Do not apply that floor for an ordinary unmatched" in REPORT_PROMPT
+
 
 class TestSanitizeStillWorks:
     def test_valid_envelope_round_trips(self):

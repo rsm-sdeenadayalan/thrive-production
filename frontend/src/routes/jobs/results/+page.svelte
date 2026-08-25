@@ -126,6 +126,7 @@
 			{resultsCopy.refineButton}
 		</Button>
 	</form>
+	<p class="text-3xs text-muted-ink">{resultsCopy.refineHint}</p>
 
 	<div>
 		<nav aria-label={feedCopy.tabsLabel} class="flex flex-wrap gap-1.5">

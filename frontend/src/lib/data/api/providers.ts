@@ -318,11 +318,15 @@ export function getJobFeed(params: {
 	tab?: JobFeedTab;
 	q?: string;
 	minScore?: number;
+	/** Results-page-only: score the top candidates with the real LLM rubric
+	 *  instead of the hybrid-search proxy. See `feed_for`'s `score_with_llm`. */
+	scoreWithLlm?: boolean;
 }): Promise<JobFeedResult> {
 	const search = new URLSearchParams();
 	if (params.tab !== undefined) search.set("tab", params.tab);
 	if (params.q !== undefined) search.set("q", params.q);
 	if (params.minScore !== undefined) search.set("min_score", String(params.minScore));
+	if (params.scoreWithLlm) search.set("score_with_llm", "1");
 	const qs = search.toString();
 	return apiFetch<JobFeedResult>(`/jobs/feed${qs ? `?${qs}` : ""}`);
 }

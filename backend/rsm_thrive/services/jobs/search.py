@@ -24,7 +24,16 @@ def profile_of(user):
     parts = [version.summary]
     parts += sorted(skills)
     for exp in version.experience:
-        parts.append(exp.get("title", ""))
+        # Title alone used to be all that reached the embedding and the LLM
+        # report -- organization and period (tenure) were silently dropped,
+        # so nothing that scores a match could ever see "6 years as a Senior
+        # Business Analyst." Both ride along now, e.g.
+        # "Senior Business Analyst, Acme Corp (2019-2025)".
+        header = ", ".join(p for p in (exp.get("title", ""), exp.get("organization", "")) if p)
+        period = exp.get("period", "")
+        if period:
+            header = f"{header} ({period})" if header else period
+        parts.append(header)
         parts += exp.get("bullets", [])
     return {"text": "\n".join(p for p in parts if p),
             "skills": skills, "version": version}

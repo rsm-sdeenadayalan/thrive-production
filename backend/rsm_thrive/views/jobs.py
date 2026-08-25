@@ -62,11 +62,14 @@ def _parse_min_score(raw):
 def jobs_feed(request):
     if request.method != "GET":
         return json_error("method_not_allowed", "Use GET.", 405)
+    score_with_llm = request.GET.get("score_with_llm") in ("1", "true")
     outcome = feed_for(
         request.user,
         query=request.GET.get("q", ""),
         tab=request.GET.get("tab", "recommended"),
         min_score=_parse_min_score(request.GET.get("min_score")),
+        score_with_llm=score_with_llm,
+        llm_factory=llm_factory if score_with_llm else None,
     )
     results = [
         {

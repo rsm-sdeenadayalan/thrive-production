@@ -1007,7 +1007,7 @@ export function uploadResume(file: File): Promise<void> {
 }
 
 export function getJobFeed(
-  params: { tab?: JobFeedTab; q?: string; minScore?: number } = {},
+  params: { tab?: JobFeedTab; q?: string; minScore?: number; scoreWithLlm?: boolean } = {},
 ): Promise<JobFeedResult> {
   return apiEnabled() ? api.getJobFeed(params) : mockGetJobFeed(params);
 }

@@ -1,10 +1,15 @@
+import json
+
 import pytest
 from django.contrib.auth.models import User
 
 from rsm_thrive.models import JobPosting, MatchReport, PostingInteraction, ResumeVersion
 from rsm_thrive.services.embeddings import FakeEmbeddings
-from rsm_thrive.services.jobs.feed import feed_for
+from rsm_thrive.services.jobs.feed import LLM_SCORE_TOP_N, feed_for
+from rsm_thrive.services.jobs.search import search_postings
+from rsm_thrive.services.llm import FakeLLM
 from rsm_thrive.testing import make_student
+from rsm_thrive.views import jobs as jobs_views
 
 pytestmark = pytest.mark.django_db
 
@@ -30,6 +35,18 @@ def _resume(user, is_current=True, label="v1"):
         user=user, label=label, summary="sql analyst",
         skills=[{"id": "s1", "name": "SQL", "source": "manual"}],
         courses=[], experience=[], is_current=is_current)
+
+
+def _reply(score=72, competency="good"):
+    return json.dumps({"score": score, "competency": competency,
+                       "matched_skills": ["sql"], "gaps": ["tableau"],
+                       "verdict": "Competitive. Emphasize SQL projects."})
+
+
+def _raising_factory(message="LLM backend unavailable in this test."):
+    def factory():
+        raise RuntimeError(message)
+    return factory
 
 
 class TestFeedFor:
@@ -194,3 +211,188 @@ class TestFeedEndpoint:
         response = client.post("/api/thrive/jobs/feed")
         assert response.status_code == 405
         assert response.json()["error"]["code"] == "method_not_allowed"
+
+
+class TestFeedForLlmScoring:
+    """The results page's opt-in: score the top candidates with the real
+    rubric instead of the hybrid-search proxy. See `feed_for`'s
+    `score_with_llm` and `_score_top_candidates_with_llm`.
+    """
+
+    def test_recommended_is_restricted_to_scored_candidates_and_resorted(self, student):
+        _resume(student)
+        _posting("1", title="Data Analyst")
+        _posting("2", title="Data Analyst II")
+
+        # `_score_top_candidates_with_llm` scores the cheap pre-rank's top
+        # slice in ITS OWN order, so ask that same ranking what order the
+        # LLM will see the two postings in, then script the FIRST one
+        # scored to get the LOWER report score. A correct re-sort must
+        # still put the SECOND-scored posting first once the reports are
+        # in -- Recommended is the one tab this reordering is visible on.
+        cheap_order = [row["posting"].pk
+                      for row in search_postings(student, "", limit=200)["results"]]
+        fake = FakeLLM(replies=[_reply(score=40, competency="stretch"),
+                                _reply(score=90, competency="strong")])
+
+        outcome = feed_for(student, tab="recommended", score_with_llm=True,
+                           llm_factory=lambda: fake)
+
+        assert [e["posting"].pk for e in outcome["results"]] == list(reversed(cheap_order))
+        assert [e["report_score"] for e in outcome["results"]] == [90, 40]
+        assert MatchReport.objects.count() == 2
+
+    def test_recommended_never_backfills_from_outside_the_scored_window(self, student):
+        _resume(student)
+        for i in range(LLM_SCORE_TOP_N + 1):
+            _posting(str(i), title=f"Data Analyst {i}")
+
+        cheap_order = [row["posting"].pk
+                      for row in search_postings(student, "", limit=200)["results"]]
+        outside_the_window = cheap_order[LLM_SCORE_TOP_N]
+
+        # Every one of the top-N candidates gets knocked down to a REACH
+        # score; the 11th-ranked posting's cheap estimate is left completely
+        # untouched, and would still beat all ten if Recommended fell back to
+        # it -- exactly the bug ("an unverified proxy score outranking an
+        # honestly-scored one") this whole feature exists to fix, one rank
+        # down. Recommended must drop it, not let it back in.
+        fake = FakeLLM(replies=[_reply(score=5, competency="reach")
+                               for _ in range(LLM_SCORE_TOP_N)])
+
+        outcome = feed_for(student, tab="recommended", score_with_llm=True,
+                           llm_factory=lambda: fake, min_score=0)
+
+        result_pks = [e["posting"].pk for e in outcome["results"]]
+        assert outside_the_window not in result_pks
+        assert len(result_pks) == LLM_SCORE_TOP_N
+        assert all(e["report_score"] == 5 for e in outcome["results"])
+
+    def test_all_and_liked_tabs_are_untouched_by_score_with_llm(self, student):
+        """Only Recommended is restricted+resorted by the scoring pass --
+        All and Liked still mean "everything matching the search," in the
+        cheap pre-rank's own order, same as when `score_with_llm=False`.
+        """
+        _resume(student)
+        for i in range(LLM_SCORE_TOP_N + 1):
+            _posting(str(i), title=f"Data Analyst {i}")
+
+        without_llm = feed_for(student, tab="all", score_with_llm=False)
+        fake = FakeLLM(replies=[_reply(score=5, competency="reach")
+                               for _ in range(LLM_SCORE_TOP_N)])
+        with_llm = feed_for(student, tab="all", score_with_llm=True, llm_factory=lambda: fake)
+
+        assert ([e["posting"].pk for e in without_llm["results"]]
+                == [e["posting"].pk for e in with_llm["results"]])
+        assert with_llm["counts"]["all"] == LLM_SCORE_TOP_N + 1
+
+    def test_cached_report_is_reused_without_calling_the_llm(self, student):
+        version = _resume(student)
+        posting = _posting("1")
+        MatchReport.objects.create(
+            user=student, posting=posting, resume_version=version,
+            competency="strong", score=95, matched_skills=["sql"], gaps=[],
+            verdict="Cached.")
+        fake = FakeLLM(replies=[])  # any .chat() call raises: cache must not call it
+
+        outcome = feed_for(student, tab="all", score_with_llm=True,
+                           llm_factory=lambda: fake)
+
+        [entry] = outcome["results"]
+        assert entry["report_score"] == 95
+        assert fake.calls == []
+        assert MatchReport.objects.count() == 1
+
+    def test_llm_failure_on_one_posting_falls_back_to_its_estimate(self, student):
+        _resume(student)
+        overlapping = _posting("1", title="Data Analyst", description="sql python",
+                               skills=("sql", "python"))
+        fake = FakeLLM(replies=[])  # first (only) chat call raises
+
+        outcome = feed_for(student, tab="all", score_with_llm=True,
+                           llm_factory=lambda: fake)
+
+        [entry] = outcome["results"]
+        assert entry["report_score"] is None
+        assert entry["posting"].pk == overlapping.pk
+        assert MatchReport.objects.count() == 0
+
+    def test_llm_entirely_unavailable_still_renders_estimates(self, student):
+        _resume(student)
+        _posting("1")
+        _posting("2")
+
+        outcome = feed_for(student, tab="all", score_with_llm=True,
+                           llm_factory=_raising_factory())
+
+        assert len(outcome["results"]) == 2
+        assert all(e["report_score"] is None for e in outcome["results"])
+        assert MatchReport.objects.count() == 0
+
+    def test_only_scores_the_top_n_candidates(self, student):
+        _resume(student)
+        for i in range(LLM_SCORE_TOP_N + 3):
+            _posting(str(i), title=f"Data Analyst {i}")
+        fake = FakeLLM(replies=[_reply(score=80) for _ in range(LLM_SCORE_TOP_N)])
+
+        feed_for(student, tab="all", score_with_llm=True, llm_factory=lambda: fake)
+
+        assert MatchReport.objects.count() == LLM_SCORE_TOP_N
+        assert len(fake.calls) == LLM_SCORE_TOP_N
+
+    def test_floor_is_reapplied_against_the_report_score(self, student):
+        _resume(student)
+        _posting("1", title="Data Analyst", description="sql python",
+                skills=("sql", "python"))
+
+        [cheap_row] = search_postings(student, "", limit=200)["results"]
+        cheap_score = round(cheap_row["score"] * 100)
+        assert cheap_score >= 50, "test premise: the hybrid estimate must clear the floor"
+
+        # The report knocks the same posting below that same floor -- the
+        # floor must follow the report's score, not the proxy it replaced.
+        fake = FakeLLM(replies=[_reply(score=20, competency="reach")])
+
+        outcome = feed_for(student, tab="all", min_score=50, score_with_llm=True,
+                           llm_factory=lambda: fake)
+
+        assert outcome["results"] == []
+
+    def test_no_profile_skips_llm_scoring_entirely(self, student):
+        _posting("1")
+        fake = FakeLLM(replies=[])
+
+        outcome = feed_for(student, tab="all", score_with_llm=True,
+                           llm_factory=lambda: fake)
+
+        assert outcome["profile_available"] is False
+        assert fake.calls == []
+        assert MatchReport.objects.count() == 0
+
+
+class TestFeedEndpointLlmScoring:
+    def test_score_with_llm_query_param_generates_a_report(self, client, student,
+                                                            monkeypatch):
+        _resume(student)
+        posting = _posting("1")
+        fake = FakeLLM(replies=[_reply(score=88, competency="strong")])
+        monkeypatch.setattr(jobs_views, "llm_factory", lambda: fake)
+
+        payload = client.get("/api/thrive/jobs/feed?score_with_llm=1").json()
+
+        [entry] = payload["results"]
+        assert entry["job"]["id"] == f"job-{posting.pk}"
+        assert entry["reportScore"] == 88
+        assert entry["competency"] == "strong"
+
+    def test_default_request_never_touches_the_llm(self, client, student, monkeypatch):
+        _resume(student)
+        _posting("1")
+        monkeypatch.setattr(jobs_views, "llm_factory",
+                            lambda: (_ for _ in ()).throw(
+                                AssertionError("llm_factory should not run")))
+
+        payload = client.get("/api/thrive/jobs/feed").json()
+
+        [entry] = payload["results"]
+        assert entry["reportScore"] is None

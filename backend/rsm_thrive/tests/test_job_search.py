@@ -39,6 +39,32 @@ class TestProfile:
         assert profile["skills"] == {"python", "sql"}
         assert "sql" in profile["text"].lower()
 
+    def test_profile_text_carries_organization_and_period(self, student):
+        """Tenure and employer are invisible to anything that scores a match
+        unless they reach `profile["text"]` -- neither the embedding nor the
+        LLM report sees fields the profile text never mentions.
+        """
+        resume = _resume(student)
+        resume.experience = [{
+            "id": "exp-1", "title": "Senior Business Analyst",
+            "organization": "Acme Corp", "period": "2019-2025",
+            "bullets": ["Led analytics for revenue and operations teams"],
+        }]
+        resume.save()
+
+        text = profile_of(student)["text"]
+        assert "Senior Business Analyst" in text
+        assert "Acme Corp" in text
+        assert "2019-2025" in text
+
+    def test_profile_text_tolerates_missing_organization_or_period(self, student):
+        resume = _resume(student)
+        resume.experience = [{"id": "exp-1", "title": "Analyst", "bullets": ["Did analysis"]}]
+        resume.save()
+
+        text = profile_of(student)["text"]
+        assert "Analyst" in text
+
 
 class TestSearch:
     def test_terms_filter_and_profile_ranking(self, student):

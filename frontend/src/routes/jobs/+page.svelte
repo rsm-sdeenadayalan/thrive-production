@@ -255,6 +255,7 @@
 				{setup.roleButton}
 			</Button>
 		</form>
+		<p class="text-3xs text-muted-ink">{setup.searchHint}</p>
 
 		<div>
 			<p class="thrive-eyebrow mb-1.5">{setup.quickPicksLabel}</p>
