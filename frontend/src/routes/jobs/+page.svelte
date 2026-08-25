@@ -49,6 +49,26 @@
 	 */
 	let resumeFileName = $state<string | null>(null);
 
+	/**
+	 * Mirror the chosen filename beside the picker.
+	 *
+	 * It is the ONLY confirmation a student gets that their file landed: the
+	 * input is `sr-only`, so the browser's own "no file chosen" text is not on
+	 * screen and the styled label never changes by itself.
+	 *
+	 * ## Neither file input carries `required`, and that is deliberate
+	 *
+	 * `required` on an `sr-only` input is a silent dead end. Pressing the submit
+	 * button with nothing chosen fires `invalid` and NEVER fires `submit`, so
+	 * the browser blocks the post and aims its validation bubble at an element
+	 * one pixel wide and clipped out of view. The student sees nothing happen at
+	 * all, presses it again, and concludes the upload is broken. Verified in a
+	 * browser: `invalid: "Please select a file."` with no `submit` event.
+	 *
+	 * The server action already guards the empty case and answers with "Choose
+	 * a file first." somewhere actually visible. Letting the form post is what
+	 * lets that message reach anyone.
+	 */
 	function trackChosenFile(event: Event) {
 		const input = event.currentTarget as HTMLInputElement;
 		resumeFileName = input.files?.[0]?.name ?? null;
@@ -125,7 +145,6 @@
 							type="file"
 							name="file"
 							accept="application/pdf"
-							required
 							class="sr-only"
 							onchange={trackChosenFile}
 						/>
@@ -201,7 +220,6 @@
 							type="file"
 							name="file"
 							accept="application/pdf"
-							required
 							class="sr-only"
 							onchange={trackChosenFile}
 						/>

@@ -975,6 +975,34 @@ export const messages = {
 			empty: 'Choose a file first.',
 			/** The provider failing for a reason nobody has thought about. */
 			error: 'Something went wrong uploading your resume. Try again.',
+
+			/**
+			 * Why an upload was refused, keyed by the backend's error code.
+			 *
+			 * Every rejection used to collapse into `error` above, so a student
+			 * whose resume was a scan, or 8MB, or a .docx renamed to .pdf, was told
+			 * "Something went wrong … Try again" — which is not what went wrong and
+			 * is advice that cannot work. Retrying a scanned PDF fails forever.
+			 *
+			 * Keyed by CODE rather than passing the server's own sentence through:
+			 * copy lives in this file, and echoing a remote string would put it
+			 * somewhere a reader of this file cannot see it. An unrecognised code
+			 * falls back to `error`, which is what that string is now for.
+			 */
+			uploadErrors: {
+				/** Wrong type: not a PDF at all, whatever the extension says. */
+				bad_request: 'That file is not a PDF. Export your resume as a PDF and try again.',
+				too_large: 'That PDF is over the 5MB limit. Try exporting it again at a smaller size.',
+				/**
+				 * A PDF with no text layer — almost always a scan or a photo. Says
+				 * what to do about it, because "try again" is useless here.
+				 */
+				unreadable_resume:
+					'No text could be read from that PDF, so it is probably a scan or an image. Export it from your editor instead of scanning a printout.',
+				/** The extraction model is down. This one IS worth retrying. */
+				llm_unavailable:
+					'The resume reader is unavailable right now. Nothing was changed — try again in a few minutes.'
+			},
 			/**
 			 * The styled file-picker label, shared by both banner states below:
 			 * the native `<input type="file">` cannot be restyled, so this is the

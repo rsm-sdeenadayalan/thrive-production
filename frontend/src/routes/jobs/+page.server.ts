@@ -65,7 +65,23 @@ export const actions: Actions = {
 			await uploadResume(file);
 		} catch (error) {
 			if (error instanceof ApiError) {
-				return fail(error.status, { error: messages.jobs.profileBanner.error });
+				/*
+				 * Say WHICH thing was wrong with the file.
+				 *
+				 * Every rejection used to collapse into one "Something went wrong —
+				 * try again", so the three failures a student can actually cause and
+				 * fix — a scan with no text layer, a file over 5MB, something that
+				 * is not a PDF — were indistinguishable from each other and from a
+				 * server fault, and the advice attached to all of them ("try again")
+				 * is the one thing that cannot help with any of the three.
+				 *
+				 * Keyed by the backend's error code; an unrecognised code still
+				 * falls back to the generic line, which is what it is for.
+				 */
+				const reasons: Record<string, string> = messages.jobs.profileBanner.uploadErrors;
+				return fail(error.status, {
+					error: reasons[error.code] ?? messages.jobs.profileBanner.error,
+				});
 			}
 			throw error;
 		}
