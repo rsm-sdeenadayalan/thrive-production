@@ -60,3 +60,51 @@ class TestIngestDocument:
         assert Document.objects.filter(source="test:h").count() == 1
         assert DocumentChunk.objects.count() == 1
         assert DocumentChunk.objects.get().heading == "B"
+
+
+class TestDestinationScoping:
+    """Which bots can see a document is derived from its source host.
+
+    The bug this guards: every crawled page was scoped to "resources" alone, so
+    the career destination had an EMPTY corpus while 62 career.ucsd.edu and
+    career.rady.ucsd.edu documents sat in the database. The career bot answered
+    from the model's own knowledge and said so — "I don't have specific numbered
+    context passages to cite" — about a real programme's real services.
+    """
+
+    def test_a_career_page_is_reachable_by_the_career_bot(self):
+        from rsm_thrive.management.commands.ingest_corpus import destinations_for
+
+        assert destinations_for(
+            "policy", "https://career.ucsd.edu/guides/resume.pdf") == [
+                "resources", "career"]
+        assert destinations_for(
+            "policy", "https://career.rady.ucsd.edu/resources/casecoach/") == [
+                "resources", "career"]
+
+    def test_a_career_page_stays_reachable_by_the_faq_bot(self):
+        """Additive, not a move: "how do I write a resume" is a fair FAQ question."""
+        from rsm_thrive.management.commands.ingest_corpus import destinations_for
+
+        assert "resources" in destinations_for(
+            "policy", "https://career.ucsd.edu/x")
+
+    def test_an_ordinary_page_is_not_given_the_career_destination(self):
+        from rsm_thrive.management.commands.ingest_corpus import destinations_for
+
+        assert destinations_for(
+            "policy", "https://students.ucsd.edu/academics/enroll/") == ["resources"]
+
+    def test_a_syllabus_still_reaches_the_courses_bot(self):
+        from rsm_thrive.management.commands.ingest_corpus import destinations_for
+
+        assert destinations_for("syllabus", "") == ["resources", "courses"]
+
+    def test_a_lookalike_host_is_not_matched(self):
+        """Substring matching would catch "careers.example.com"; this is exact."""
+        from rsm_thrive.management.commands.ingest_corpus import destinations_for
+
+        assert destinations_for(
+            "policy", "https://notcareer.ucsd.edu/x") == ["resources"]
+        assert destinations_for(
+            "policy", "https://career.ucsd.edu.evil.test/x") == ["resources"]

@@ -17,11 +17,16 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--llm", choices=["fake", "real"], default="fake")
+        # The shipped golden set describes the corpus that ships. Unit tests
+        # need their own tiny set against their own fixture corpus, or the two
+        # become coupled and the golden set can never grow past the fixture.
+        parser.add_argument("--golden", default=str(GOLDEN),
+                            help="Path to a golden-case JSON file (default: the shipped set).")
 
     def handle(self, *args, **options):
         if not DocumentChunk.objects.exists():
             raise CommandError("The knowledge table is empty — run ingest_corpus first.")
-        cases = json.loads(GOLDEN.read_text())
+        cases = json.loads(Path(options["golden"]).read_text())
         config = bot_config("faq")
         failures = 0
         for case in cases:

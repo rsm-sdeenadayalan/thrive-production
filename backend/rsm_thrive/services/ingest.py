@@ -65,8 +65,30 @@ def extract_pdf_text(path):
     return "\n\n".join((page.extract_text() or "") for page in reader.pages)
 
 
+def embedding_text(chunk):
+    """What actually gets embedded for a chunk: its heading AND its text.
+
+    Embedding the text alone left table chunks effectively unretrievable.
+    Measured 2026-08-24 against the ingested corpus: the rebuilt Rady fee table
+    carried the amounts and payment deadlines correctly, but asking "what does
+    the MSBA cost per quarter and when is payment due?" ranked those chunks
+    outside the top FOURTEEN — a chunk whose text is `| $21,279.39 | ... |`
+    shares almost no lexical signal with a question, while the heading that
+    describes it ("Registration fees by quarter for ... Rady School of
+    Management") was stored as metadata and never embedded at all.
+
+    Prepending the heading is the cheap half of the fix; the keyword blend in
+    services/retrieval.py is the other half. Changing this changes every
+    stored vector, so re-run ingest_corpus after deploying it.
+    """
+    heading = (chunk.get("heading") or "").strip()
+    text = chunk.get("text") or ""
+    return f"{heading}\n\n{text}" if heading else text
+
+
 @transaction.atomic
-def ingest_document(source, title, kind, destinations, text, embeddings):
+def ingest_document(source, title, kind, destinations, text, embeddings,
+                    source_url=""):
     """Delete-and-recreate the document for `source`, then re-chunk and re-embed it.
 
     Because this deletes and recreates rather than diffing in place, chunks get
@@ -77,10 +99,11 @@ def ingest_document(source, title, kind, destinations, text, embeddings):
     """
     Document.objects.filter(source=source).delete()
     doc = Document.objects.create(source=source, title=title, kind=kind,
-                                  destinations=destinations)
+                                  destinations=destinations,
+                                  source_url=source_url or "")
     chunks = chunk_text(text)
     if chunks:
-        vectors = embeddings.embed([c["text"] for c in chunks])
+        vectors = embeddings.embed([embedding_text(c) for c in chunks])
         DocumentChunk.objects.bulk_create([
             DocumentChunk(document=doc, seq=seq, heading=c["heading"],
                           text=c["text"], embedding=vector)

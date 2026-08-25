@@ -1,0 +1,40 @@
+Source: https://studenthealth.ucsd.edu/services/immunizations/hpv-vaccine.html
+Fetched: 2026-08-24T06:22:25.165Z · fidelity 98.9 (band A) · pipeline rubric/1.2.0
+
+# HPV Vaccine
+
+## Human Papillomavirus (HPV) Vaccine
+
+Gardasil® was the first vaccine approved by the Food and Drug Administration (FDA) developed to protect against cervical cancer. As of 2017, Gardasil-9 has been the only HPV vaccine available in the United States and provides the most comprehensive protection. It protects against:
+
+-   HPV-16 & HPV-18. These are the two most common high-risk strains of HPV, causing 70% of cervical cancers, 90% of anal cancers, and many cancers that affect the throat and genitals.
+-   HPV-31, 33, 34, 45, 52 & 58. Combined, these strains cause an additional 20% of cervical cancers.
+-   HPV-6 & HPV-11. These strains cause 90% of genital warts and are considered low risk because they don’t cause cancer. However, genital warts are contagious and being vaccinated can prevent infection or exposing sexual partners.
+
+The age recommendations from the Centers for Disease Control (CDC) include:
+
+-   Children aged 11-12 – Given as part of the vaccination schedule for children; can be given to children as young as 9 years old; goal is to vaccinate children before they become sexually active and risk exposure.
+-   Adults up to and including age 26 – Includes adults who previously started but did not complete the series.
+-   Some adults up to and including age 45 – In 2018, the FDA expanded the recommendation to include adults; although the vaccine will not protect adults already exposed to HPV strains.
+
+It is not recommended to receive the vaccine during pregnancy, if an adverse reaction occurred after a previous dose of HPV vaccine, or during an acute illness.
+
+The HPV vaccine is given as a series of 2- or 3-doses based on the age at first dose. From age 9-15, it’s given as a 2-dose series given 6-12 months apart. From age 15 and up, it’s given as a 3-dose series with the second dose given 1-2 months after the initial dose, and the third dose given 6 months after the initial dose.
+
+An appointment is needed. Please schedule by going to [MyStudentChart](https://mystudentchart.ucsd.edu/shs/Authentication/Login?) > Menu > Visits > Schedule an Appointment > Nursing Immunization Visit, or [call Student Health Services Main Line](https://studenthealth.ucsd.edu/about/contact/index.html).
+
+UC SHIP covers the cost of the HPV vaccine when administered at SHS for all students who started the HPV series prior to turning age 27. See the [Cost of Services](https://studenthealth.ucsd.edu/services/cost/index.html) page for pricing.
+
+## Resources
+
+-   [Centers for Disease Control – HPV Vaccination](https://www.cdc.gov/hpv/vaccines/index.html)
+-   [Human Papillomavirus (HPV)](https://studenthealth.ucsd.edu/resources/health-topics/hpv/index.html)
+-   [Merck & Co. Patient Information (PDF)](https://www.merck.com/product/usa/pi_circulars/g/gardasil_9/gardasil_9_ppi.pdf)
+
+If you are currently sick or injured and need medical advice, [call the SHS Main Line](https://studenthealth.ucsd.edu/about/contact/index.html) to speak with a registered nurse who can provide guidance. This service is available 24/7 to all students at no cost. You may also message the nursing team during [regular hours](https://studenthealth.ucsd.edu/appointments/hours-location.html) via [MyStudentChart:](https://mystudentchart.ucsd.edu/) Menu > Student Health Ask-a-Nurse.
+
+## Key facts
+
+- These are the two most common high-risk strains of HPV, causing 70% of cervical cancers, 90% of anal cancers, and many cancers that affect the throat and genitals.
+- Combined, these strains cause an additional 20% of cervical cancers.
+- These strains cause 90% of genital warts and are considered low risk because they don’t cause cancer.

@@ -1,0 +1,20 @@
+[
+  {
+    "id": "fixture-drop-deadline",
+    "question": "When can I drop a course without a W?",
+    "must_contain": ["week"],
+    "must_refuse": false
+  },
+  {
+    "id": "fixture-drop-approval",
+    "question": "Who approves a drop after week two?",
+    "must_contain": ["program office"],
+    "must_refuse": false
+  },
+  {
+    "id": "fixture-off-topic-refusal",
+    "question": "Who won the Super Bowl in 2024?",
+    "must_contain": [],
+    "must_refuse": true
+  }
+]

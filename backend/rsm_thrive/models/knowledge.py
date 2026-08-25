@@ -11,6 +11,10 @@ class Document(models.Model):
     title = models.CharField(max_length=300)
     kind = models.CharField(max_length=16, choices=KIND_CHOICES)
     destinations = models.JSONField(default=list)  # which bots may retrieve it
+    # The public page this document came from, when there is one. Answers cite
+    # it so a student can open the authoritative source instead of taking the
+    # bot's word for a deadline. Blank for fixtures and hand-pasted material.
+    source_url = models.URLField(max_length=600, blank=True, default="")
     fetched_at = models.DateTimeField(default=timezone.now)
 
 

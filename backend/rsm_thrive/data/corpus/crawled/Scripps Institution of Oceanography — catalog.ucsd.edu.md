@@ -1,0 +1,50 @@
+Source: https://catalog.ucsd.edu/graduate/graduate-professional-schools/scripps-oceanography/index.html
+Fetched: 2026-08-24T07:28:33.969Z · fidelity 99.7 (band A) · pipeline rubric/1.2.0
+
+# Scripps Institution of Oceanography
+
+For more than a century, Scripps Institution of Oceanography has been dedicated to providing exceptional educational opportunities. As one of the world’s oldest, largest, and most important centers for marine, earth, and atmospheric science research and public service, Scripps Oceanography’s educational mission is to train its graduate students to perform cutting-edge research and to apply and communicate scientific knowledge for the benefit of society and the environment.
+
+Research at Scripps Oceanography encompasses physical, chemical, biological, geological, and geophysical studies of the oceans, earth, and atmosphere. Among the hundreds of research programs are studies of air-sea interaction, climate prediction, ocean dynamics, earthquakes and earth structure, the physiology, ecology, and genetics of marine organisms, marine chemistry, beach erosion, coastal pollution, coral reefs, the marine food chain, the geological history of the ocean basins, and many multidisciplinary aspects of global change, conservation, and the environment.
+
+The Scripps Oceanography graduate program has grown hand in hand with the research programs. Most graduate students are admitted as candidates for a PhD, which can be obtained in Oceanography, Marine Biology, or Earth Science. Master’s degrees in these same areas are also available; these may be based on either a master’s thesis or on course work. Other doctoral programs include a joint PhD program (with San Diego State University) in Earthquake Science and Applied Geophysics, and a concurrent PhD/MBA program with the Rady School of Management. Scripps also offers professional master of advanced studies degrees in Marine Biodiversity and Conservation, and in Climate Science and Policy. For UC San Diego undergraduates there is a contiguous five-year BS/MS in earth sciences and marine biology.
+
+Scripps Oceanography graduate education is divided into three programs: Climate, Ocean, and Atmosphere (consisting of the Applied Ocean Science, Climate Sciences, and Physical Oceanography curricular groups); Geosciences of the Earth, Oceans, and Planets (consisting of the Geosciences, Geophysics, and Marine Chemistry and Geochemistry curricular groups); and Ocean Biosciences (consisting of the Biological Oceanography and Marine Biology curricular groups and the Chemical Biology track). These academic programs are supported by approximately 110 professors, who are complemented by an academic staff of more than 125 scientists. With a graduate student enrollment of about 300, the student-faculty ratio is about three to one; consequently, classes tend to be small, and the student has the opportunity to work closely with his or her thesis adviser. Oceanography, marine biology, and earth sciences are interdisciplinary fields that allow for informal exchange and interaction on a variety of levels.
+
+Graduate students come to Scripps Oceanography with extremely varied interests and backgrounds—ecologists, geologists, chemists, biologists, physicists, engineers, and mathematicians from the United States and many foreign countries. Most students select positions as research assistants when they enter the program—a practice that not only gives them an early involvement with research, but also provides salaries and tuition remission. Since Scripps faculty teach undergraduate courses, teaching assistant positions are also available. The Scripps department guarantees five years of support to any student admitted to and remaining in the PhD program, as long as that student remains in good standing.
+
+### Facilities
+
+Scripps Oceanography was founded in 1903 as an independent biological research laboratory and became an integral part of the University of California in 1912. It now occupies 170 acres along the Pacific coastline, below the UC San Diego main campus. The waters immediately offshore are part of the California Marine Protected Areas and the institution has a 1,084-foot research pier that supports a scientific diving program, small boat deployment, and research and data collection. Two nearby parts of the UC Natural Reserve System, a rocky shore/subtidal canyon and a wetland, are used for education and research.
+
+Students at Scripps Oceanography have access to some of the nation’s most sophisticated, specialized laboratories and facilities for oceanographic and earth science studies covering a wide range of disciplines from biology and physiology to geophysics and atmospheric sciences. Scripps offers facilities for detailed experimental studies, including two large experimental aquarium rooms. The Marine Science Development Center is equipped with a comprehensive set of materials and machines to fabricate and test a wide range of research devices; its staff provide expert design and engineering assistance. The Hydraulics Laboratory has a 150-foot wind-wave channel, a 110-foot glass-walled wave channel, pressure testing vessels, and a temperature/pressure calibration facility; staff can assist in the design, fabrication, and calibration of a wide range of oceanographic instrumentation.
+
+Scripps Oceanography researchers operate and make available a variety of specialized instruments in biology, chemistry, geosciences, and oceanography. Computer resources include access to the San Diego Supercomputer Center. The various marine life and geological specimens housed in Scripps’s Oceanographic Collections comprise a vast and unique “library” available for scientific studies, both within Scripps and at other institutions, and are the world’s largest university-based oceanographic collections.
+
+Scripps Oceanography operates a fleet of oceanographic research vessels recognized worldwide for its outstanding capabilities, including the research vessels _Roger Revelle, Sally Ride,_ and _Robert Gordon Sproul_, and the research platform FLIP. These vessels, equipped with a variety of instruments to explore the oceans, constitute mobile UC San Diego laboratories and observatories that serve students and researchers from Scripps, UC San Diego, and institutions throughout the world. Research cruises range from short missions offshore San Diego to months-long expeditions into the most remote areas of the world’s oceans, and are supported by professional mariners, technicians, and shore-based staff in the Scripps Ship Operations and Marine Technical Support department. During a student’s tenure at Scripps, he or she will have the opportunity to go to sea on Scripps’ research vessels, and perhaps even organize a student-led expedition as part of the unique UC Ship Funds Program, which enables students to propose, plan, and execute their own research at sea aboard a Scripps-operated vessel.
+
+In addition to these large oceangoing vessels, Scripps Oceanography maintains a fleet of small boats that are deployable from Scripps Pier and other local areas. The small-boat program provides instruction, equipment, and operational support to faculty and students for research and instruction around our La Jolla location as well as at research sites worldwide.
+
+The Scripps Scientific Diving Program is the oldest, and one of the most active, science support program of its kind in the United States. The program trains and supports the university’s scientists, students, and technicians in the use of underwater techniques and technology necessary to safely conduct their research in underwater environments, from temperate and tropical reefs to open ocean to deep reef environments utilizing mixed-gas rebreathers. Scripps is a founding member of the American Academy of Underwater Sciences (AAUS) and remains a member in good standing. Adherence to AAUS standards facilitates collaboration between member institutions as qualifications are recognized through a process of reciprocity.
+
+California Sea Grant, which is headquartered at Scripps Oceanography, is part of the National Oceanic and Atmospheric Administration (NOAA) Sea Grant network and provides research funding, extension services, outreach, and education for coastal science and policy. The Southwest Fisheries Science Center (SWFSC), located on the Scripps campus, is one of thirty major laboratories and centers operated by the National Marine Fisheries Service, a component of NOAA.
+
+UC San Diego is unique in having a public aquarium and science center on campus. Birch Aquarium at Scripps provides ocean and earth sciences educational experiences for K–16 students and the public, and outreach opportunities for UC San Diego faculty, researchers, and graduate/undergraduate students. The aquarium includes more than sixty habitats, from the cold waters of the Pacific Northwest to the tropical waters of Mexico and the Western Pacific. Birch Aquarium at Scripps also has an interactive science center emphasizing research by Scripps and other UC San Diego scientists. Students may work at Birch Aquarium at Scripps as part-time employees, interns, or volunteers. Birch Aquarium at Scripps also serves as a living laboratory that can enhance a broad range of course work. For students interested in science communication, aquarium staff coordinate and teach a course focused on communicating ocean sciences to informal audiences.
+
+See “[Scripps Institution of Oceanography](https://catalog.ucsd.edu/curric/SIO-gr.html)” for further details on study programs, requirements, degrees, and courses.
+
+For additional information please contact:
+
+Scripps Institution of Oceanography  
+University of California San Diego  
+9500 Gilman Dr. # 0208  
+La Jolla, CA 92093-0208  
+(858) 534-1694  
+[siodept@sio.ucsd.edu](mailto:siodept@sio.ucsd.edu)
+
+[http://scripps.ucsd.edu/education/](http://scripps.ucsd.edu/education/)
+
+## Who to contact
+
+- (858) 534-1694
+- [siodept@sio.ucsd.edu](mailto:siodept@sio.ucsd.edu)
