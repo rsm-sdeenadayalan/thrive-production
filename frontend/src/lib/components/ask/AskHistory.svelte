@@ -94,7 +94,7 @@
 <nav
 	aria-label={copy.rail.historyLabel}
 	data-tone="sunken"
-	class="thrive-panel flex shrink-0 flex-col gap-1.5 p-2.5 xl:w-60"
+	class="thrive-panel flex shrink-0 flex-col gap-1.5 p-2.5 xl:h-full xl:min-h-0 xl:w-60"
 >
 	<div class="flex flex-wrap items-baseline justify-between gap-2">
 		<p class="thrive-eyebrow">{copy.rail.historyHeading}</p>
@@ -130,13 +130,13 @@
 		<p class="text-3xs text-muted-ink">{copy.rail.historyEmpty}</p>
 	{:else}
 		<!--
-			Scrolls inside itself. Above `xl` the cap is the chat's own height, so the
-			two columns end level and the chat cannot be pushed down by a long history;
-			below it the cap is short, because this sits ABOVE the chat there and the
-			composer is what the page is for.
+			Scrolls inside itself. Above `xl` it takes whatever height is left in the
+			rail after the heading, so the two columns end level and the chat cannot be
+			pushed down by a long history; below it the cap is short, because this sits
+			ABOVE the chat there and the composer is what the page is for.
 		-->
 		<ul
-			class="-mx-1 flex max-h-40 min-h-0 gap-2 overflow-x-auto overflow-y-hidden px-1 pb-1 xl:mx-0 xl:max-h-[var(--thrive-chat-height)] xl:flex-col xl:gap-1 xl:overflow-x-hidden xl:overflow-y-auto xl:px-0"
+			class="-mx-1 flex max-h-40 min-h-0 gap-2 overflow-x-auto overflow-y-hidden px-1 pb-1 xl:mx-0 xl:max-h-none xl:flex-1 xl:flex-col xl:gap-1 xl:overflow-x-hidden xl:overflow-y-auto xl:px-0"
 		>
 			{#each visible as conversation (conversation.id)}
 				{@const open = conversation.id === openId}

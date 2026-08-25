@@ -447,28 +447,35 @@
 {/snippet}
 
 <!--
-	The height above `xl` is what makes the LOG the scroller rather than the
-	document. See `--thrive-chat-height` in `app.css` for why it is a fixed panel
-	and not a viewport calculation, and why a phone deliberately does not get one.
+	`h-full` above `xl` is what makes the LOG the scroller rather than the
+	document: the height it fills comes from the section (`--thrive-ask-height` in
+	`app.css`), which is why this is `h-full` rather than a number of its own — the
+	panel used to carry a flat 34rem and stopped two-thirds of the way down a tall
+	screen. A phone deliberately gets no height at all; see the token's note.
 
-	`flex-1` IS GATED ON `xl`, and that is load-bearing rather than fussy.
+	`flex-1` starts at `lg`, and what it governs changes with the axis.
 
-	Above `xl` this sits in a `flex-row` beside the history rail, where `flex-1`
-	governs WIDTH and is exactly what makes the chat take the room the rail does
-	not. Below `xl` it is a child of a `flex-col`, where `flex-1` would govern
-	HEIGHT instead: `flex-basis: 0%` plus grow silently beats the `h-` beside it, so
-	the panel would take its content's height, the log would never overflow, and the
-	document would scroll in its place.
+	Between `lg` and `xl` this is a child of a `flex-col` whose height is now
+	definite (the section owns it), so `flex-1` governs HEIGHT and is exactly what
+	makes the chat fill the room the header and the history strip do not take.
+	Above `xl` the parent turns into a `flex-row`, `flex-1` governs WIDTH instead,
+	and `h-full` supplies the height.
 
-	That exact mistake shipped for one commit when the rail was removed and this
-	became a column child with an ungated `flex-1`. `check:interaction` caught it by
-	SKIPPING its own keyboard-scroll assertion — "could not make the log overflow" —
-	which is the quietest possible failure and still louder than the layout, which
-	looked fine.
+	This was gated on `xl` for a while, back when the panel carried its own fixed
+	height: a column child with an ungated `flex-1` has `flex-basis: 0%` plus grow,
+	which silently beats an `h-` beside it, so the panel took its content's height,
+	the log never overflowed, and the document scrolled in its place. That is only
+	a hazard when the two rules DISAGREE — with the height coming from the parent
+	instead, growing to fill it is the whole point.
+
+	That mistake shipped once, and `check:interaction` caught it by SKIPPING its own
+	keyboard-scroll assertion — "could not make the log overflow" — which is the
+	quietest possible failure and still louder than the layout, which looked fine.
+	Worth knowing that a skip is the signal here, not a failure.
 -->
 <section
 	aria-labelledby="ask-destination-heading"
-	class="thrive-panel flex min-h-0 min-w-0 flex-col p-0 xl:h-[var(--thrive-chat-height)] xl:flex-1"
+	class="thrive-panel flex min-h-0 min-w-0 flex-col p-0 lg:min-h-0 lg:flex-1 xl:h-full"
 >
 	<div class="border-b border-line px-3 py-2.5">
 		<h2 id="ask-destination-heading" class="text-base font-medium text-ink">

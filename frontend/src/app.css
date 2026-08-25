@@ -423,25 +423,43 @@
      integers JavaScript slices with, so they cannot be CSS. */
   --thrive-card-body-cap: 18.75rem;
 
-  /* Ask THRIVE's chat window, above `xl` only.
+  /* Ask THRIVE's whole SECTION height, above `lg` only.
 
-     A definite height is what makes the LOG the scroller instead of the
-     document. Without it the log's `flex-1 min-h-0` resolves to its own content
-     -- there is no height to divide up -- so the page grows, the composer walks
-     off the bottom of the screen as the conversation gets longer, and the log's
-     `tabindex` guards an overflow that never happens.
+     A definite height somewhere up the spine is what makes the LOG the scroller
+     instead of the document. Without one the log's `flex-1 min-h-0` resolves to
+     its own content -- there is no height to divide up -- so the page grows, the
+     composer walks off the bottom of the screen as the conversation gets longer,
+     and the log's `tabindex` guards an overflow that never happens.
 
-     34rem, not a viewport calculation. `calc(100dvh - topbar - gutters -
-     header)` was the first shape and it is brittle in two directions: the header
-     above it wraps to two lines at some widths, and `dvh` moves under a mobile
-     browser's collapsing chrome. A fixed panel that always fits the shortest
-     desktop viewport this app targets (1052px) is the calmer answer, and the
-     document is allowed to scroll past it the way it does past any other panel.
+     This used to be a flat 34rem ON THE PANEL, which left the chat ending
+     two-thirds of the way down a 1200px screen with a field of empty page under
+     it. It fills the window now.
 
-     Below `xl` this is deliberately NOT applied: on a phone the whole page
-     scrolling is the right behaviour, and a 544px box inside a 812px screen
-     would give a student two nested scrollbars to fight. */
-  --thrive-chat-height: 34rem;
+     The height lives on the SECTION and the panel takes what is left of it,
+     which is what makes a viewport calculation safe here. Pinning the panel
+     itself meant subtracting the header, and the header's height is
+     content-dependent -- it wraps to two lines at some widths -- so the
+     subtraction was a guess that was wrong at exactly those widths. As a
+     section height there is nothing to guess: the header is a `shrink-0` child
+     INSIDE this box and takes what it needs, the chat row is `flex-1 min-h-0`
+     and takes the rest, and a wrapped header shortens the chat by exactly the
+     line it grew by.
+
+     So the only terms are fixed tokens: the top bar, plus `main`'s own vertical
+     padding (`lg:pt-3` = 0.75rem and `lg:pb-page-bottom`).
+
+     `dvh` rather than `vh` for the mobile-chrome case, though it barely matters
+     here: this is gated on `lg`, and below it the whole page scrolling is the
+     right behaviour -- a fixed box inside an 812px screen would give a student
+     two nested scrollbars to fight.
+
+     `lg` and not `xl`, because `xl` (1280px) left every 1024-1279px laptop with
+     the dead field of page this token exists to remove. Note that `check-layout`
+     only samples 1512 and a phone, so that band has no gate standing over it and
+     was checked in a browser by hand. */
+  --thrive-ask-height: calc(
+    100dvh - var(--thrive-topbar-height) - 0.75rem - var(--thrive-page-gutter-bottom)
+  );
 
   /* The chat log's LINE LENGTH, which is a different thing from its width.
 

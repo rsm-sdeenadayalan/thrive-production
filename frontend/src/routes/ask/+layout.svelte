@@ -70,10 +70,19 @@
 	content and the log's own `overflow-y-auto` never engages — the document grows
 	instead, which is precisely the shape `check:layout` exists to catch.
 -->
-<div class="mx-auto flex w-full max-w-page min-h-0 flex-col gap-4 lg:gap-3">
+<!--
+	The height above `xl` is what lets the chat fill the window instead of
+	stopping two-thirds down it. See `--thrive-ask-height` in `app.css` for why it
+	is measured HERE and not on the panel: the header inside it is `shrink-0` and
+	takes what it needs, so a header that wraps shortens the chat rather than
+	overflowing the screen — which is what a panel-level calculation got wrong.
+-->
+<div
+	class="mx-auto flex w-full max-w-page min-h-0 flex-col gap-4 lg:h-[var(--thrive-ask-height)] lg:gap-3"
+>
 	<!-- The section's one `h1`. The chat window's title is an `h2` under it: there
 	     is one page here and the destination is a region within it. -->
-	<header>
+	<header class="shrink-0">
 		<p class="thrive-eyebrow">{copy.eyebrow}</p>
 		<h1 class="mt-1 text-3xl font-bold text-ink">{copy.title}</h1>
 		<p class="mt-1.5 max-w-measure text-sm text-body">
@@ -87,14 +96,19 @@
 	<!--
 		The history rail and the chat, side by side above `xl`.
 
-		`items-start` rather than stretch: the two are independent scroll containers
-		with their own heights, and stretching would make the shorter one grow to the
-		taller and defeat both caps.
+		`items-stretch` and `flex-1`: both columns now run the full height of the
+		section, so they end level and the chat reaches the bottom of the window.
+		This was `items-start` while the panel carried a fixed 34rem of its own —
+		stretching two independently-capped boxes would have grown the shorter to
+		the taller and defeated both caps. With the height owned by the section
+		there is one cap, they share it, and each still scrolls inside itself.
 
 		Below `xl` this stacks, and `AskHistory` flips to a horizontal strip — see the
 		note there for why two rails plus a chat cannot fit a phone.
 	-->
-	<div class="flex min-h-0 flex-col gap-4 lg:gap-3 xl:flex-row xl:items-start xl:gap-3">
+	<div
+		class="flex min-h-0 flex-col gap-4 lg:min-h-0 lg:flex-1 lg:gap-3 xl:flex-row xl:items-stretch xl:gap-3"
+	>
 		<AskHistory conversations={data.conversations} {destination} />
 
 		{@render children()}
