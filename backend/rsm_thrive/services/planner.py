@@ -1225,12 +1225,21 @@ def rating_form_for(step):
         "scale": [{"value": s["value"], "label": s["label"], "help": s["help"]}
                   for s in SKILL_SCALE],
         "default": DEFAULT_SKILL_RATING,
+        # camelCase ON PURPOSE, and the one place Python emits it. This dict is
+        # stored verbatim in ChatMessage.form and served straight through the
+        # serializer, so the key IS the wire name the frontend reads. Renaming
+        # it to snake_case "for consistency" would silently unlabel the button.
         "submitLabel": "Submit ratings",
     }
 
 
 def compose_rating_message(ratings):
     """The message a submitted rating form sends, as a student would phrase it.
+
+    NO PRODUCTION CALLER TODAY: the browser composes this same sentence in
+    ChatWindow.svelte, because the form is submitted client-side. The two
+    formats are character-identical and this one is the tested copy — keep
+    them in step, and prefer calling this from any future server-side path.
 
     Words, not a payload: the transcript then reads like something a person
     said, and the extractor sees the same kind of input whether the student
