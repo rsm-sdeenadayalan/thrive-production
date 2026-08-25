@@ -107,14 +107,19 @@ describe("the provider surface", () => {
     "setCurrentVersion",
     "getConversations",
     "getConversation",
+    "deleteConversation",
   ] as const;
 
-  it("exports all 27 providers and SlotUnavailableError from $lib/data", async () => {
+  it("exports all 28 providers and SlotUnavailableError from $lib/data", async () => {
     const data = await freshData();
 
     // 25 through Phase 7; the two Ask THRIVE conversation reads landed in
     // Phase 9. The literal is the pin -- widening the seam should be a decision.
-    expect(PROVIDERS).toHaveLength(27);
+    // `deleteConversation` is the 28th, and it is the first WRITE on this
+    // surface to get a delegator: the composer's writes deliberately have none
+    // (mock mode has nothing to persist to), but a delete removes a row from a
+    // list mock mode does render, so it needs a mock counterpart to be honest.
+    expect(PROVIDERS).toHaveLength(28);
     for (const name of PROVIDERS) {
       expect(typeof data[name], `${name} is missing from the barrel`).toBe(
         "function",
@@ -192,9 +197,10 @@ describe("the provider surface", () => {
       data.setCurrentVersion("res-001"),
       data.getConversations(),
       data.getConversation("conv-001"),
+      data.deleteConversation("conv-does-not-exist"),
     ];
 
-    expect(calls).toHaveLength(27);
+    expect(calls).toHaveLength(28);
     for (const call of calls) {
       expect(call).toBeInstanceOf(Promise);
     }
@@ -954,5 +960,53 @@ describe("the mock latency", () => {
 
     latency.setMockLatencyMs(-5);
     expect(latency.mockLatencyMs()).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Deleting a saved conversation
+// ---------------------------------------------------------------------------
+
+describe("deleteConversation", () => {
+  it("removes the conversation from the list it came from", async () => {
+    const data = await freshData();
+
+    const before = await data.getConversations();
+    const target = before[0];
+
+    await data.deleteConversation(target.id);
+    const after = await data.getConversations();
+
+    expect(before.map((c) => c.id)).toContain(target.id);
+    expect(after.map((c) => c.id)).not.toContain(target.id);
+    expect(after).toHaveLength(before.length - 1);
+  });
+
+  it("makes the deleted conversation unreadable, so its URL 404s", async () => {
+    const data = await freshData();
+
+    const [target] = await data.getConversations();
+    await data.deleteConversation(target.id);
+
+    // `load` turns this null into the 404 a stale link deserves.
+    expect(await data.getConversation(target.id)).toBeNull();
+  });
+
+  it("leaves the other conversations alone", async () => {
+    const data = await freshData();
+
+    const before = await data.getConversations();
+    await data.deleteConversation(before[0].id);
+    const after = await data.getConversations();
+
+    expect(after.map((c) => c.id)).toEqual(before.slice(1).map((c) => c.id));
+  });
+
+  it("is quiet about an id that was never there", async () => {
+    const data = await freshData();
+
+    // A double submit or a stale tab. The student asked for it to not exist,
+    // and it does not.
+    await expect(data.deleteConversation("conv-nope")).resolves.toBeUndefined();
   });
 });

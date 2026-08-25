@@ -165,6 +165,25 @@ export function sendConversationMessage(
 	);
 }
 
+/**
+ * Throw a saved conversation away, messages and all.
+ *
+ * A conversation that is already gone resolves rather than throwing: the
+ * student asked for it to not exist, and it does not. That covers the double
+ * submit and the stale tab, neither of which is an error worth showing.
+ */
+export async function deleteConversation(conversationId: string): Promise<void> {
+	try {
+		await apiFetch<{ deleted: string }>(
+			`/conversations/${encodeURIComponent(conversationId)}`,
+			{ method: "DELETE" },
+		);
+	} catch (error) {
+		if (error instanceof ApiError && error.status === 404) return;
+		throw error;
+	}
+}
+
 export async function bookAppointment(
 	slotId: string,
 	reason: string,

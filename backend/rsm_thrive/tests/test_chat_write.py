@@ -175,7 +175,75 @@ class TestMethodGuards:
         assert client.get("/api/thrive/conversations").status_code == 200
         assert client.delete("/api/thrive/conversations").status_code == 405
 
-    def test_conversation_detail_delete_is_405(self, client, student):
+    def test_conversation_detail_put_is_405(self, client, student):
+        # DELETE is a real verb on this route now (see TestDeleteConversation);
+        # everything else still is not.
         conv = Conversation.objects.create(user=student, destination="career",
                                            title="t")
-        assert client.delete(f"/api/thrive/conversations/conv-{conv.pk}").status_code == 405
+        assert client.put(f"/api/thrive/conversations/conv-{conv.pk}").status_code == 405
+
+
+class TestDeleteConversation:
+    """A student can throw a saved conversation away."""
+
+    def test_it_deletes_the_conversation_and_its_messages(self, client, student):
+        conv = Conversation.objects.create(user=student, destination="career",
+                                           title="t")
+        ChatMessage.objects.create(conversation=conv, role="student", body="hi")
+        ChatMessage.objects.create(conversation=conv, role="thrive", body="hello")
+
+        response = client.delete(f"/api/thrive/conversations/conv-{conv.pk}")
+
+        assert response.status_code == 200
+        assert not Conversation.objects.filter(pk=conv.pk).exists()
+        assert ChatMessage.objects.filter(conversation_id=conv.pk).count() == 0
+
+    def test_it_takes_this_conversations_planner_session_with_it(self, client, student):
+        from rsm_thrive.models import PlannerSession
+
+        conv = Conversation.objects.create(user=student, destination="courses",
+                                           title="17 month")
+        PlannerSession.objects.create(conversation=conv, intake={"track": "17 month"})
+
+        client.delete(f"/api/thrive/conversations/conv-{conv.pk}")
+
+        assert PlannerSession.objects.count() == 0
+
+    def test_it_leaves_the_students_committed_plan_alone(self, client, student):
+        # The plan is keyed to the STUDENT and served by /api/thrive/plan.
+        # Tidying the chat list is not a request to throw a plan of study away.
+        from rsm_thrive.models import CoursePlan
+
+        CoursePlan.objects.create(user=student, track="17 month",
+                                  intake={"track": "17 month"})
+        conv = Conversation.objects.create(user=student, destination="courses",
+                                           title="17 month")
+
+        client.delete(f"/api/thrive/conversations/conv-{conv.pk}")
+
+        assert CoursePlan.objects.filter(user=student).exists()
+
+    def test_another_students_conversation_is_a_404_and_survives(self, client, student):
+        # A 404 rather than a 403: a distinct "forbidden" would confirm that
+        # someone else's conversation id is real.
+        stranger = User.objects.create_user("other")
+        theirs = Conversation.objects.create(user=stranger, destination="career",
+                                             title="theirs")
+
+        response = client.delete(f"/api/thrive/conversations/conv-{theirs.pk}")
+
+        assert response.status_code == 404
+        assert Conversation.objects.filter(pk=theirs.pk).exists()
+
+    def test_deleting_something_that_is_not_there_is_a_404(self, client, student):
+        assert client.delete("/api/thrive/conversations/conv-99999").status_code == 404
+
+    def test_it_requires_login(self, client):
+        user = User.objects.create_user("someone")
+        conv = Conversation.objects.create(user=user, destination="career",
+                                           title="t")
+
+        response = client.delete(f"/api/thrive/conversations/conv-{conv.pk}")
+
+        assert response.status_code in (401, 403)
+        assert Conversation.objects.filter(pk=conv.pk).exists()

@@ -1216,7 +1216,25 @@ export const messages = {
 			messageCount: (count: number) => (count === 1 ? '1 message' : `${count} messages`),
 			newConversation: 'New conversation',
 			/** The rail's own accessible name for a history entry. */
-			openConversation: (title: string, when: string) => `${title}, ${when}`
+			openConversation: (title: string, when: string) => `${title}, ${when}`,
+
+			/**
+			 * Deleting a saved conversation.
+			 *
+			 * The button names the conversation it would delete, because the rail
+			 * holds a column of identical icons and "Delete" alone tells a screen
+			 * reader user nothing about which one they are on.
+			 *
+			 * The confirm text says what does not come back. Deleting takes the
+			 * messages with it, and a student who reads "Delete this conversation?"
+			 * could reasonably think they are only clearing a row from a list.
+			 */
+			deleteConversation: (title: string) => `Delete ${title}`,
+			deleteConfirm: (title: string) =>
+				`Delete “${title}”? The messages in it are deleted too, and this cannot be undone.`,
+			deleteAction: 'Delete',
+			deleteKeep: 'Keep',
+			deleteFailed: 'That conversation could not be deleted. It is still here — try again.'
 		},
 
 		history: {

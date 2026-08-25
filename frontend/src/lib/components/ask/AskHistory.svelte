@@ -1,8 +1,12 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
 	import MessageSquarePlus from '@lucide/svelte/icons/message-square-plus';
+	import Trash2 from '@lucide/svelte/icons/trash-2';
 
 	import { conversationsFor, type ConversationView } from '$lib/ask';
+	import Button from '$lib/components/ui/Button.svelte';
 	import { messages } from '$lib/messages';
 	import type { AskDestination } from '$lib/data';
 	import { cn } from '$lib/utils';
@@ -72,6 +76,25 @@
 	 * what is current, with nothing to synchronise.
 	 */
 	const openId = $derived(page.url.searchParams.get('c'));
+
+	/**
+	 * Which row is asking "are you sure", if any.
+	 *
+	 * A two-step delete rather than a one-click one. These rows are small, dense
+	 * and identical-looking, the strip below `xl` puts them under a thumb, and
+	 * deleting takes the messages with it — a mis-tap here is not recoverable.
+	 *
+	 * Inline in the row rather than a native `confirm()`: nothing else in this app
+	 * uses one, and a blocking browser dialog cannot say WHICH conversation is
+	 * about to go in the app's own words.
+	 */
+	let confirmingId = $state<string | null>(null);
+
+	/** Set while a delete is in flight, so the button can say so and lock. */
+	let deletingId = $state<string | null>(null);
+
+	/** Shown when the server refused. Cleared on the next attempt. */
+	let deleteError = $state<string | null>(null);
 </script>
 
 <!--
@@ -121,6 +144,17 @@
 		</a>
 	</div>
 
+	{#if deleteError}
+		<!-- `role="alert"`: it appears in response to something the student just
+		     did, and it has to be announced rather than waited for. -->
+		<p
+			role="alert"
+			class="rounded-sm border border-urgent bg-urgent-soft px-2 py-1 text-3xs text-urgent"
+		>
+			{deleteError}
+		</p>
+	{/if}
+
 	{#if visible.length === 0}
 		<!--
 			An empty state that says what WOULD be here, not "no data". This is the
@@ -141,7 +175,7 @@
 			{#each visible as conversation (conversation.id)}
 				{@const open = conversation.id === openId}
 
-				<li class="w-56 shrink-0 xl:w-auto xl:shrink">
+				<li class="relative w-56 shrink-0 xl:w-auto xl:shrink">
 					<a
 						href={`/ask/${destination}?c=${conversation.id}`}
 						aria-current={open ? 'page' : undefined}
@@ -175,7 +209,12 @@
 								: 'border-line border-l-line bg-surface hover:border-line-strong hover:bg-primary-soft'
 						)}
 					>
-						<span class="line-clamp-2 text-2xs font-medium text-ink">{conversation.title}</span>
+						<!-- `pr-9` clears the delete button positioned over the row's
+						     trailing edge, so a long title wraps before it rather than
+						     running underneath it. -->
+						<span class="line-clamp-2 pr-9 text-2xs font-medium text-ink"
+							>{conversation.title}</span
+						>
 
 						<!-- When and how long. Both values, both on the numeric face, so a
 						     column of them lines up. -->
@@ -185,6 +224,89 @@
 							)}
 						</span>
 					</a>
+
+					<!--
+						The delete control, OUTSIDE the anchor. A button inside a link is
+						invalid HTML and the browser resolves it by activating the link, so
+						the two have to be siblings; the row is `relative` and this is
+						positioned over its trailing edge.
+
+						`pr-11` on the title above is what keeps a long title from running
+						underneath it.
+					-->
+					{#if confirmingId !== conversation.id}
+						<button
+							type="button"
+							onclick={() => {
+								confirmingId = conversation.id;
+								deleteError = null;
+							}}
+							aria-label={copy.rail.deleteConversation(conversation.title)}
+							class="absolute top-0 right-0 flex size-11 items-center justify-center rounded-md text-muted-ink hover:text-ink"
+						>
+							<Trash2 aria-hidden="true" class="size-3.5" />
+						</button>
+					{:else}
+						<!--
+							The confirm step, drawn OVER the row rather than under it: the
+							rail is a fixed-height scroller and a row that grew would push
+							its neighbours around while the student was reading it.
+						-->
+						<div
+							class="absolute inset-0 z-10 flex flex-col justify-center gap-1 rounded-md border border-line-strong bg-surface p-1.5"
+						>
+							<p class="text-3xs text-body">{copy.rail.deleteConfirm(conversation.title)}</p>
+							<div class="flex gap-1">
+								<form
+									method="POST"
+									action={`/ask/${destination}?/deleteConversation`}
+									use:enhance={() => {
+										deletingId = conversation.id;
+										deleteError = null;
+
+										return async ({ result }) => {
+											deletingId = null;
+
+											if (result.type === 'failure' || result.type === 'error') {
+												// Never silent: the row is still there, and saying so
+												// beats a button that appears to have done nothing.
+												deleteError = copy.rail.deleteFailed;
+												confirmingId = null;
+												return;
+											}
+
+											confirmingId = null;
+											// A redirect means the open conversation was the one
+											// deleted; the browser is already going somewhere and
+											// invalidating on top of it would race that navigation.
+											if (result.type !== 'redirect') await invalidateAll();
+										};
+									}}
+								>
+									<input type="hidden" name="conversationId" value={conversation.id} />
+									<Button
+										type="submit"
+										variant="danger"
+										size="sm"
+										disabled={deletingId === conversation.id}
+										class="min-h-11"
+									>
+										{copy.rail.deleteAction}
+									</Button>
+								</form>
+
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									class="min-h-11"
+									onclick={() => (confirmingId = null)}
+								>
+									{copy.rail.deleteKeep}
+								</Button>
+							</div>
+						</div>
+					{/if}
 				</li>
 			{/each}
 		</ul>

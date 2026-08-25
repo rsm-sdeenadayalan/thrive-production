@@ -564,8 +564,28 @@ function mockSetCurrentVersion(
  * per-destination provider would mean three round trips to render one rail that
  * shows a count for each.
  */
+/**
+ * Conversations deleted in mock mode, by id.
+ *
+ * A module-scope set shared by every importer and wiped on restart, the same
+ * shape as `jobInteractions` and the booking store above (and the reason
+ * `providers.spec.ts` reaches for `freshData()` rather than a reset export).
+ *
+ * It exists so the control does not lie offline. `buildMockConversations()`
+ * rebuilds from fixtures on every call, so without somewhere to record the
+ * deletion the row would reappear on the next load — a delete button that
+ * visibly does nothing is worse than one that is absent.
+ */
+const deletedConversations = new Set<string>();
+
+function mockDeleteConversation(conversationId: string): Promise<void> {
+  deletedConversations.add(conversationId);
+  return resolveAfterDelay(undefined);
+}
+
 function mockGetConversations(): Promise<Conversation[]> {
   const conversations = buildMockConversations()
+    .filter((conversation) => !deletedConversations.has(conversation.id))
     .slice()
     .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
     // Copies out, and the message arrays too: a shallow spread would hand the
@@ -964,6 +984,22 @@ export function setCurrentVersion(
 
 export function getConversations(): Promise<Conversation[]> {
   return apiEnabled() ? api.getConversations() : mockGetConversations();
+}
+
+/**
+ * Delete a saved conversation.
+ *
+ * Unlike the composer's write providers, this one DOES have a mock
+ * counterpart. Sending a message offline has nothing to persist to, so
+ * `ChatWindow` fakes the exchange in component state and says so on screen.
+ * Deleting is different: the list it removes a row from is rendered offline
+ * too, so a button that left the row sitting there would be a control visibly
+ * not working rather than an honest limitation.
+ */
+export function deleteConversation(conversationId: string): Promise<void> {
+  return apiEnabled()
+    ? api.deleteConversation(conversationId)
+    : mockDeleteConversation(conversationId);
 }
 
 /**

@@ -120,12 +120,29 @@ def _own_conversation(user, conversation_id):
 
 
 @api_login_required
-@require_http_methods(["GET"])
+@require_http_methods(["GET", "DELETE"])
 def conversation(request, conversation_id):
     row = _own_conversation(request.user, conversation_id)
     if row is None:
         return json_error("unknown_conversation",
                           f"No conversation {conversation_id}.", 404)
+    if request.method == "DELETE":
+        # `_own_conversation` filters on `user`, so a conversation belonging to
+        # someone else is a 404 above and never reaches this line -- the same
+        # answer a conversation that does not exist gets, which is deliberate:
+        # a distinct 403 would confirm that some other student's id is real.
+        #
+        # The messages and this conversation's `PlannerSession` go with it
+        # through their cascades -- a student who deletes a conversation means
+        # the exchange, not just its row in the list.
+        #
+        # The student's committed `CoursePlan` does NOT go, and that is not an
+        # oversight: it is keyed to the USER rather than to a conversation, it
+        # is what `/api/thrive/plan` serves, and it outlives the chat that
+        # happened to build it. Tidying the chat list is not a request to throw
+        # away a plan of study.
+        row.delete()
+        return json_ok({"deleted": conversation_id})
     return json_ok(conversation_payload(row))
 
 

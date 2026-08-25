@@ -1,11 +1,11 @@
-import { error } from "@sveltejs/kit";
+import { error, fail, redirect } from "@sveltejs/kit";
 
 import { isAskDestination, toConversationDetailView } from "$lib/ask";
 import { apiEnabled } from "$lib/data/api/client";
-import { getConversation, getConversationStarter } from "$lib/data";
+import { deleteConversation, getConversation, getConversationStarter } from "$lib/data";
 import { messages } from "$lib/messages";
 import { dayKeyOf } from "$lib/schedule";
-import type { PageServerLoad } from "./$types";
+import type { Actions, PageServerLoad } from "./$types";
 
 /**
  * One destination, and optionally one conversation open inside it.
@@ -98,3 +98,52 @@ export const load: PageServerLoad = async ({ params, url }) => {
 		starter: null,
 	};
 };
+
+/**
+ * Deleting a saved conversation.
+ *
+ * A form action rather than a `fetch` from the rail, for the reason every other
+ * write in this app is one: it works before the client bundle has loaded and
+ * without JavaScript at all, and the redirect below is then the browser's own
+ * rather than something the component has to remember to do.
+ *
+ * The action lives on the PAGE while the control lives in the LAYOUT, which is
+ * fine and is why the form posts to an explicit `?/deleteConversation` URL: a
+ * layout has no actions of its own, and the destination page is always the one
+ * underneath it.
+ */
+export const actions = {
+	deleteConversation: async ({ request, params, url }) => {
+		if (!isAskDestination(params.destination)) {
+			error(404, messages.ask.notFound.destination);
+		}
+
+		const data = await request.formData();
+		const conversationId = String(data.get("conversationId") ?? "");
+		if (!conversationId) {
+			return fail(400, { deleteFailed: true });
+		}
+
+		try {
+			await deleteConversation(conversationId);
+		} catch {
+			// The rail still shows the row, which is the truth: it is still there.
+			return fail(500, { deleteFailed: true });
+		}
+
+		/*
+		 * If the conversation just deleted is the one on screen, the URL now points
+		 * at something that does not exist and `load` would 404 on it. Land on the
+		 * bare destination instead -- a new conversation, which is what a student
+		 * who just threw this one away is ready for.
+		 *
+		 * Deleting any OTHER row leaves the open one open: the action returns, the
+		 * page invalidates, and only the rail changes.
+		 */
+		if (url.searchParams.get("c") === conversationId) {
+			redirect(303, `/ask/${params.destination}`);
+		}
+
+		return { deleted: conversationId };
+	}
+} satisfies Actions;
