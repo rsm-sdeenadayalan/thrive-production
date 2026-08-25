@@ -12,6 +12,7 @@ import type {
 	Assignment,
 	AskDestination,
 	Conversation,
+	ConversationStarter,
 	Course,
 	CourseRequest,
 	CourseRequestInput,
@@ -95,6 +96,31 @@ export function getMyAppointments(): Promise<Appointment[]> {
 
 export function getConversations(): Promise<Conversation[]> {
 	return apiFetch<Conversation[]>("/conversations");
+}
+
+/**
+ * The opening prompt for a destination, or null when it has none.
+ *
+ * Comes from the backend rather than being written in the frontend so the
+ * question a student is opened on and the question they are re-asked are the
+ * same string from the same place. Only the course recommender has a script;
+ * the other destinations return null and keep their existing empty state.
+ *
+ * A failure here is not worth a broken page: the empty state is a perfectly
+ * good fallback, so this swallows the error and returns null.
+ */
+export async function getConversationStarter(
+	destination: string,
+): Promise<ConversationStarter | null> {
+	if (destination !== "courses") return null;
+	try {
+		const body = await apiFetch<{ starter: ConversationStarter | null }>(
+			"/plan/intake",
+		);
+		return body.starter ?? null;
+	} catch {
+		return null;
+	}
 }
 
 export async function getConversation(

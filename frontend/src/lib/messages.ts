@@ -1195,6 +1195,21 @@ export const messages = {
 			thriveSaid: 'THRIVE said: ',
 
 			/**
+			 * Names the row of choice buttons.
+			 *
+			 * "Suggested answers" rather than "options": they are shortcuts for
+			 * answers a student could equally type, and calling them options would
+			 * imply the question only accepts these.
+			 */
+			quickRepliesLabel: 'Suggested answers',
+			quickRepliesHint: 'Tap one, or type your own answer.',
+
+			/** The rating form on the skills step. */
+			ratingLabel: 'Rate yourself, 1 to 5',
+			ratingHint: 'Every row starts at 3 — move the ones that are wrong, then submit.',
+			ratingRowLabel: (row: string) => `${row}, 1 to 5`,
+
+			/**
 			 * The reply, and it says plainly that it cannot answer.
 			 *
 			 * A placeholder that mimics a real answer teaches a student to trust

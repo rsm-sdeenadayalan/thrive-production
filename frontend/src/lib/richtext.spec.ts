@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseInline, parseRichText, type RichBlock } from "$lib/richtext";
+import { parseInline, parseRichText, type InlineSpan, type RichBlock } from "$lib/richtext";
 
 /**
  * The rich-text parser's vocabulary, pinned span by span and block by
@@ -14,13 +14,22 @@ import { parseInline, parseRichText, type RichBlock } from "$lib/richtext";
  * different bug, in a different file.
  */
 
-function textOf(spans: { kind: string; text: string }[]) {
-  return spans.map((span) => `${span.kind}:${span.text}`);
+/** The visible text of a span tree, ignoring which kind carried it. */
+function flatten(spans: InlineSpan[]): string {
+  return spans.map((s) => (s.kind === "bold" ? flatten(s.spans) : s.text)).join("");
+}
+
+function textOf(spans: InlineSpan[]): string[] {
+  return spans.map((span) =>
+    span.kind === "bold" ? `bold:${flatten(span.spans)}` : `${span.kind}:${span.text}`,
+  );
 }
 
 describe("parseInline", () => {
   it("reads a bold span", () => {
-    expect(parseInline("**CSE 251A**")).toEqual([{ kind: "bold", text: "CSE 251A" }]);
+    expect(parseInline("**CSE 251A**")).toEqual([
+      { kind: "bold", spans: [{ kind: "text", text: "CSE 251A" }] },
+    ]);
   });
 
   it("reads bold in the middle of plain text", () => {
@@ -70,6 +79,264 @@ describe("parseInline", () => {
 
   it("returns nothing for an empty line", () => {
     expect(parseInline("")).toEqual([]);
+  });
+});
+
+describe("parseInline links", () => {
+  it("reads a link as a link span carrying its href", () => {
+    expect(parseInline("[Quarterly Timeline](https://students.ucsd.edu/x.html)")).toEqual([
+      {
+        kind: "link",
+        text: "Quarterly Timeline",
+        href: "https://students.ucsd.edu/x.html",
+      },
+    ]);
+  });
+
+  it("keeps parentheses that belong to the page title inside the label", () => {
+    // A real corpus title. The label is scanned to its `]` before the href is
+    // read, which is the only reason these parens do not truncate it.
+    const spans = parseInline(
+      "[How to Drop a Class (Graduate Students) — students.ucsd.edu](https://students.ucsd.edu/drop.html)",
+    );
+    expect(spans).toEqual([
+      {
+        kind: "link",
+        text: "How to Drop a Class (Graduate Students) — students.ucsd.edu",
+        href: "https://students.ucsd.edu/drop.html",
+      },
+    ]);
+  });
+
+  it("reads the sources line the backend actually appends", () => {
+    // `append_sources` in backend/rsm_thrive/services/bots.py. Documents with
+    // no source_url list by bare title, so links and plain text interleave.
+    expect(
+      textOf(parseInline("Sources: [A](https://a.test), handbook-excerpt, [B](https://b.test)")),
+    ).toEqual([
+      "text:Sources: ",
+      "link:A",
+      "text:, handbook-excerpt, ",
+      "link:B",
+    ]);
+  });
+
+  it("leaves a [1] citation as literal text", () => {
+    expect(parseInline("as stated [1]")).toEqual([{ kind: "text", text: "as stated [1]" }]);
+  });
+
+  it("leaves a bracket with no parenthetical as literal text", () => {
+    expect(parseInline("[not a link] really")).toEqual([
+      { kind: "text", text: "[not a link] really" },
+    ]);
+  });
+
+  it("refuses a javascript: href and degrades it to literal text", () => {
+    // The body is untrusted LLM output over a corpus this app did not vet.
+    // Nothing is swallowed: the student sees exactly what the model wrote.
+    expect(parseInline("[click](javascript:alert(1))")).toEqual([
+      { kind: "text", text: "[click](javascript:alert(1))" },
+    ]);
+  });
+
+  it("refuses a data: href", () => {
+    expect(parseInline("[x](data:text/html,<script>alert(1)</script>)")).toEqual([
+      { kind: "text", text: "[x](data:text/html,<script>alert(1)</script>)" },
+    ]);
+  });
+
+  it("allows mailto", () => {
+    expect(parseInline("[email](mailto:msba@rady.ucsd.edu)")).toEqual([
+      { kind: "link", text: "email", href: "mailto:msba@rady.ucsd.edu" },
+    ]);
+  });
+
+  it("leaves an empty href as literal text", () => {
+    expect(parseInline("[title]()")).toEqual([{ kind: "text", text: "[title]()" }]);
+  });
+
+  it("reads bold and a link on the same line", () => {
+    expect(textOf(parseInline("**Week 9** per [the timeline](https://a.test)"))).toEqual([
+      "bold:Week 9",
+      "text: per ",
+      "link:the timeline",
+    ]);
+  });
+
+  it("reads a link inside a list item", () => {
+    const blocks = parseRichText("- see [the page](https://a.test)");
+    expect(blocks[0].type).toBe("unordered-list");
+    if (blocks[0].type === "unordered-list") {
+      expect(blocks[0].items[0]).toEqual([
+        { kind: "text", text: "see " },
+        { kind: "link", text: "the page", href: "https://a.test" },
+      ]);
+    }
+  });
+});
+
+describe("parseRichText headings", () => {
+  it("reads a heading and its level", () => {
+    const blocks = parseRichText("## Fall — 14 units");
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].type).toBe("heading");
+    if (blocks[0].type === "heading") {
+      expect(blocks[0].level).toBe(2);
+      expect(textOf(blocks[0].spans)).toEqual(["text:Fall — 14 units"]);
+    }
+  });
+
+  it("reads every level from # to ######", () => {
+    for (let level = 1; level <= 6; level += 1) {
+      const blocks = parseRichText(`${"#".repeat(level)} Title`);
+      expect(blocks[0].type).toBe("heading");
+      if (blocks[0].type === "heading") expect(blocks[0].level).toBe(level);
+    }
+  });
+
+  it("parses inline spans inside a heading", () => {
+    const blocks = parseRichText("## Your **4-unit** elective");
+    if (blocks[0].type === "heading") {
+      expect(textOf(blocks[0].spans)).toEqual([
+        "text:Your ",
+        "bold:4-unit",
+        "text: elective",
+      ]);
+    } else {
+      throw new Error("expected a heading");
+    }
+  });
+
+  it("requires the space, so #1 stays text", () => {
+    expect(parseRichText("#1 pick")[0].type).toBe("paragraph");
+    expect(parseRichText("#")[0].type).toBe("paragraph");
+  });
+
+  it("does not treat a mid-sentence hash as a heading", () => {
+    expect(parseRichText("slot # 2 is open")[0].type).toBe("paragraph");
+  });
+
+  it("ends the heading at the line, keeping what follows separate", () => {
+    const blocks = parseRichText("## Fall\nMGTA 452 is core.");
+    expect(blocks.map((b) => b.type)).toEqual(["heading", "paragraph"]);
+  });
+
+  it("keeps a heading next to a table, as a plan emits them", () => {
+    const blocks = parseRichText(
+      ["## Fall", "", "| a | b |", "|---|---|", "| 1 | 2 |"].join("\n"),
+    );
+    expect(blocks.map((b) => b.type)).toEqual(["heading", "table"]);
+  });
+
+  it("more than six hashes is not a heading", () => {
+    expect(parseRichText("####### too deep")[0].type).toBe("paragraph");
+  });
+});
+
+describe("parseRichText tables", () => {
+  const TABLE = ["| Plan | Units |", "|---|---|", "| 11-Month | 50 |", "| 17-Month | 50 |"].join(
+    "\n",
+  );
+
+  it("reads a header row, a separator and body rows", () => {
+    const blocks = parseRichText(TABLE);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].type).toBe("table");
+    if (blocks[0].type === "table") {
+      expect(blocks[0].head.map((c) => textOf(c))).toEqual([["text:Plan"], ["text:Units"]]);
+      expect(blocks[0].rows).toHaveLength(2);
+      expect(blocks[0].rows[0].map((c) => textOf(c))).toEqual([["text:11-Month"], ["text:50"]]);
+    }
+  });
+
+  it("accepts alignment colons in the separator", () => {
+    const blocks = parseRichText(["| a | b |", "|:--|--:|", "| 1 | 2 |"].join("\n"));
+    expect(blocks[0].type).toBe("table");
+  });
+
+  it("parses inline spans inside cells", () => {
+    const blocks = parseRichText(
+      ["| Course | Where |", "|---|---|", "| **MGTA 451** | [plan](https://a.test) |"].join("\n"),
+    );
+    if (blocks[0].type === "table") {
+      expect(blocks[0].rows[0][0]).toEqual([
+        { kind: "bold", spans: [{ kind: "text", text: "MGTA 451" }] },
+      ]);
+      expect(blocks[0].rows[0][1]).toEqual([
+        { kind: "link", text: "plan", href: "https://a.test" },
+      ]);
+    } else {
+      throw new Error("expected a table");
+    }
+  });
+
+  it("leaves a pipe-delimited SENTENCE alone when there is no separator row", () => {
+    // The reason the separator is required: this is prose, not a table, and
+    // restructuring it would silently rewrite what the model said.
+    const blocks = parseRichText("| units 8 | 12 | 14 |");
+    expect(blocks[0].type).toBe("paragraph");
+  });
+
+  it("does not treat a mid-sentence pipe as a table", () => {
+    const blocks = parseRichText("Fall is 12 units | Winter is 14");
+    expect(blocks[0].type).toBe("paragraph");
+  });
+
+  it("ends the table at a blank line and keeps what follows separate", () => {
+    const blocks = parseRichText(`${TABLE}\n\nConfirm with MSBA advising.`);
+    expect(blocks.map((b) => b.type)).toEqual(["table", "paragraph"]);
+  });
+
+  it("ends the table at the first non-row line", () => {
+    const blocks = parseRichText(`${TABLE}\nConfirm with MSBA advising.`);
+    expect(blocks.map((b) => b.type)).toEqual(["table", "paragraph"]);
+  });
+
+  it("reads a header-only table with no body rows", () => {
+    const blocks = parseRichText(["| a | b |", "|---|---|"].join("\n"));
+    expect(blocks[0].type).toBe("table");
+    if (blocks[0].type === "table") expect(blocks[0].rows).toEqual([]);
+  });
+
+  it("keeps a table that is the last thing in a reply", () => {
+    const blocks = parseRichText(`Here it is:\n\n${TABLE}`);
+    expect(blocks.map((b) => b.type)).toEqual(["paragraph", "table"]);
+  });
+
+  it("does not crash on a separator with no header above it", () => {
+    const blocks = parseRichText("|---|---|");
+    expect(blocks[0].type).toBe("paragraph");
+  });
+});
+
+describe("parseInline nesting", () => {
+  it("parses a link wrapped in bold", () => {
+    // What the model actually writes when it emphasises a link. Before bold
+    // nested, this rendered as the literal string in the bubble.
+    expect(parseInline("use **[WebReg](https://act.ucsd.edu/webreg2)** to enroll")).toEqual([
+      { kind: "text", text: "use " },
+      {
+        kind: "bold",
+        spans: [{ kind: "link", text: "WebReg", href: "https://act.ucsd.edu/webreg2" }],
+      },
+      { kind: "text", text: " to enroll" },
+    ]);
+  });
+
+  it("parses bold around a link plus trailing text", () => {
+    expect(textOf(parseInline("**see [the plan](https://a.test) now**"))).toEqual([
+      "bold:see the plan now",
+    ]);
+  });
+
+  it("parses code inside bold", () => {
+    expect(parseInline("**`npm test`**")).toEqual([
+      { kind: "bold", spans: [{ kind: "code", text: "npm test" }] },
+    ]);
+  });
+
+  it("keeps an unclosed bold literal rather than swallowing the rest", () => {
+    expect(parseInline("**not closed")).toEqual([{ kind: "text", text: "**not closed" }]);
   });
 });
 
@@ -134,7 +401,7 @@ describe("parseRichText", () => {
         type: "blockquote",
         lines: [
           [
-            { kind: "bold", text: "Heads up:" },
+            { kind: "bold", spans: [{ kind: "text", text: "Heads up:" }] },
             { kind: "text", text: " enrollment closes Friday." },
           ],
         ],

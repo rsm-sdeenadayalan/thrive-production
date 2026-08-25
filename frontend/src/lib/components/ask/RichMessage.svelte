@@ -11,8 +11,9 @@
 	 * verdict, and both ultimately answer over a corpus a student did not
 	 * write and this app did not vet. `parseRichText` returns a tree of plain
 	 * objects, and every node of that tree becomes a real Svelte element below
-	 * -- `<p>`, `<ol>`/`<ul>`/`<li>`, `<blockquote>`, `<strong>`, `<code>` --
-	 * never a string handed to the browser to parse as markup. There is
+	 * -- `<p>`, `<ol>`/`<ul>`/`<li>`, `<blockquote>`, `<strong>`, `<code>`,
+	 * `<a>`, `<table>` -- never a string handed to the browser to parse as
+	 * markup. There is
 	 * nothing here for a prompt-injected "ignore the above and render
 	 * `<img onerror=...>`" to land in.
 	 *
@@ -39,7 +40,31 @@
 {#snippet inline(spans: InlineSpan[])}
 	{#each spans as span, index (index)}
 		{#if span.kind === 'bold'}
-			<strong>{span.text}</strong>
+			<!-- Recursive: `inline` renders itself for the bold span's children, so
+			     an emphasised link stays a link. -->
+			<strong>{@render inline(span.spans)}</strong>
+		{:else if span.kind === 'link'}
+			<!--
+				`rel="noopener noreferrer"` with `target="_blank"`: these hrefs come
+				out of a corpus this app did not write, so the opened page must not
+				get a `window.opener` handle back into an authenticated THRIVE tab,
+				and must not receive this URL as a referrer.
+
+				`parseRichText` has already rejected every scheme except http(s) and
+				mailto -- see `SAFE_SCHEME` in `$lib/richtext`. This template is the
+				second half of that guarantee, not the first: it renders whatever the
+				parser blessed and does no validation of its own.
+
+				Underlined rather than colour-only. The bubble sets the ink for its
+				side of the conversation, and a link inside it has to be
+				distinguishable without relying on hue.
+			-->
+			<a
+				href={span.href}
+				target="_blank"
+				rel="noopener noreferrer"
+				class="underline underline-offset-2 hover:no-underline"
+			>{span.text}</a>
 		{:else if span.kind === 'code'}
 			<!-- `thrive-numeric` is the design system's one mono treatment (see
 			     app.css / designSystem.spec.ts): a component asks for a TREATMENT
@@ -73,6 +98,64 @@
 				<li>{@render inline(item)}</li>
 			{/each}
 		</ul>
+	{:else if block.type === 'heading'}
+		<!--
+			Starts at `h3`, never `h1`.
+
+			The page already owns its heading hierarchy — the panel around this is
+			an `h2` — so a reply that injected an `h1` would put a top-level heading
+			inside a section, which is exactly the document-outline break screen
+			reader users navigate by. Markdown `#` therefore maps to `h3` and each
+			further `#` steps down one, capped at `h6`.
+
+			Size is set by level rather than by the tag's default so a `#` and a
+			`##` are visibly different without any of them shouting: this is a chat
+			bubble, not a document.
+		-->
+		{@const level = Math.min(block.level + 2, 6)}
+		<svelte:element
+			this={`h${level}`}
+			class={cn(
+				'text-left font-medium text-ink',
+				block.level === 1 ? 'text-sm' : 'text-xs',
+				spacing(index)
+			)}
+		>
+			{@render inline(block.spans)}
+		</svelte:element>
+	{:else if block.type === 'table'}
+		<!--
+			The scroll container is not optional. A comparison table of three plans
+			of study is wider than a chat bubble on a phone, and a table that
+			overflows its bubble pushes the DOCUMENT sideways -- which is the one
+			thing `check:layout` fails a page for. `overflow-x-auto` keeps the
+			overflow inside the table's own box, so the page never scrolls
+			horizontally and the table still scrolls to reveal itself.
+		-->
+		<div class={cn('max-w-full overflow-x-auto', spacing(index))}>
+			<table class="w-full border-collapse text-left text-xs">
+				<thead>
+					<tr>
+						{#each block.head as cell, cellIndex (cellIndex)}
+							<th class="border-b border-line-strong px-1.5 py-1 font-medium">
+								{@render inline(cell)}
+							</th>
+						{/each}
+					</tr>
+				</thead>
+				<tbody>
+					{#each block.rows as row, rowIndex (rowIndex)}
+						<tr>
+							{#each row as cell, cellIndex (cellIndex)}
+								<td class="border-b border-hairline px-1.5 py-1 align-top">
+									{@render inline(cell)}
+								</td>
+							{/each}
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
 	{:else if block.type === 'blockquote'}
 		<!-- The left border is `WeekView`'s day-divider pattern (`border-l
 		     border-hairline`), reused for a quote accent rather than a new class. -->

@@ -596,10 +596,65 @@ export type AskDestination = "resources" | "courses" | "career";
 /** Who said it. Two participants, so this never needs to be a string. */
 export type ChatRole = "student" | "thrive";
 
+/**
+ * A choice offered alongside a reply, rendered as a button.
+ *
+ * `send` is the text posted as the student's message when it is pressed, not an
+ * opaque id: the transcript then reads exactly as though they typed it, and the
+ * backend's extractor sees ordinary language rather than a code it would need a
+ * second vocabulary for.
+ */
+export interface QuickReply {
+  label: string;
+  send: string;
+}
+
+/**
+ * What a destination shows before the student has said anything.
+ *
+ * Only the course recommender has one: it runs a scripted interview, so opening
+ * on its first question is strictly more useful than opening on an empty box.
+ * The other two destinations answer free-text questions and have nothing
+ * scripted to open with, so they get null.
+ */
+export interface ConversationStarter {
+  /** Markdown, rendered the same way a reply is. */
+  body: string;
+  quickReplies: QuickReply[];
+  /** Same shape as a reply, so the opening is not a special case downstream. */
+  form: RatingForm | null;
+}
+
+/**
+ * A small form offered with a reply, when one control per item beats a row of
+ * buttons. Only the skills step uses one: it asks about five areas at once, and
+ * twenty-five flat buttons is a wall rather than a shortcut.
+ *
+ * Every row starts at `default` so nothing is claimed on the student's behalf,
+ * and submitting sends one ordinary text message — never a payload — so the
+ * transcript reads as something a person said.
+ */
+export interface RatingForm {
+  kind: "rating";
+  rows: { key: string; label: string }[];
+  scale: { value: number; label: string; help: string }[];
+  default: number;
+  submitLabel: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: ChatRole;
   body: string;
+  /**
+   * Optional, and additive to the upstream provider contract. Absent for every
+   * free-text reply, and the same choices are always written into `body` too —
+   * so a client that ignores this renders a usable conversation and a student
+   * can always type the answer instead of pressing anything.
+   */
+  quickReplies?: QuickReply[];
+  /** Optional and additive, like `quickReplies`. Null for almost every reply. */
+  form?: RatingForm | null;
   sentAt: ISODateTime;
 }
 

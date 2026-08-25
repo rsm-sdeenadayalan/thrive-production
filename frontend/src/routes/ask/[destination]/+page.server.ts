@@ -2,7 +2,7 @@ import { error } from "@sveltejs/kit";
 
 import { isAskDestination, toConversationDetailView } from "$lib/ask";
 import { apiEnabled } from "$lib/data/api/client";
-import { getConversation } from "$lib/data";
+import { getConversation, getConversationStarter } from "$lib/data";
 import { messages } from "$lib/messages";
 import { dayKeyOf } from "$lib/schedule";
 import type { PageServerLoad } from "./$types";
@@ -58,7 +58,16 @@ export const load: PageServerLoad = async ({ params, url }) => {
 	const live = apiEnabled();
 
 	if (!conversationId) {
-		return { destination, conversation: null, todayKey, live };
+		/*
+		 * No conversation yet, so offer the destination's opening prompt if it has
+		 * one. Only the course recommender does: it runs a scripted interview, and
+		 * opening on its first question with its buttons is strictly more useful
+		 * than opening on a box the student has to type into to find out a question
+		 * was coming. Fetched here rather than written in the component so the
+		 * question cannot drift from the one the bot asks.
+		 */
+		const starter = await getConversationStarter(destination);
+		return { destination, conversation: null, todayKey, live, starter };
 	}
 
 	const conversation = await getConversation(conversationId);
@@ -85,5 +94,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
 		conversation: toConversationDetailView(conversation, todayKey),
 		todayKey,
 		live,
+		// A conversation is open, so there is nothing to open ON.
+		starter: null,
 	};
 };

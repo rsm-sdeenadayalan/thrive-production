@@ -42,6 +42,7 @@ import type {
   Assignment,
   Course,
   Conversation,
+  ConversationStarter,
   CourseRequest,
   CourseRequestInput,
   CourseRequestPrefill,
@@ -959,6 +960,22 @@ export function setCurrentVersion(
 
 export function getConversations(): Promise<Conversation[]> {
   return apiEnabled() ? api.getConversations() : mockGetConversations();
+}
+
+/**
+ * The opening prompt for a destination, or null when there is none.
+ *
+ * Null in mock mode on purpose: the interview is a real backend behaviour, and
+ * faking its first question offline would show a student a prompt that nothing
+ * can answer. Offline keeps the existing empty state, which says plainly that
+ * the surface is not connected yet.
+ */
+export function getConversationStarter(
+  destination: string,
+): Promise<ConversationStarter | null> {
+  return apiEnabled()
+    ? api.getConversationStarter(destination)
+    : Promise.resolve(null);
 }
 
 export function getConversation(

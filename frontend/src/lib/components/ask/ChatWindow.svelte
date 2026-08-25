@@ -5,6 +5,7 @@
 
 	import { goto } from '$app/navigation';
 	import { showsDayLabel, type ChatMessageView, type ConversationDetailView } from '$lib/ask';
+	import type { ConversationStarter, RatingForm } from '$lib/data';
 	import RichMessage from '$lib/components/ask/RichMessage.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import { messages } from '$lib/messages';
@@ -74,13 +75,20 @@
 	let {
 		destination,
 		conversation,
-		live
+		live,
+		starter = null
 	}: {
 		destination: AskDestination;
 		/** The saved conversation in view, or null for a fresh one. */
 		conversation: ConversationDetailView | null;
 		/** Whether `/ask-sync` is reachable. See the doc comment above. */
 		live: boolean;
+		/**
+		 * The destination's opening question, when it has one and nothing has been
+		 * said yet. Only the course recommender does. Null offline, and null once a
+		 * conversation is open -- there is then nothing to open ON.
+		 */
+		starter?: ConversationStarter | null;
 	} = $props();
 
 	const copy = messages.ask;
@@ -96,6 +104,30 @@
 
 	/** True while a live send is in flight. Disables the composer. */
 	let pending = $state(false);
+
+	/**
+	 * The rating form's current values, keyed by row.
+	 *
+	 * Seeded lazily from the form's own `default` rather than initialised up
+	 * front: the form arrives with a message, so there is nothing to seed until
+	 * one is on screen, and `$state` in a component that remounts per
+	 * conversation cannot outlive the question it belongs to.
+	 */
+	let ratings = $state<Record<string, number>>({});
+
+	function ratingOf(form: RatingForm, key: string) {
+		return ratings[key] ?? form.default;
+	}
+
+	/** Submit the form as one ordinary message, phrased as a person would. */
+	function submitRatings(form: RatingForm) {
+		if (pending) return;
+		const said = form.rows
+			.map((row) => `${row.label} ${ratingOf(form, row.key)}`)
+			.join(', ');
+		ratings = {};
+		choose(said);
+	}
 
 	/**
 	 * A counter, not a timestamp, and not `Date.now()`.
@@ -122,6 +154,41 @@
 	 */
 	const empty = $derived(saved.length === 0 && sent.length === 0);
 
+	/**
+	 * Send a specific text, from a button rather than the field.
+	 *
+	 * Goes through exactly the same path as a typed message, and posts the words
+	 * the button stands for rather than an id. The transcript then reads as though
+	 * the student typed it, the backend's extractor sees ordinary language, and
+	 * pressing a button is never a different kind of turn from typing one.
+	 */
+	function choose(text: string) {
+		if (pending) return;
+		draft = '';
+		if (live) {
+			sendLive(text);
+			return;
+		}
+		pushMock(text);
+	}
+
+	/**
+	 * Whether the choices under a saved message should show.
+	 *
+	 * The last saved message only, and only while this tab has not moved past it:
+	 * once the student has said anything else, the question those buttons answer
+	 * is behind them.
+	 */
+	function showsChoices(index: number) {
+		const message = saved[index];
+		return (
+			index === saved.length - 1 &&
+			message.role === 'thrive' &&
+			(message.quickReplies.length > 0 || message.form !== null) &&
+			sent.length === 0
+		);
+	}
+
 	function send(event: SubmitEvent) {
 		event.preventDefault();
 
@@ -141,15 +208,23 @@
 		 * to label a message that will not exist in a minute. The "This session"
 		 * heading is what places them instead.
 		 */
+		pushMock(body);
+	}
+
+	/** The offline half: the student's line and a reply that says it cannot answer. */
+	function pushMock(body: string) {
 		sent = [
 			...sent,
-			{ id: `sent-${nextId++}`, role: 'student', body, timeLabel: '', dayLabel: '' },
+			{ id: `sent-${nextId++}`, role: 'student', body, timeLabel: '', dayLabel: '',
+			  quickReplies: [], form: null },
 			{
 				id: `sent-${nextId++}`,
 				role: 'thrive',
 				body: copy.chat.placeholderReply,
 				timeLabel: '',
-				dayLabel: ''
+				dayLabel: '',
+				quickReplies: [],
+				form: null
 			}
 		];
 
@@ -161,7 +236,11 @@
 	 * round trip; this is steps 1-4 of it.
 	 */
 	async function sendLive(body: string) {
-		sent = [...sent, { id: `sent-${nextId++}`, role: 'student', body, timeLabel: '', dayLabel: '' }];
+		sent = [
+			...sent,
+			{ id: `sent-${nextId++}`, role: 'student', body, timeLabel: '', dayLabel: '',
+			  quickReplies: [], form: null }
+		];
 		pending = true;
 		scrollToNewest();
 
@@ -192,7 +271,8 @@
 			pending = false;
 			sent = [
 				...sent,
-				{ id: `sent-${nextId++}`, role: 'thrive', body: copy.chat.errorReply, timeLabel: '', dayLabel: '' }
+				{ id: `sent-${nextId++}`, role: 'thrive', body: copy.chat.errorReply,
+				  timeLabel: '', dayLabel: '', quickReplies: [], form: null }
 			];
 			scrollToNewest();
 		}
@@ -262,6 +342,106 @@
 					{message.timeLabel}
 				</span>
 			{/if}
+		</div>
+	</div>
+{/snippet}
+
+{#snippet ratingForm(form: RatingForm)}
+	<!--
+		One control per area rather than a flat row of twenty-five buttons.
+
+		`aria-pressed` rather than a radio group: these are buttons that set a
+		value, and the pattern already used by the appointments day chips, so it
+		reads the same way to a screen reader as the rest of the app. Each row is
+		its own labelled group so "Python programming, 1 to 5" is announced before
+		the numbers, which are otherwise five anonymous digits.
+
+		`min-h-11` is the 44px touch floor. The number buttons are square-ish and
+		wrap, so five of them fit a phone without a sideways scroll.
+	-->
+	<div class="flex justify-start">
+		<div class="min-w-0 max-w-[min(85%,var(--thrive-chat-measure))]">
+			<p class="thrive-eyebrow mt-1.5">{copy.chat.ratingLabel}</p>
+			<div class="mt-1 space-y-1.5 rounded-md border border-line bg-sunken p-2">
+				{#each form.rows as row (row.key)}
+					<div>
+						<p id={`rate-${row.key}`} class="text-xs text-body">{row.label}</p>
+						<div
+							role="group"
+							aria-labelledby={`rate-${row.key}`}
+							class="mt-0.5 flex flex-wrap gap-1"
+						>
+							{#each form.scale as point (point.value)}
+								<button
+									type="button"
+									disabled={pending}
+									aria-pressed={ratingOf(form, row.key) === point.value}
+									title={point.help}
+									onclick={() => (ratings = { ...ratings, [row.key]: point.value })}
+									class={cn(
+										'min-h-11 min-w-11 rounded-md border-[1.5px] text-sm',
+										ratingOf(form, row.key) === point.value
+											? 'border-line-strong bg-primary text-on-primary'
+											: 'border-line bg-surface text-ink'
+									)}
+								>
+									{point.label}
+								</button>
+							{/each}
+						</div>
+					</div>
+				{/each}
+
+				<Button
+					type="button"
+					variant="primary"
+					disabled={pending}
+					class="min-h-11 w-full"
+					onclick={() => submitRatings(form)}
+				>
+					{form.submitLabel}
+				</Button>
+			</div>
+			<p class="mt-1 text-3xs text-muted-ink">{copy.chat.ratingHint}</p>
+		</div>
+	</div>
+{/snippet}
+
+{#snippet quickReplyRow(replies: ConversationStarter['quickReplies'])}
+	<!--
+		Only ever rendered under the NEWEST reply — see `showsQuickReplies`. The
+		buttons answer the question that was just asked, so leaving them on older
+		turns would offer a student a shortcut to re-answer something already
+		settled, and pressing one would read as editing history rather than adding
+		to it.
+
+		`min-h-11` is 44px, the touch-target floor `check:interaction` asserts. The
+		row wraps rather than scrolling sideways: six role names do not fit a phone
+		on one line, and a horizontally scrolling strip hides choices behind an
+		edge with nothing to suggest they are there.
+	-->
+	<div class="flex justify-start">
+		<div class="min-w-0 max-w-[min(85%,var(--thrive-chat-measure))]">
+			<p id="quick-replies-label" class="thrive-eyebrow mt-1.5">
+				{copy.chat.quickRepliesLabel}
+			</p>
+			<div
+				role="group"
+				aria-labelledby="quick-replies-label"
+				class="mt-1 flex flex-wrap gap-1.5"
+			>
+				{#each replies as reply (reply.send)}
+					<button
+						type="button"
+						disabled={pending}
+						onclick={() => choose(reply.send)}
+						class="min-h-11 rounded-md border-[1.5px] border-line-strong bg-surface px-2.5 text-sm text-ink"
+					>
+						{reply.label}
+					</button>
+				{/each}
+			</div>
+			<p class="mt-1 text-3xs text-muted-ink">{copy.chat.quickRepliesHint}</p>
 		</div>
 	</div>
 {/snippet}
@@ -337,13 +517,35 @@
 			// tall void underneath it, which read as a panel that had failed to load
 			// rather than as an invitation. With messages in it, back to a normal
 			// top-anchored stack.
-			empty ? 'grid place-items-center' : 'space-y-2.5'
+			empty && !starter ? 'grid place-items-center' : 'space-y-2.5'
 		)}
 	>
-		{#if empty}
+		{#if empty && starter}
 			<!--
-				The empty state says what THIS destination can help with. A blank box
-				would make the three surfaces indistinguishable, which is the whole
+				Opening ON the first question, rather than on a box that has to be
+				typed into before the question appears.
+
+				Rendered as a THRIVE bubble because that is what it is -- the same text
+				the bot sends, arriving before the student has had to ask for it. The
+				buttons underneath go through the same `choose` a real reply's buttons
+				use, and because `conversation` is null that first press CREATES the
+				conversation, so nothing here is a special case downstream.
+			-->
+			{@render bubble(
+				{ id: 'starter', role: 'thrive', body: starter.body, timeLabel: '',
+				  dayLabel: '', quickReplies: starter.quickReplies, form: starter.form ?? null },
+				false
+			)}
+			{#if starter.form}
+				{@render ratingForm(starter.form)}
+			{/if}
+			{#if starter.quickReplies.length > 0}
+				{@render quickReplyRow(starter.quickReplies)}
+			{/if}
+		{:else if empty}
+			<!--
+				No script for this destination, so say what it CAN help with. A blank
+				box would make the three surfaces indistinguishable, which is the whole
 				thing they are not.
 			-->
 			<div class="max-w-measure rounded-lg border border-line bg-sunken p-3">
@@ -369,6 +571,15 @@
 			{/if}
 
 			{@render bubble(message, true)}
+
+			{#if showsChoices(index)}
+				{#if message.form}
+					{@render ratingForm(message.form)}
+				{/if}
+				{#if message.quickReplies.length > 0}
+					{@render quickReplyRow(message.quickReplies)}
+				{/if}
+			{/if}
 		{/each}
 
 		{#if sent.length > 0}
@@ -387,7 +598,8 @@
 					same way a real reply would be announced.
 				-->
 				{@render bubble(
-					{ id: 'pending', role: 'thrive', body: copy.chat.pendingReply, timeLabel: '', dayLabel: '' },
+					{ id: 'pending', role: 'thrive', body: copy.chat.pendingReply,
+					  timeLabel: '', dayLabel: '', quickReplies: [], form: null },
 					false
 				)}
 			{/if}

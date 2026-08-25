@@ -2,6 +2,8 @@ import type {
   AskDestination,
   ChatRole,
   Conversation,
+  QuickReply,
+  RatingForm,
 } from "$lib/data";
 import { formatShortDate, formatTime } from "$lib/format";
 import { messages } from "$lib/messages";
@@ -112,6 +114,12 @@ export interface ChatMessageView {
   timeLabel: string;
   /** "Today" / "Yesterday" / "Aug 19" */
   dayLabel: string;
+  /** Never optional here, unlike the provider's `ChatMessage`: a component
+   *  walking a view model should not have to re-derive "no choices offered"
+   *  from an absent field. */
+  quickReplies: QuickReply[];
+  /** A form offered with this reply, if any. See `RatingForm`. */
+  form: RatingForm | null;
 }
 
 export interface ConversationView {
@@ -160,6 +168,8 @@ export function toConversationDetailView(
       id: message.id,
       role: message.role,
       body: message.body,
+      quickReplies: message.quickReplies ?? [],
+      form: message.form ?? null,
       timeLabel: formatTime(message.sentAt),
       dayLabel: relativeDayLabel(message.sentAt, todayKey),
     })),

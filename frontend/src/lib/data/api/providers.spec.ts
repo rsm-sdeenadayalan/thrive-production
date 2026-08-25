@@ -42,6 +42,32 @@ describe("read providers", () => {
     expect(impl.mock.calls[0][0]).toBe(`http://api.test${expectedPath}`);
   });
 
+  it("getConversationStarter asks the planner for the opening question", async () => {
+    const impl = stubFetch(200, { starter: { body: "q", quickReplies: [] } });
+    const starter = await runWithAuth(AUTH, () => api.getConversationStarter("courses"));
+    expect(impl.mock.calls[0][0]).toBe("http://api.test/api/thrive/plan/intake");
+    expect(starter).toEqual({ body: "q", quickReplies: [] });
+  });
+
+  it("getConversationStarter does not call anything for the other destinations", async () => {
+    // Only the course recommender runs a script; the others have nothing to
+    // open on, and asking the planner about them would be a wasted round trip.
+    const impl = stubFetch(200, {});
+    for (const destination of ["resources", "career"]) {
+      expect(await runWithAuth(AUTH, () => api.getConversationStarter(destination))).toBeNull();
+    }
+    expect(impl).not.toHaveBeenCalled();
+  });
+
+  it("getConversationStarter falls back to null rather than breaking the page", async () => {
+    // The empty state is a perfectly good fallback, so a failure here must not
+    // take the chat down with it.
+    stubFetch(500, { error: { code: "boom", message: "nope" } });
+    expect(
+      await runWithAuth(AUTH, () => api.getConversationStarter("courses")),
+    ).toBeNull();
+  });
+
   it("getSlots encodes the advisor id", async () => {
     const impl = stubFetch(200, []);
     await runWithAuth(AUTH, () => api.getSlots("adv 1"));

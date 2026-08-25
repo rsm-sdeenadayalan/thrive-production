@@ -33,7 +33,10 @@ function message(
   dayLabel: string,
   role: ChatMessageView["role"] = "student",
 ): ChatMessageView {
-  return { id, role, body: "b", timeLabel: "9:00 AM", dayLabel };
+  return {
+    id, role, body: "b", timeLabel: "9:00 AM", dayLabel,
+    quickReplies: [], form: null,
+  };
 }
 
 function conversation(
@@ -260,6 +263,36 @@ describe("toConversationDetailView", () => {
     for (const message of view.messages) {
       expect("sentAt" in message).toBe(false);
     }
+  });
+
+  it("defaults quickReplies and form when the provider message omits them", () => {
+    // Every free-text reply in the mock fixtures and most saved conversations
+    // never sets these -- a component walking the view model must not have to
+    // treat "absent" and "empty" as two different states.
+    const view = toConversationDetailView(
+      conversation("a", "courses", new Date(2026, 7, 21, 14, 30).toISOString(), 1),
+      today,
+    );
+
+    expect(view.messages[0].quickReplies).toEqual([]);
+    expect(view.messages[0].form).toBeNull();
+  });
+
+  it("carries quickReplies and form through when the provider message sets them", () => {
+    const source = conversation("a", "courses", new Date(2026, 7, 21, 14, 30).toISOString(), 1);
+    source.messages[0].quickReplies = [{ label: "11 month", send: "11 month" }];
+    source.messages[0].form = {
+      kind: "rating",
+      rows: [{ key: "skill_python", label: "Python" }],
+      scale: [{ value: 3, label: "3", help: "Comfortable" }],
+      default: 3,
+      submitLabel: "Submit ratings",
+    };
+
+    const view = toConversationDetailView(source, today);
+
+    expect(view.messages[0].quickReplies).toEqual([{ label: "11 month", send: "11 month" }]);
+    expect(view.messages[0].form?.rows).toEqual([{ key: "skill_python", label: "Python" }]);
   });
 });
 
