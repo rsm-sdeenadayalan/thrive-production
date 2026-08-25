@@ -6,6 +6,7 @@ from django.contrib.auth.models import User
 
 from rsm_thrive.models import JobPosting, MatchReport, PostingInteraction, ResumeVersion
 from rsm_thrive.services.embeddings import FakeEmbeddings
+from rsm_thrive.services.jobs import report as report_service
 from rsm_thrive.services.jobs.feed import LLM_SCORE_TOP_N, feed_for
 from rsm_thrive.services.jobs.search import search_postings
 from rsm_thrive.services.llm import FakeLLM
@@ -441,6 +442,44 @@ class TestFeedForLlmScoring:
         # generous slack keeps this stable on a loaded CI box while still
         # failing hard if scoring regresses to fully serial.
         assert elapsed < sleep_seconds * (LLM_SCORE_TOP_N / 2)
+
+    def test_a_report_written_while_this_search_was_scoring_is_not_a_crash(
+            self, student, monkeypatch):
+        """Two overlapping searches for the same student are a 500 unless
+        the write is idempotent.
+
+        Both requests check the `MatchReport` cache before either writes, so
+        both decide the same posting still needs scoring, and the second one
+        to finish inserts a row that already exists -- `UNIQUE constraint
+        failed: rsm_thrive_matchreport.user_id, ...posting_id,
+        ...resume_version_id`. Observed live: clicking a region chip while
+        the unfiltered search was still scoring 500'd the results page.
+
+        The racing insert is staged from `_user_message`, which runs on the
+        CALLING thread after this search's cache check and before its own
+        write -- exactly the window the other request occupies. (It cannot
+        be staged from inside the LLM call: those run in worker threads,
+        where touching SQLite is its own separate failure.)
+        """
+        version = _resume(student)
+        posting = _posting("1")
+        real_user_message = report_service._user_message
+
+        def racing_user_message(profile, posting_arg):
+            MatchReport.objects.create(
+                user=student, posting=posting, resume_version=version,
+                competency="strong", score=91, matched_skills=["sql"],
+                gaps=[], verdict="Written by the other request.")
+            return real_user_message(profile, posting_arg)
+
+        monkeypatch.setattr(report_service, "_user_message", racing_user_message)
+
+        outcome = feed_for(student, tab="all", score_with_llm=True,
+                           llm_factory=lambda: FakeLLM(replies=[_reply(score=70)]))
+
+        [entry] = outcome["results"]
+        assert MatchReport.objects.count() == 1
+        assert entry["report_score"] == 91
 
 
 class TestFeedForRegionFilter:

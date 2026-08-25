@@ -114,8 +114,12 @@ def generate_report(llm, user, posting) -> MatchReport:
     envelope = parse_llm_json(raw)
     sanitized = _sanitize(envelope)
 
-    return MatchReport.objects.create(
-        user=user, posting=posting, resume_version=version, **sanitized)
+    # Same check-then-write window as the concurrent path below: another
+    # request can have cached this posting while this one was waiting on the
+    # LLM, and a plain `create` would raise against `uniq_match_report`.
+    report, _ = MatchReport.objects.get_or_create(
+        user=user, posting=posting, resume_version=version, defaults=sanitized)
+    return report
 
 
 def generate_reports_concurrently(llm, user, postings):
@@ -178,5 +182,14 @@ def generate_reports_concurrently(llm, user, postings):
                 "-- falling back to that posting's estimate",
                 posting.pk, user.pk, exc_info=exc)
             continue
-        MatchReport.objects.create(
-            user=user, posting=posting, resume_version=version, **sanitized)
+        # `get_or_create`, not `create`: the cache check above ran before any
+        # of these writes, so another request scoring the same student at the
+        # same time (a region chip clicked while the unfiltered search is
+        # still scoring) can have written this exact row in between -- and a
+        # plain `create` then raises IntegrityError against
+        # `uniq_match_report` and 500s the whole results page. Whoever wrote
+        # first wins; this verdict is simply discarded, which costs nothing:
+        # both scored the same posting against the same resume version.
+        MatchReport.objects.get_or_create(
+            user=user, posting=posting, resume_version=version,
+            defaults=sanitized)
