@@ -922,6 +922,14 @@ export const messages = {
 			empty: 'Choose a file first.',
 			/** The provider failing for a reason nobody has thought about. */
 			error: 'Something went wrong uploading your resume. Try again.',
+			/**
+			 * The styled file-picker label, shared by both banner states below:
+			 * the native `<input type="file">` cannot be restyled, so this is the
+			 * button-shaped `<label>` a student actually sees and clicks.
+			 */
+			chooseFile: 'Choose PDF',
+			/** Shown beside the picker until `input.files` has something in it. */
+			noFileChosen: 'No file chosen',
 
 			/** A resume is already on file -- the compact row that keeps upload reachable. */
 			hasResume: {

@@ -7,7 +7,7 @@
 
 	import BenchmarkPanel from '$lib/components/jobs/BenchmarkPanel.svelte';
 	import JobFeedCard from '$lib/components/jobs/JobFeedCard.svelte';
-	import Button from '$lib/components/ui/Button.svelte';
+	import Button, { buttonClasses } from '$lib/components/ui/Button.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import type { JobFeedTab } from '$lib/data';
 	import { feedEmptyState } from '$lib/jobs';
@@ -74,12 +74,30 @@
 
 	let uploading = $state(false);
 	let uploadError = $state<string | null>(null);
+	/**
+	 * The name of whatever's in `input.files`, since the input itself is
+	 * `sr-only` behind a styled label -- see `chooseFile` below.
+	 */
+	let resumeFileName = $state<string | null>(null);
+
+	function trackChosenFile(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		resumeFileName = input.files?.[0]?.name ?? null;
+	}
 </script>
 
 <svelte:head><title>{pageTitle(copy.documentTitle)}</title></svelte:head>
 
 <div class="mx-auto w-full max-w-page space-y-6 lg:space-y-4">
-	<header class="mx-auto w-full max-w-5xl">
+	<!--
+		No `max-w-5xl` wrapper here: `max-w-5xl` (64rem) is narrower than the page
+		container (`--container-page`, 80rem), so `mx-auto max-w-5xl` on the header
+		alone re-centered it inside the page container -- pulling its left edge in
+		from the search box, tab bar and job cards below, which fill the full
+		width. Long-line wrapping is handled by `max-w-measure` on the intro
+		paragraph alone.
+	-->
+	<header class="w-full">
 		<p class="thrive-eyebrow">{copy.eyebrow}</p>
 		<h1 class="mt-1 text-3xl font-bold text-ink">{copy.title}</h1>
 		<p class="mt-1.5 max-w-measure text-sm text-body">{copy.intro}</p>
@@ -169,17 +187,26 @@
 					<input type="hidden" name="minScore" value={data.minScore} />
 				{/if}
 				<div class="min-w-0">
-					<label for="jobs-resume" class="thrive-eyebrow mb-1.5 block">
+					<span class="thrive-eyebrow mb-1.5 block">
 						{copy.profileBanner.hasResume.fileLabel}
-					</label>
-					<input
-						id="jobs-resume"
-						type="file"
-						name="file"
-						accept="application/pdf"
-						required
-						class="block text-2xs text-body"
-					/>
+					</span>
+					<div class="flex flex-wrap items-center gap-2">
+						<label for="jobs-resume" class={buttonClasses('secondary', 'sm', 'cursor-pointer has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-primary')}>
+							{copy.profileBanner.chooseFile}
+						</label>
+						<input
+							id="jobs-resume"
+							type="file"
+							name="file"
+							accept="application/pdf"
+							required
+							class="sr-only"
+							onchange={trackChosenFile}
+						/>
+						<span class="text-2xs text-muted-ink">
+							{resumeFileName ?? copy.profileBanner.noFileChosen}
+						</span>
+					</div>
 				</div>
 				<Button type="submit" variant="ghost" size="sm" disabled={uploading}>
 					{#if uploading}
@@ -241,17 +268,26 @@
 					<input type="hidden" name="minScore" value={data.minScore} />
 				{/if}
 				<div class="min-w-0">
-					<label for="jobs-resume" class="thrive-eyebrow mb-1.5 block">
+					<span class="thrive-eyebrow mb-1.5 block">
 						{copy.profileBanner.fileLabel}
-					</label>
-					<input
-						id="jobs-resume"
-						type="file"
-						name="file"
-						accept="application/pdf"
-						required
-						class="block text-2xs text-body"
-					/>
+					</span>
+					<div class="flex flex-wrap items-center gap-2">
+						<label for="jobs-resume" class={buttonClasses('secondary', 'md', 'cursor-pointer has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-primary')}>
+							{copy.profileBanner.chooseFile}
+						</label>
+						<input
+							id="jobs-resume"
+							type="file"
+							name="file"
+							accept="application/pdf"
+							required
+							class="sr-only"
+							onchange={trackChosenFile}
+						/>
+						<span class="text-2xs text-muted-ink">
+							{resumeFileName ?? copy.profileBanner.noFileChosen}
+						</span>
+					</div>
 				</div>
 				<Button type="submit" variant="secondary" disabled={uploading}>
 					{#if uploading}
