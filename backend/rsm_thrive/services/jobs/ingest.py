@@ -45,14 +45,35 @@ def ingest_from(sources, embeddings=None):
             good_rows.append(row)
         rows = good_rows
 
-        existing_hashes = dict(
-            JobPosting.objects.filter(source=source.name)
-            .values_list("external_id", "content_hash"))
+        existing = {external_id: (content_hash, len(embedding or []))
+                    for external_id, content_hash, embedding
+                    in JobPosting.objects.filter(source=source.name)
+                    .values_list("external_id", "content_hash", "embedding")}
 
         hashes = {r["external_id"]: _content_hash(r["title"] or "", r["description"] or "")
                   for r in rows}
-        to_embed = [r for r in rows
-                    if existing_hashes.get(r["external_id"]) != hashes[r["external_id"]]]
+
+        # The hash alone is not enough to decide "already embedded".
+        #
+        # Switching embedding backends (THRIVE_LLM fake <-> real, or a corrected
+        # TRITONAI_EMBED_MODEL) changes the VECTOR while leaving the posting's
+        # text identical, so a hash-only skip re-embedded nothing and every
+        # posting kept a wrong-dimension vector forever. `search_postings` then
+        # logs a dimension mismatch and silently falls back to skill overlap --
+        # semantic ranking off, results near-random -- and the documented
+        # remedy ("re-run ingest_jobs after switching") did nothing at all.
+        #
+        # So a row is re-embedded when its content changed OR when what is
+        # stored is not the width this backend produces. `Embeddings.dimension`
+        # answers that without embedding anything for a fixed-width backend.
+        want_dim = embeddings.dimension
+
+        def _stale(row):
+            content_hash, stored_dim = existing.get(row["external_id"], (None, 0))
+            return (content_hash != hashes[row["external_id"]]
+                    or stored_dim != want_dim)
+
+        to_embed = [r for r in rows if _stale(r)]
 
         texts = [f"{r['title']}\n{r['description'][:2000]}" for r in to_embed]
         vectors = embeddings.embed(texts) if texts else []

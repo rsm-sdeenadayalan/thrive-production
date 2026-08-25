@@ -15,6 +15,24 @@ class Embeddings(ABC):
     def embed(self, texts: list) -> list:
         """texts -> list of same-length float vectors."""
 
+    @property
+    def dimension(self) -> int:
+        """How wide this backend's vectors are.
+
+        Callers use it to notice that STORED vectors were written by a
+        different backend — a fake-vs-real switch, or a corrected embed model —
+        without embedding anything to find out. Ingest re-embeds on a mismatch;
+        without that check the stored width never changes and semantic ranking
+        silently degrades to keyword overlap.
+
+        The default asks the backend once and caches, which costs one call for
+        a remote model and nothing thereafter. A backend with a fixed width
+        should just declare it.
+        """
+        if getattr(self, "_dimension", None) is None:
+            self._dimension = len(self.embed(["dimension probe"])[0])
+        return self._dimension
+
 
 class FakeEmbeddings(Embeddings):
     """Deterministic bag-of-hashed-words unit vectors.
@@ -22,6 +40,10 @@ class FakeEmbeddings(Embeddings):
     Shared words land in shared dimensions, so overlapping texts score
     higher than disjoint ones — enough signal for every retrieval test.
     """
+
+    # Fixed by construction, so declaring it keeps the dimension check free:
+    # tests that count embed calls stay exact.
+    dimension = FAKE_DIM
 
     def embed(self, texts: list) -> list:
         out = []

@@ -103,3 +103,36 @@ class TestIngest:
         assert embeddings.calls == 2
         assert posting.content_hash != first_hash
         assert posting.description == "SQL, Tableau, and Python"
+
+
+class TestEmbeddingBackendSwitch:
+    """A backend switch must re-embed even when the postings' text is identical.
+
+    The hash-skip optimisation compared content only, so switching
+    THRIVE_LLM (or correcting TRITONAI_EMBED_MODEL) left every posting on its
+    old, wrong-width vector: `search_postings` logged a dimension mismatch and
+    quietly ranked on keyword overlap alone. Re-running ingest -- the remedy the
+    README prescribes -- did nothing, because nothing had changed textually.
+    """
+
+    def test_stored_vectors_of_another_width_are_reembedded(self):
+        class WideEmbeddings(FakeEmbeddings):
+            dimension = 64
+
+            def embed(self, texts: list) -> list:
+                return [[0.1] * 64 for _ in texts]
+
+        ingest_from([FakeJobSource([_row()])], embeddings=FakeEmbeddings())
+        assert len(JobPosting.objects.get().embedding) == FakeEmbeddings.dimension
+
+        # Same rows, same text, different backend: the vector must be replaced.
+        ingest_from([FakeJobSource([_row()])], embeddings=WideEmbeddings())
+        assert len(JobPosting.objects.get().embedding) == 64
+
+    def test_same_backend_still_skips_reembedding(self):
+        embeddings = CountingEmbeddings()
+        ingest_from([FakeJobSource([_row()])], embeddings=embeddings)
+        after_first = embeddings.calls
+
+        ingest_from([FakeJobSource([_row()])], embeddings=embeddings)
+        assert embeddings.calls == after_first
