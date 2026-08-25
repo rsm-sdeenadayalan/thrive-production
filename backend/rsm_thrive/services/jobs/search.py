@@ -12,6 +12,8 @@ from django.db.models import Q
 
 from rsm_thrive.models import JobPosting, ResumeVersion
 from rsm_thrive.services.embeddings import cosine, get_embeddings
+from rsm_thrive.services.jobs.ranking import rank_score
+from rsm_thrive.services.jobs.region import REGION_VALUES, region_of
 
 logger = logging.getLogger("rsm_thrive.jobs")
 
@@ -48,9 +50,21 @@ def _matching_postings(query):
     return postings
 
 
-def search_postings(user, query, limit=20, embeddings=None):
+def search_postings(user, query, limit=20, embeddings=None, region=""):
+    """Rank postings for `user` against `query`.
+
+    `region` (one of `region.REGION_VALUES`, or `""` for no filter) narrows
+    the candidate pool by `region_of(posting.location)` BEFORE ranking and
+    BEFORE `limit` truncates the result -- filtering a corpus of thousands
+    down to one region has to happen before the top-`limit` cut, or a region
+    with genuine matches outside whatever the un-filtered top `limit` happened
+    to contain would come back empty. An unrecognized value is treated the
+    same as "" (no filter) rather than raising.
+    """
     profile = profile_of(user)
     postings = list(_matching_postings(query))
+    if region in REGION_VALUES:
+        postings = [p for p in postings if region_of(p.location) == region]
 
     profile_vector = None
     if profile is not None and postings:
@@ -80,7 +94,14 @@ def search_postings(user, query, limit=20, embeddings=None):
                         "matched_skills": matched, "missing_skills": missing})
 
     if profile is not None:
-        results.sort(key=lambda r: (-r["score"], r["posting"].title))
+        # Candidate SELECTION, not the displayed score: `r["score"]` stays
+        # the resume-fit estimate (shown as-is until/unless an LLM report
+        # replaces it -- see `feed.py`). `rank_score` layers title relevance
+        # on top purely to decide ordering, so a genuinely-titled match with
+        # middling resume fit outranks an unrelated title that happens to
+        # share resume vocabulary. See `services/jobs/ranking.py`.
+        results.sort(key=lambda r: (-rank_score(query, r["posting"].title, r["score"]),
+                                    r["posting"].title))
     else:
         results.sort(key=lambda r: (r["posting"].posted_at is None,
                                     -(r["posting"].posted_at.timestamp()

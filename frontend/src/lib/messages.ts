@@ -1034,6 +1034,35 @@ export const messages = {
 				recommended: 'The short list -- capped to the top 10, and only postings worth prepping an interview for.',
 				liked: 'Postings you have liked, saved here for later.',
 				all: 'Every posting matching your search, unranked and unfiltered -- the full list, not the short one.'
+			},
+
+			/**
+			 * The region filter: a row of chips narrowing the list to one
+			 * location bucket. `names` is keyed by `JobRegion` -- see
+			 * `backend/rsm_thrive/services/jobs/region.py` for how a posting's
+			 * free-text location is bucketed.
+			 */
+			regions: {
+				label: 'Region',
+				all: 'All regions',
+				names: {
+					remote: 'Remote',
+					san_diego: 'San Diego',
+					bay_area: 'Bay Area',
+					los_angeles: 'Los Angeles',
+					seattle: 'Seattle',
+					new_york: 'New York',
+					other_us: 'Other US',
+					international: 'International'
+				},
+				/** Shown under the heading whenever a region filter is active,
+				 *  so the filter is visible even on an otherwise-empty list. */
+				active: (name: string) => `Filtered to ${name}.`,
+				clear: 'Clear filter',
+				/** The region-aware empty state: honest about WHY the list is
+				 *  empty (the filter, not the search) and how to undo it. */
+				empty: (name: string) =>
+					`No postings match this search in ${name}. Clear the filter to see more.`
 			}
 		},
 

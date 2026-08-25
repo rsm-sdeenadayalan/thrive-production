@@ -70,6 +70,7 @@ def jobs_feed(request):
         min_score=_parse_min_score(request.GET.get("min_score")),
         score_with_llm=score_with_llm,
         llm_factory=llm_factory if score_with_llm else None,
+        region=request.GET.get("region", ""),
     )
     results = [
         {

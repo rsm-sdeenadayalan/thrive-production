@@ -182,6 +182,20 @@ describe("job feed providers", () => {
       "http://api.test/api/thrive/jobs/feed?tab=liked");
   });
 
+  it("getJobFeed encodes region", async () => {
+    const impl = stubFetch(200, FEED_PAYLOAD);
+    await runWithAuth(AUTH, () => api.getJobFeed({ region: "san_diego" }));
+    expect(impl.mock.calls[0][0]).toBe(
+      "http://api.test/api/thrive/jobs/feed?region=san_diego");
+  });
+
+  it("getJobFeed omits region when it is the empty string (all regions)", async () => {
+    const impl = stubFetch(200, FEED_PAYLOAD);
+    await runWithAuth(AUTH, () => api.getJobFeed({ tab: "all", region: "" }));
+    expect(impl.mock.calls[0][0]).toBe(
+      "http://api.test/api/thrive/jobs/feed?tab=all");
+  });
+
   it("likeJob POSTs to the job's like endpoint and returns the interaction state", async () => {
     const impl = stubFetch(200, { jobId: "job-1", liked: true, dismissed: false });
     const result = await runWithAuth(AUTH, () => api.likeJob("job-1"));

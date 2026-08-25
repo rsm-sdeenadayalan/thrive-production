@@ -1,4 +1,5 @@
 import json
+import threading
 
 import pytest
 from django.contrib.auth.models import User
@@ -22,12 +23,38 @@ def student(client):
 
 
 def _posting(external_id, title="Data Analyst", description="sql python",
-             skills=("sql", "python")):
+             skills=("sql", "python"), location=""):
     [vector] = FakeEmbeddings().embed([f"{title}\n{description}"])
     return JobPosting.objects.create(
         source="fake", external_id=external_id, title=title, company="Acme",
         url=f"https://e.example/{external_id}", description=description,
-        skills=list(skills), embedding=vector)
+        skills=list(skills), embedding=vector, location=location)
+
+
+class TitleKeyedLLM:
+    """A thread-safe stub keyed by the posting TITLE embedded in the user
+    message, rather than by call order.
+
+    `_score_top_candidates_with_llm` now scores candidates concurrently
+    (see `report.generate_reports_concurrently`), so which posting's LLM
+    call happens first is no longer deterministic -- a test that needs a
+    SPECIFIC posting to get a SPECIFIC scripted score cannot rely on
+    `FakeLLM`'s call-order queue and has to key off content instead.
+    """
+
+    def __init__(self, replies_by_title: dict):
+        self._replies_by_title = dict(replies_by_title)
+        self.calls = []
+        self._lock = threading.Lock()
+
+    def chat(self, system, messages, json_mode=False):
+        with self._lock:
+            self.calls.append((system, messages, json_mode))
+        content = messages[0]["content"]
+        for title, reply in self._replies_by_title.items():
+            if f"Title: {title}\n" in content:
+                return reply
+        raise AssertionError(f"no scripted reply for this posting's title: {content[:200]!r}")
 
 
 def _resume(user, is_current=True, label="v1"):
@@ -221,24 +248,24 @@ class TestFeedForLlmScoring:
 
     def test_recommended_is_restricted_to_scored_candidates_and_resorted(self, student):
         _resume(student)
-        _posting("1", title="Data Analyst")
-        _posting("2", title="Data Analyst II")
+        one = _posting("1", title="Data Analyst")
+        two = _posting("2", title="Data Analyst II")
 
-        # `_score_top_candidates_with_llm` scores the cheap pre-rank's top
-        # slice in ITS OWN order, so ask that same ranking what order the
-        # LLM will see the two postings in, then script the FIRST one
-        # scored to get the LOWER report score. A correct re-sort must
-        # still put the SECOND-scored posting first once the reports are
-        # in -- Recommended is the one tab this reordering is visible on.
-        cheap_order = [row["posting"].pk
-                      for row in search_postings(student, "", limit=200)["results"]]
-        fake = FakeLLM(replies=[_reply(score=40, competency="stretch"),
-                                _reply(score=90, competency="strong")])
+        # Scoring now runs concurrently (see `report.generate_reports_concurrently`),
+        # so which posting's LLM call happens first is not deterministic --
+        # script by TITLE instead of call order, and give the FIRST-ranked
+        # cheap-pre-rank posting the LOWER report score. A correct re-sort
+        # must still put the SECOND-ranked posting first once the reports
+        # are in -- Recommended is the one tab this reordering is visible on.
+        fake = TitleKeyedLLM({
+            one.title: _reply(score=40, competency="stretch"),
+            two.title: _reply(score=90, competency="strong"),
+        })
 
         outcome = feed_for(student, tab="recommended", score_with_llm=True,
                            llm_factory=lambda: fake)
 
-        assert [e["posting"].pk for e in outcome["results"]] == list(reversed(cheap_order))
+        assert [e["posting"].pk for e in outcome["results"]] == [two.pk, one.pk]
         assert [e["report_score"] for e in outcome["results"]] == [90, 40]
         assert MatchReport.objects.count() == 2
 
@@ -369,6 +396,129 @@ class TestFeedForLlmScoring:
         assert fake.calls == []
         assert MatchReport.objects.count() == 0
 
+    def test_scoring_window_is_wider_than_the_displayed_shortlist(self):
+        # `jobs.ts`'s `targetResults` caps the results page's SHOWN list to
+        # 10 -- this window has to stay strictly wider than that cap, or a
+        # strong posting sitting just past #10 in the cheap pre-rank (the
+        # reported bug) can never surface even after this fix.
+        assert LLM_SCORE_TOP_N > 10
+
+    def test_scoring_runs_concurrently_not_serially(self, student):
+        """A wall-clock proof, not just a call count: `LLM_SCORE_TOP_N`
+        candidates each scored by an LLM stub that sleeps must finish in
+        roughly ONE sleep's worth of time, not `LLM_SCORE_TOP_N` of them --
+        otherwise widening the window (10 -> 24) would make every fresh
+        search noticeably slower, which is the whole reason the scoring
+        pass was parallelized alongside the widening.
+        """
+        import time
+
+        _resume(student)
+        for i in range(LLM_SCORE_TOP_N):
+            _posting(str(i), title=f"Data Analyst {i}")
+
+        sleep_seconds = 0.2
+
+        class SleepyLLM:
+            def __init__(self):
+                self.calls = 0
+                self._lock = threading.Lock()
+
+            def chat(self, system, messages, json_mode=False):
+                with self._lock:
+                    self.calls += 1
+                time.sleep(sleep_seconds)
+                return _reply(score=70)
+
+        fake = SleepyLLM()
+        started = time.monotonic()
+        feed_for(student, tab="all", score_with_llm=True, llm_factory=lambda: fake)
+        elapsed = time.monotonic() - started
+
+        assert fake.calls == LLM_SCORE_TOP_N
+        # Serial would take LLM_SCORE_TOP_N * sleep_seconds (4.8s here).
+        # Bounded to 8 workers, the real minimum is ceil(24/8) = 3 sleeps;
+        # generous slack keeps this stable on a loaded CI box while still
+        # failing hard if scoring regresses to fully serial.
+        assert elapsed < sleep_seconds * (LLM_SCORE_TOP_N / 2)
+
+
+class TestFeedForRegionFilter:
+    """`region` (see `services/jobs/region.py`) narrows the candidate pool
+    BEFORE the LLM-scoring window is chosen -- filtering to a region scores
+    postings from that region, not the global top-N filtered down to
+    whatever survives. See `feed_for`'s `region` param.
+    """
+
+    def test_filters_to_the_requested_region(self, student):
+        sd = _posting("1", title="Data Analyst", location="San Diego, CA")
+        _posting("2", title="Data Analyst", location="Tokyo, Japan")
+
+        outcome = feed_for(student, tab="all", region="san_diego")
+
+        assert [e["posting"].pk for e in outcome["results"]] == [sd.pk]
+        assert outcome["counts"]["all"] == 1
+
+    def test_no_region_shows_everything(self, student):
+        _posting("1", location="San Diego, CA")
+        _posting("2", location="Tokyo, Japan")
+
+        outcome = feed_for(student, tab="all", region="")
+
+        assert len(outcome["results"]) == 2
+
+    def test_unrecognized_region_value_is_treated_as_no_filter(self, student):
+        _posting("1", location="San Diego, CA")
+        _posting("2", location="Tokyo, Japan")
+
+        outcome = feed_for(student, tab="all", region="mars")
+
+        assert len(outcome["results"]) == 2
+
+    def test_region_filter_applies_before_the_llm_scoring_window(self, student):
+        """The regression this test guards against: filtering AFTER slicing
+        the top-N cheap-rank candidates would score the global top N and
+        then filter it down to (often) nothing. Filtering first means a
+        region with fewer than N matching postings still gets every one of
+        them scored.
+        """
+        _resume(student)
+        remote_postings = [
+            _posting(f"remote-{i}", title=f"Data Analyst {i}", location="Remote")
+            for i in range(3)
+        ]
+        # Plenty of non-remote postings that would fill the scoring window
+        # if the filter ran after slicing instead of before.
+        for i in range(LLM_SCORE_TOP_N):
+            _posting(f"office-{i}", title=f"Data Analyst {i}", location="Tokyo, Japan")
+
+        fake = FakeLLM(replies=[_reply(score=70) for _ in remote_postings])
+
+        outcome = feed_for(student, tab="recommended", region="remote",
+                           score_with_llm=True, llm_factory=lambda: fake)
+
+        result_pks = {e["posting"].pk for e in outcome["results"]}
+        assert result_pks == {p.pk for p in remote_postings}
+        assert MatchReport.objects.count() == len(remote_postings)
+
+    def test_region_filter_applies_to_all_and_liked_tabs_too(self, student):
+        _posting("1", location="San Diego, CA")
+        _posting("2", location="Tokyo, Japan")
+
+        all_tab = feed_for(student, tab="all", region="san_diego")
+        liked_tab = feed_for(student, tab="liked", region="san_diego")
+
+        assert all_tab["counts"]["all"] == 1
+        assert all_tab["counts"] == liked_tab["counts"]
+
+    def test_region_with_no_matches_returns_an_empty_but_honest_result(self, student):
+        _posting("1", location="Tokyo, Japan")
+
+        outcome = feed_for(student, tab="all", region="san_diego")
+
+        assert outcome["results"] == []
+        assert outcome["counts"] == {"recommended": 0, "liked": 0, "all": 0}
+
 
 class TestFeedEndpointLlmScoring:
     def test_score_with_llm_query_param_generates_a_report(self, client, student,
@@ -396,3 +546,23 @@ class TestFeedEndpointLlmScoring:
 
         [entry] = payload["results"]
         assert entry["reportScore"] is None
+
+
+class TestFeedEndpointRegion:
+    def test_region_query_param_filters_results(self, client, student):
+        sd = _posting("1", location="San Diego, CA")
+        _posting("2", location="Tokyo, Japan")
+
+        payload = client.get("/api/thrive/jobs/feed?tab=all&region=san_diego").json()
+
+        [entry] = payload["results"]
+        assert entry["job"]["id"] == f"job-{sd.pk}"
+        assert payload["counts"]["all"] == 1
+
+    def test_no_region_param_is_the_same_as_all_regions(self, client, student):
+        _posting("1", location="San Diego, CA")
+        _posting("2", location="Tokyo, Japan")
+
+        payload = client.get("/api/thrive/jobs/feed?tab=all").json()
+
+        assert len(payload["results"]) == 2

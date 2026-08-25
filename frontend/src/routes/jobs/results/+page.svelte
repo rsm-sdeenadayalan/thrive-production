@@ -6,8 +6,8 @@
 	import JobFeedCard from '$lib/components/jobs/JobFeedCard.svelte';
 	import Button, { buttonClasses } from '$lib/components/ui/Button.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
-	import type { JobFeedTab } from '$lib/data';
-	import { feedEmptyState } from '$lib/jobs';
+	import type { JobFeedTab, JobRegion } from '$lib/data';
+	import { feedEmptyState, JOB_REGIONS, jobRegionLabel } from '$lib/jobs';
 	import { messages } from '$lib/messages';
 	import { pageTitle } from '$lib/title';
 	import { cn } from '$lib/utils';
@@ -43,15 +43,37 @@
 
 	const TABS: JobFeedTab[] = ['recommended', 'liked', 'all'];
 
-	/** A tab's link, carrying the current query and minimum score along with it. */
+	/** A tab's link, carrying the current query, minimum score and region filter along with it. */
 	function tabHref(tab: JobFeedTab): string {
 		const params = new URLSearchParams();
 		if (tab !== 'recommended') params.set('tab', tab);
 		if (data.q.trim().length > 0) params.set('q', data.q);
 		if (data.minScore !== undefined) params.set('minScore', String(data.minScore));
+		if (data.region !== '') params.set('region', data.region);
 		const query = params.toString();
 		return query ? `/jobs/results?${query}` : '/jobs/results';
 	}
+
+	/** A region chip's link -- same preserve-everything-else pattern as `tabHref`,
+	 *  just swapping which param it sets. `''` is "All regions." */
+	function regionHref(region: JobRegion | ''): string {
+		const params = new URLSearchParams();
+		if (data.tab !== 'recommended') params.set('tab', data.tab);
+		if (data.q.trim().length > 0) params.set('q', data.q);
+		if (data.minScore !== undefined) params.set('minScore', String(data.minScore));
+		if (region !== '') params.set('region', region);
+		const query = params.toString();
+		return query ? `/jobs/results?${query}` : '/jobs/results';
+	}
+
+	const regionsCopy = resultsCopy.regions;
+	const regionActive = $derived(data.region !== '');
+	const regionLabel = $derived(regionActive ? jobRegionLabel(data.region as JobRegion) : '');
+	/** Truly nothing matched, anywhere, once the region filter applies -- the
+	 *  honest "this region has no matches" dead end, distinct from a search
+	 *  that matched postings but none cleared the recommended bar (still
+	 *  handled by `showBelowBar` below, which keeps its existing message). */
+	const regionZeroMatches = $derived(regionActive && data.counts.all === 0);
 
 	/** Postings matched, but none cleared the interview-worthy bar. */
 	const showBelowBar = $derived(
@@ -95,6 +117,18 @@
 			{#if data.tab === 'recommended' && data.targetedCount !== null && data.targetedCount > 0}
 				<p class="mt-1.5 text-sm text-body">{resultsCopy.count(data.targetedCount)}</p>
 			{/if}
+			{#if regionActive}
+				<!-- The region filter's own visibility: an active chip below already
+				     shows it in the control itself, but a heading-adjacent line keeps
+				     it visible on an empty-ish list too, where the chip row can be a
+				     scroll away on a narrow screen. -->
+				<p class="mt-1.5 text-2xs text-muted-ink">
+					{regionsCopy.active(regionLabel)}
+					<a href={regionHref('')} class="font-medium text-primary hover:underline"
+						>{regionsCopy.clear}</a
+					>
+				</p>
+			{/if}
 		</div>
 		<a href="/jobs" class="shrink-0 text-2xs font-medium text-primary hover:underline">
 			{resultsCopy.backToSetup}
@@ -107,6 +141,9 @@
 		<input type="hidden" name="tab" value={data.tab} />
 		{#if data.minScore !== undefined}
 			<input type="hidden" name="minScore" value={data.minScore} />
+		{/if}
+		{#if data.region !== ''}
+			<input type="hidden" name="region" value={data.region} />
 		{/if}
 		<div class="min-w-0 max-w-sm flex-1">
 			<label for="jobs-results-q" class="thrive-eyebrow mb-1.5 block">
@@ -148,6 +185,39 @@
 		<p class="mt-1.5 text-3xs text-muted-ink">{resultsCopy.tabHints[data.tab]}</p>
 	</div>
 
+	<!-- The region filter: a row of chips, same visual language as the tab bar
+	     above it. "All regions" is the default/clear chip, not a bucket. -->
+	<div>
+		<nav aria-label={regionsCopy.label} class="flex flex-wrap gap-1.5">
+			<a
+				href={regionHref('')}
+				aria-current={data.region === '' ? 'page' : undefined}
+				class={cn(
+					'rounded-sm px-2.5 py-1.5 text-2xs font-medium',
+					data.region === ''
+						? 'bg-primary text-on-primary'
+						: 'text-body hover:bg-sunken hover:text-ink'
+				)}
+			>
+				{regionsCopy.all}
+			</a>
+			{#each JOB_REGIONS as region (region)}
+				<a
+					href={regionHref(region)}
+					aria-current={data.region === region ? 'page' : undefined}
+					class={cn(
+						'rounded-sm px-2.5 py-1.5 text-2xs font-medium',
+						data.region === region
+							? 'bg-primary text-on-primary'
+							: 'text-body hover:bg-sunken hover:text-ink'
+					)}
+				>
+					{jobRegionLabel(region)}
+				</a>
+			{/each}
+		</nav>
+	</div>
+
 	{#if !data.profileAvailable}
 		<!-- Upload lives on `/jobs`, not here -- this is a pointer back, not a
 		     second copy of the form. -->
@@ -157,7 +227,14 @@
 		</div>
 	{/if}
 
-	{#if emptyState === 'no-jobs-at-all'}
+	{#if regionZeroMatches}
+		<EmptyState icon={Search} message={regionsCopy.empty(regionLabel)} />
+		<p class="text-2xs">
+			<a href={regionHref('')} class="font-medium text-primary hover:underline"
+				>{regionsCopy.clear}</a
+			>
+		</p>
+	{:else if emptyState === 'no-jobs-at-all'}
 		<EmptyState icon={Search} message={feedCopy.empty.noJobsAtAll} />
 	{:else if emptyState === 'no-matches-for-query'}
 		<EmptyState icon={Search} message={feedCopy.empty.noMatchesForQuery(data.q)} />
@@ -179,7 +256,13 @@
 				<ul aria-label={resultsCopy.headings[data.tab](data.q)} class="space-y-3">
 					{#each data.results as entry (entry.id)}
 						<li>
-							<JobFeedCard {entry} tab={data.tab} q={data.q} minScore={data.minScore} />
+							<JobFeedCard
+								{entry}
+								tab={data.tab}
+								q={data.q}
+								minScore={data.minScore}
+								region={data.region}
+							/>
 						</li>
 					{/each}
 				</ul>

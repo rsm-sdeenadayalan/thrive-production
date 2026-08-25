@@ -54,6 +54,7 @@ import type {
   JobFeedTab,
   JobInteractionState,
   JobPosting,
+  JobRegion,
   JobPostingDetail,
   JobSearchEntry,
   JobSearchResult,
@@ -92,6 +93,7 @@ import { buildMockCourses } from "./mock/courses";
 import { mockDegreeProgress } from "./mock/degree";
 import { buildMockEvents } from "./mock/events";
 import { type JobFixture, mockJobs } from "./mock/jobs";
+import { regionOf } from "../jobs";
 import { mockResources } from "./mock/resources";
 import { mockStudent } from "./mock/student";
 import { buildMockSyllabi } from "./mock/syllabi";
@@ -787,20 +789,22 @@ function scoredFeedCandidates(query: string): JobFeedEntry[] {
 const FEED_TABS = new Set<JobFeedTab>(["recommended", "liked", "all"]);
 
 /**
- * Same split as the Django feed: `min_score` filters against `entries` first
- * (falling back to the hybrid score when there is no report), and the three
- * tab counts are taken from what survives that filter, not from the whole
- * candidate set.
+ * Same split as the Django feed: `region` filters the candidate pool first
+ * (same reasoning as `feed_for`'s -- see `region.py` -- a region filter has
+ * to run before anything else narrows the list, not after), `min_score`
+ * filters what is left (falling back to the hybrid score when there is no
+ * report), and the three tab counts are taken from what survives BOTH
+ * filters, not from the whole candidate set.
  */
 function mockGetJobFeed(
-  params: { tab?: JobFeedTab; q?: string; minScore?: number } = {},
+  params: { tab?: JobFeedTab; q?: string; minScore?: number; region?: JobRegion | "" } = {},
 ): Promise<JobFeedResult> {
   const tab = params.tab && FEED_TABS.has(params.tab) ? params.tab : "recommended";
   const minScore = params.minScore ?? 0;
 
-  const entries = scoredFeedCandidates(params.q ?? "").filter(
-    (entry) => (entry.reportScore ?? entry.score) >= minScore,
-  );
+  const entries = scoredFeedCandidates(params.q ?? "")
+    .filter((entry) => !params.region || regionOf(entry.job.location) === params.region)
+    .filter((entry) => (entry.reportScore ?? entry.score) >= minScore);
 
   const recommended = entries.filter((entry) => !entry.dismissed);
   const liked = entries.filter((entry) => entry.liked);
@@ -1007,7 +1011,13 @@ export function uploadResume(file: File): Promise<void> {
 }
 
 export function getJobFeed(
-  params: { tab?: JobFeedTab; q?: string; minScore?: number; scoreWithLlm?: boolean } = {},
+  params: {
+    tab?: JobFeedTab;
+    q?: string;
+    minScore?: number;
+    scoreWithLlm?: boolean;
+    region?: JobRegion | "";
+  } = {},
 ): Promise<JobFeedResult> {
   return apiEnabled() ? api.getJobFeed(params) : mockGetJobFeed(params);
 }

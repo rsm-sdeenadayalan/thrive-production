@@ -5,7 +5,7 @@ per-user like/dismiss state, split into tabs.
 import logging
 
 from rsm_thrive.models import MatchReport, PostingInteraction, ResumeVersion
-from rsm_thrive.services.jobs.report import generate_report
+from rsm_thrive.services.jobs.report import generate_reports_concurrently
 from rsm_thrive.services.jobs.search import search_postings
 
 logger = logging.getLogger("rsm_thrive.jobs")
@@ -13,55 +13,56 @@ logger = logging.getLogger("rsm_thrive.jobs")
 TABS = {"recommended", "liked", "all"}
 
 # How many of the cheap pre-rank's top candidates get a real LLM assessment
-# when `score_with_llm=True`. This is the results page's whole shortlist
-# (see `targetResults`'s `cap`), so scoring exactly this many keeps one fresh
-# search affordable: cached hits are free, a miss is one LLM call.
-LLM_SCORE_TOP_N = 10
+# when `score_with_llm=True`. This is WIDER than the results page's displayed
+# shortlist (`targetResults`'s `cap` of 10, in `jobs.ts`) on purpose: the
+# cheap pre-rank is still a proxy, and a genuinely strong posting can land
+# just outside a narrower window (measured case: an 82-scoring "Data
+# Analyst" posting sat at cheap-pre-rank #22 for the query "data analyst").
+# Scoring 24 candidates and then showing the best 10 BY REAL SCORE gives that
+# posting room to surface without scoring the entire corpus. Cached hits are
+# free; a miss is one LLM call, parallelized (see `_score_top_candidates_with_llm`)
+# so widening this window doesn't multiply wall-clock time by 2.4x.
+LLM_SCORE_TOP_N = 24
 
 
 def _score_top_candidates_with_llm(user, candidates, llm_factory):
     """Ensure a `MatchReport` exists for each of `candidates` (already the
-    cheap pre-rank's top slice -- see `LLM_SCORE_TOP_N`), one real LLM call
-    per cache miss.
+    cheap pre-rank's top slice -- see `LLM_SCORE_TOP_N`), scoring cache
+    misses concurrently -- see `report.generate_reports_concurrently`.
 
     Never raises. The LLM backend can be entirely unavailable (bad/missing
     key, network down) or fail on one specific posting (timeout, malformed
     JSON) -- either way that posting simply keeps its cheap-score estimate
     and the caller's request still succeeds. Callers pick up the freshly
     cached reports by re-querying `MatchReport` afterward.
+
+    `llm_factory()` runs once here, before any scoring starts -- if it
+    fails, no posting is scored at all, rather than firing off N doomed
+    calls.
     """
-    llm = None
-    llm_unavailable = False
-    for row in candidates:
-        posting = row["posting"]
-        if llm is None and not llm_unavailable:
-            try:
-                llm = llm_factory()
-            except Exception:
-                logger.warning(
-                    "LLM backend unavailable for match-report scoring (user=%s) "
-                    "-- results page will show estimates for this search",
-                    user.pk, exc_info=True)
-                llm_unavailable = True
-        if llm is None:
-            continue
-        try:
-            generate_report(llm, user, posting)
-        except Exception:
-            logger.warning(
-                "match-report generation failed (posting=%s, user=%s) "
-                "-- falling back to that posting's estimate",
-                posting.pk, user.pk, exc_info=True)
+    if not candidates:
+        return
+    try:
+        llm = llm_factory()
+    except Exception:
+        logger.warning(
+            "LLM backend unavailable for match-report scoring (user=%s) "
+            "-- results page will show estimates for this search",
+            user.pk, exc_info=True)
+        return
+
+    generate_reports_concurrently(llm, user, [row["posting"] for row in candidates])
 
 
 def feed_for(user, *, query="", tab="recommended", min_score=0, limit=50, embeddings=None,
-             score_with_llm=False, llm_factory=None):
+             score_with_llm=False, llm_factory=None, region=""):
     """Rank postings for `user`, overlay report/interaction state, and split into tabs.
 
     `score_with_llm=True` is the results page's opt-in: the top
     `LLM_SCORE_TOP_N` candidates from the cheap pre-rank each get a real
     `generate_report` call (cache-first, so a repeat search against the same
-    resume version costs nothing).
+    resume version costs nothing), scored concurrently -- see
+    `_score_top_candidates_with_llm`.
 
     That scoring pass changes what `tab="recommended"` returns, and ONLY
     that tab: Recommended is rebuilt from just that scored candidate
@@ -75,11 +76,21 @@ def feed_for(user, *, query="", tab="recommended", min_score=0, limit=50, embedd
     they still mean "everything matching the search," so they keep showing
     every candidate in the cheap pre-rank's own order, picking up whatever
     report happens to be cached (same overlay this function always did).
+
+    `region`, one of `region.REGION_VALUES` or `""` for no filter, narrows
+    the candidate pool by `region_of(posting.location)` BEFORE the
+    `LLM_SCORE_TOP_N` scoring window is chosen -- filtering to "san_diego"
+    scores San Diego postings, not the global top N filtered down to
+    whatever of them happens to survive. It is applied inside
+    `search_postings` itself, before even ITS OWN top-200 candidate cut, for
+    the same reason: a region can genuinely have matches that a search
+    ranked outside the top 200 by resume fit, and filtering after that cut
+    would starve them out too.
     """
     if tab not in TABS:
         tab = "recommended"
 
-    outcome = search_postings(user, query, limit=200, embeddings=embeddings)
+    outcome = search_postings(user, query, limit=200, embeddings=embeddings, region=region)
     rows = outcome["results"]
     posting_ids = [row["posting"].pk for row in rows]
 

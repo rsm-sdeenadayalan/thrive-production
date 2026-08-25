@@ -2,8 +2,8 @@ import { fail, redirect } from "@sveltejs/kit";
 
 import { apiEnabled } from "$lib/data/api/client";
 import { dismissJob, getJobFeed, likeJob, searchJobs } from "$lib/data";
-import type { JobFeedTab, RoleBenchmark } from "$lib/data";
-import { targetResults, toJobFeedEntryView } from "$lib/jobs";
+import type { JobFeedTab, JobRegion, RoleBenchmark } from "$lib/data";
+import { isJobRegion, targetResults, toJobFeedEntryView } from "$lib/jobs";
 import { messages } from "$lib/messages";
 import type { Actions, PageServerLoad } from "./$types";
 
@@ -49,9 +49,10 @@ export const load: PageServerLoad = async ({ url }) => {
 	const tab = parseTab(url.searchParams.get("tab"));
 	const q = url.searchParams.get("q") ?? "";
 	const minScore = parseMinScore(url.searchParams.get("minScore"));
+	const region = parseRegion(url.searchParams.get("region"));
 
 	const [feed, benchmark] = await Promise.all([
-		getJobFeed({ tab, q, minScore, scoreWithLlm: true }),
+		getJobFeed({ tab, q, minScore, scoreWithLlm: true, region }),
 		q.trim().length > 0 ? searchJobs(q).then((result) => result.benchmark) : Promise.resolve<RoleBenchmark | null>(null),
 	]);
 
@@ -72,6 +73,7 @@ export const load: PageServerLoad = async ({ url }) => {
 		tab,
 		q,
 		minScore,
+		region,
 		profileAvailable: feed.profileAvailable,
 		counts,
 		results: targeted,
@@ -93,6 +95,12 @@ function parseMinScore(value: string | null): number | undefined {
 	return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+/** An unrecognized `region` is treated as "All regions" -- same
+ *  quietly-default convention `parseTab` uses for an unknown tab. */
+function parseRegion(value: string | null): JobRegion | "" {
+	return value !== null && isJobRegion(value) ? value : "";
+}
+
 function formString(form: FormData, key: string): string | null {
 	const value = form.get(key);
 	return typeof value === "string" ? value : null;
@@ -111,11 +119,13 @@ function redirectTarget(form: FormData, url: URL): string {
 	const tab = parseTab(formString(form, "tab") ?? url.searchParams.get("tab"));
 	const q = formString(form, "q") ?? url.searchParams.get("q") ?? "";
 	const minScore = formString(form, "minScore") ?? url.searchParams.get("minScore");
+	const region = parseRegion(formString(form, "region") ?? url.searchParams.get("region"));
 
 	const params = new URLSearchParams();
 	if (tab !== "recommended") params.set("tab", tab);
 	if (q.trim().length > 0) params.set("q", q);
 	if (minScore !== null && minScore.trim().length > 0) params.set("minScore", minScore);
+	if (region !== "") params.set("region", region);
 
 	const query = params.toString();
 	return query ? `/jobs/results?${query}` : "/jobs/results";

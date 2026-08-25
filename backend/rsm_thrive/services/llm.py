@@ -12,6 +12,7 @@ the test double.
 import json
 import logging
 import re
+import threading
 import time
 from abc import ABC, abstractmethod
 
@@ -29,17 +30,25 @@ class LLM(ABC):
 
 
 class FakeLLM(LLM):
-    """Scripted replies, recorded calls. The only LLM pytest ever runs."""
+    """Scripted replies, recorded calls. The only LLM pytest ever runs.
+
+    Thread-safe: the results page's parallel match-report scoring (see
+    `feed._score_top_candidates_with_llm`) calls one `FakeLLM` instance from
+    several worker threads at once in tests, so `calls` and `_replies` are
+    guarded by a lock rather than assumed single-threaded.
+    """
 
     def __init__(self, replies: list):
         self._replies = list(replies)
         self.calls = []
+        self._lock = threading.Lock()
 
     def chat(self, system: str, messages: list, json_mode: bool = False) -> str:
-        self.calls.append((system, messages, json_mode))
-        if not self._replies:
-            raise RuntimeError("FakeLLM exhausted")
-        return self._replies.pop(0)
+        with self._lock:
+            self.calls.append((system, messages, json_mode))
+            if not self._replies:
+                raise RuntimeError("FakeLLM exhausted")
+            return self._replies.pop(0)
 
 
 def parse_llm_json(text: str) -> dict:

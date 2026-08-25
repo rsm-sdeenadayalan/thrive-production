@@ -7,7 +7,7 @@
 
 	import Button from '$lib/components/ui/Button.svelte';
 	import Tag from '$lib/components/ui/Tag.svelte';
-	import type { JobFeedTab } from '$lib/data';
+	import type { JobFeedTab, JobRegion } from '$lib/data';
 	import { competencyLabel, ringPercent, type JobFeedEntryView } from '$lib/jobs';
 	import { messages } from '$lib/messages';
 	import { competencyTone } from '$lib/tones';
@@ -25,12 +25,12 @@
 	 * NUMBER -- that is what the competency `Tag` (strong/good/stretch/reach) is
 	 * for, and it only exists once a report has actually run.
 	 *
-	 * ## `tab`/`q`/`minScore` travel with the card, not read from `$page.url`
+	 * ## `tab`/`q`/`minScore`/`region` travel with the card, not read from `$page.url`
 	 *
 	 * Like and Dismiss are plain `POST` forms -- no `use:enhance` needed, since
 	 * a full-page redirect back to `+page.server.ts`'s `load` is exactly what
 	 * turns a like into a filled heart. That redirect target is built server-side
-	 * by `redirectTarget`, which reads these same three values back out of each
+	 * by `redirectTarget`, which reads these same four values back out of each
 	 * form's hidden inputs -- so the card carries them once here rather than
 	 * every form re-deriving the current URL.
 	 */
@@ -38,12 +38,14 @@
 		entry,
 		tab,
 		q,
-		minScore
+		minScore,
+		region
 	}: {
 		entry: JobFeedEntryView;
 		tab: JobFeedTab;
 		q: string;
 		minScore: number | undefined;
+		region: JobRegion | '';
 	} = $props();
 
 	const copy = messages.jobs.feed.card;
@@ -114,6 +116,9 @@
 			{#if minScore !== undefined}
 				<input type="hidden" name="minScore" value={minScore} />
 			{/if}
+			{#if region}
+				<input type="hidden" name="region" value={region} />
+			{/if}
 			<Button type="submit" variant={entry.liked ? 'primary' : 'secondary'} size="sm">
 				<Heart aria-hidden="true" class="size-3.5" />
 				{entry.liked ? copy.liked : copy.like}
@@ -126,6 +131,9 @@
 			<input type="hidden" name="q" value={q} />
 			{#if minScore !== undefined}
 				<input type="hidden" name="minScore" value={minScore} />
+			{/if}
+			{#if region}
+				<input type="hidden" name="region" value={region} />
 			{/if}
 			<Button type="submit" variant="ghost" size="sm">
 				{#if entry.dismissed}

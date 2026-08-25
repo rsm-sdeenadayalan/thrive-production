@@ -3,7 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   competencyLabel,
   feedEmptyState,
+  isJobRegion,
+  JOB_REGIONS,
+  jobRegionLabel,
   jobsEmptyState,
+  regionOf,
   ringPercent,
   shareWidth,
   targetResults,
@@ -326,5 +330,65 @@ describe("targetResults", () => {
       view({ score: 70 }),
     ];
     expect(targetResults(entries, { cap: 4 }).map((e) => e.score)).toEqual([90, 80, 70]);
+  });
+});
+
+describe("isJobRegion / JOB_REGIONS / jobRegionLabel", () => {
+  it("accepts every value in JOB_REGIONS and rejects an unknown one", () => {
+    for (const region of JOB_REGIONS) {
+      expect(isJobRegion(region)).toBe(true);
+    }
+    expect(isJobRegion("mars")).toBe(false);
+    expect(isJobRegion("")).toBe(false);
+  });
+
+  it("gives every region a non-empty label, each one distinct", () => {
+    const labels = JOB_REGIONS.map((r) => jobRegionLabel(r));
+    for (const label of labels) {
+      expect(label.length).toBeGreaterThan(0);
+    }
+    expect(new Set(labels).size).toBe(JOB_REGIONS.length);
+  });
+
+  it("labels null as 'all regions', distinct from every real region", () => {
+    const allLabel = jobRegionLabel(null);
+    expect(allLabel.length).toBeGreaterThan(0);
+    for (const region of JOB_REGIONS) {
+      expect(jobRegionLabel(region)).not.toBe(allLabel);
+    }
+  });
+});
+
+describe("regionOf", () => {
+  it("Remote wins even when a named place is also present", () => {
+    expect(regionOf("Remote")).toBe("remote");
+    expect(regionOf("Remote - US")).toBe("remote");
+    expect(regionOf("San Francisco, CA | Remote")).toBe("remote");
+  });
+
+  it("recognizes San Diego", () => {
+    expect(regionOf("San Diego, CA")).toBe("san_diego");
+  });
+
+  it("recognizes the Bay Area's named cities", () => {
+    expect(regionOf("San Francisco, CA")).toBe("bay_area");
+    expect(regionOf("San Jose, CA")).toBe("bay_area");
+    expect(regionOf("Oakland, CA")).toBe("bay_area");
+  });
+
+  it("recognizes Los Angeles, Seattle, and New York", () => {
+    expect(regionOf("Los Angeles, CA")).toBe("los_angeles");
+    expect(regionOf("Seattle, WA")).toBe("seattle");
+    expect(regionOf("Bellevue, WA")).toBe("seattle");
+    expect(regionOf("New York, NY")).toBe("new_york");
+  });
+
+  it("falls back to international for a recognized foreign city", () => {
+    expect(regionOf("London")).toBe("international");
+    expect(regionOf("Tokyo, Japan")).toBe("international");
+  });
+
+  it("is case-insensitive", () => {
+    expect(regionOf("SAN FRANCISCO, CA")).toBe("bay_area");
   });
 });

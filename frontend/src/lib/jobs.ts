@@ -3,6 +3,7 @@ import type {
   JobFeedEntry,
   JobFeedTab,
   JobPostingDetail,
+  JobRegion,
   JobSearchEntry,
 } from "$lib/data";
 import { formatShortDate } from "$lib/format";
@@ -242,4 +243,65 @@ export function targetResults(
   { cap = 10, floor = 45 }: { cap?: number; floor?: number } = {},
 ): JobFeedEntryView[] {
   return entries.filter((entry) => entry.score === null || entry.score >= floor).slice(0, cap);
+}
+
+// ---------------------------------------------------------------------------
+// Region filter (results page)
+// ---------------------------------------------------------------------------
+
+/**
+ * Every selectable region, in the same priority order
+ * `backend/rsm_thrive/services/jobs/region.py` checks them in. `""` (all
+ * regions, the default) is deliberately not a member -- it is the absence
+ * of a filter, not one more bucket to render alongside these.
+ */
+export const JOB_REGIONS: JobRegion[] = [
+  "remote",
+  "san_diego",
+  "bay_area",
+  "los_angeles",
+  "seattle",
+  "new_york",
+  "other_us",
+  "international",
+];
+
+export function isJobRegion(value: string): value is JobRegion {
+  return (JOB_REGIONS as string[]).includes(value);
+}
+
+/**
+ * A region's display label, from the one map that owns the translation --
+ * same pattern `competencyLabel` uses. `null` (all regions) reads as "All
+ * regions."
+ */
+export function jobRegionLabel(region: JobRegion | null): string {
+  return region === null
+    ? messages.jobs.results.regions.all
+    : messages.jobs.results.regions.names[region];
+}
+
+/**
+ * The mock provider's offline stand-in for `region_of` in
+ * `backend/rsm_thrive/services/jobs/region.py`.
+ *
+ * Not required to be byte-for-byte identical to the backend's heuristic --
+ * mock mode exists so the app runs with no API configured, not to reproduce
+ * production ranking -- but it follows the same priority order (Remote
+ * first, so a "Remote" fixture never gets swallowed by a named city) so a
+ * developer poking at the region filter offline sees behaviour that rhymes
+ * with the real one.
+ */
+export function regionOf(location: string): JobRegion {
+  const text = location.toLowerCase();
+  if (text.includes("remote")) return "remote";
+  if (text.includes("san diego")) return "san_diego";
+  if (["san francisco", "bay area", "san jose", "oakland"].some((k) => text.includes(k))) {
+    return "bay_area";
+  }
+  if (text.includes("los angeles")) return "los_angeles";
+  if (text.includes("seattle") || text.includes("bellevue")) return "seattle";
+  if (text.includes("new york")) return "new_york";
+  if (/\b(usa|united states)\b/.test(text) || /,\s*[a-z]{2}\b/.test(text)) return "other_us";
+  return "international";
 }

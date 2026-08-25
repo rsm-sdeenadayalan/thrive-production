@@ -907,6 +907,28 @@ describe("the job feed", () => {
       recommended.results.map((entry) => entry.job.id),
     );
   });
+
+  it("region filters the candidate pool, and the counts follow", async () => {
+    const data = await freshData();
+    const all = await data.getJobFeed({ tab: "all" });
+
+    const sanDiego = await data.getJobFeed({ tab: "all", region: "san_diego" });
+    expect(sanDiego.results.length).toBeGreaterThan(0);
+    expect(sanDiego.results.length).toBeLessThan(all.results.length);
+    expect(sanDiego.counts.all).toBe(sanDiego.results.length);
+    for (const entry of sanDiego.results) {
+      expect(entry.job.location.toLowerCase()).toContain("san diego");
+    }
+  });
+
+  it("no region param (or an empty one) is the same as all regions", async () => {
+    const data = await freshData();
+    const all = await data.getJobFeed({ tab: "all" });
+    const explicitlyAll = await data.getJobFeed({ tab: "all", region: "" });
+    expect(explicitlyAll.results.map((e) => e.job.id)).toEqual(
+      all.results.map((e) => e.job.id),
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------

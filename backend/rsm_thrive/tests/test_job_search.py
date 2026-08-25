@@ -97,6 +97,42 @@ class TestSearch:
         _posting("2", "B", "y", [])
         assert len(search_postings(student, "")["results"]) == 2
 
+    def test_title_aware_ranking_surfaces_the_true_role_over_a_high_overlap_impostor(
+        self, student,
+    ):
+        """The reported bug, at the `search_postings` boundary: a genuine
+        "Data Analyst" posting with only middling skill overlap must rank
+        ABOVE a "Senior Workday Analyst, Payroll" posting whose skills
+        happen to overlap heavily with the resume but whose role does not
+        match the query at all. See `services/jobs/ranking.py`.
+        """
+        _resume(student, skills=("Workday", "Payroll", "HRIS", "Python", "SQL"))
+        data_analyst = _posting("1", "Data Analyst", "sql dashboards",
+                                ["sql", "excel", "tableau"])
+        workday_analyst = _posting("2", "Senior Workday Analyst, Payroll",
+                                   "manages payroll data systems",
+                                   ["workday", "payroll", "hris", "python", "sql"])
+
+        ids = [r["posting"].external_id
+              for r in search_postings(student, "data analyst")["results"]]
+
+        assert ids.index(data_analyst.external_id) < ids.index(workday_analyst.external_id)
+
+    def test_region_filters_before_the_candidate_limit(self, student):
+        sd = _posting("1", "Data Analyst", "sql", ["sql"])
+        sd.location = "San Diego, CA"
+        sd.save()
+        _posting("2", "Data Analyst", "sql", ["sql"])
+
+        result = search_postings(student, "data analyst", region="san_diego")
+        ids = [r["posting"].external_id for r in result["results"]]
+        assert ids == [sd.external_id]
+
+    def test_unrecognized_region_is_treated_as_no_filter(self, student):
+        _posting("1", "Data Analyst", "sql", ["sql"])
+        _posting("2", "Data Analyst", "sql", ["sql"])
+        assert len(search_postings(student, "data analyst", region="mars")["results"]) == 2
+
 
 class TestBenchmark:
     def test_shares_and_ranking(self, student):

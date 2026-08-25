@@ -526,6 +526,23 @@ export interface MatchReport {
 export type JobFeedTab = "recommended" | "liked" | "all";
 
 /**
+ * A selectable location bucket for the results page's region filter.
+ *
+ * Mirrors `backend/rsm_thrive/services/jobs/region.py` exactly -- values,
+ * priority order and all. `""` (not a member of this type) means "All
+ * regions," the default with no filter applied.
+ */
+export type JobRegion =
+  | "remote"
+  | "san_diego"
+  | "bay_area"
+  | "los_angeles"
+  | "seattle"
+  | "new_york"
+  | "other_us"
+  | "international";
+
+/**
  * One posting in the feed: the hybrid search score every entry carries, plus
  * an optional cached LLM report score/competency layered on top when one
  * exists for the student's current resume version.
