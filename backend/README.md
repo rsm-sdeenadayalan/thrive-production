@@ -16,8 +16,12 @@ platform checkout on the server (branch `feat/msba-brain`).
 ## Chatbots: corpus, LLM backend, and eval
 
 The three destination bots (`resources`/FAQ, `career`, `courses`/electives)
-answer from an ingested corpus of retrieved passages plus an LLM. Two knobs
-control the backend:
+answer from an ingested corpus of retrieved passages plus an LLM. The FAQ bot
+and the course planner (below) were ported from a collaborator's prototype —
+github.com/rsm-ygadhiya/Thrive-Chatbots — and re-verified end-to-end against
+this system's real corpus, retrieval, and chat write path; `career` is ours.
+
+Two knobs control the backend:
 
 - `THRIVE_LLM` — `tritonai` (default) or `fake`. `fake` makes `get_llm()`
   raise, which is the intended way to exercise the degraded/turn-rescue path
@@ -32,18 +36,74 @@ control the backend:
   `backend/.env` and fill in the key for local dev (auto-loaded by
   `config/settings.py`).
 
-Ingest a corpus directory (`.pdf`/`.md`/`.txt`) and/or the course catalog:
+### Retrieval: hybrid rank, two admission tiers, typo repair
+
+`rsm_thrive/services/retrieval.py` is not pure cosine search. Every question
+is scored against every in-scope `DocumentChunk` two ways:
+
+- **Cosine similarity** against the question embedding — finds paraphrases.
+- **Keyword score** — the fraction of the question's distinctive terms (stop
+  words stripped) present in the chunk's heading + text.
+
+A chunk is **admitted** if either tier clears its gate: cosine ≥
+`min_similarity`, OR keyword score ≥ `lexical_min` (typically 1.0 — *every*
+distinctive term of the question present in that one chunk) with cosine above
+a low `lexical_floor` sanity check. The lexical tier exists because short,
+typo-prone student questions ("how do i get zoom?", "library hours") often
+score below the cosine gate even though the corpus answers them on page
+one — absolute cosine tracks how well-formed the *question* is, not whether
+the chunk answers it. Admitted chunks are then **ranked** by
+`cosine + 0.25 × keyword_score` — cosine still dominates ordering; the
+keyword term only lifts a chunk that shares distinctive words with the
+question (calibrated so it rescues dense, number-heavy chunks like fee
+tables without out-ranking genuine paraphrase matches).
+
+Typo tolerance sits in front of the lexical tier: query terms 5+ characters
+that don't appear in the corpus vocabulary are expanded to every corpus word
+one edit away (`expand_terms`), so "zooom" still matches "zoom" without
+relaxing the "every term present" rule for words that are already spelled
+correctly. See the module docstring for the specific measurements (cosine
+gaps, coverage deltas) behind every constant.
+
+### Corpus: layout and ingesting the real material
+
+`rsm_thrive/data/corpus/` holds the real, checked-in corpus (not a test
+fixture) in three source directories plus the course catalog:
+
+- `crawled/` — public UCSD/Rady policy pages (Blink, Student Financial
+  Solutions, career.ucsd.edu, etc.), one `.md` file per page.
+- `canvas/` — MSBA cohort Canvas pages (orientation, laptop guidelines,
+  Zoom setup, program prep).
+- `program/` — the published Plans of Study (11-month and 17-month) and
+  where-to-find-syllabi guidance.
+- `rsm_thrive/data/catalog/courses.json` — the course catalog, ingested with
+  `--catalog` rather than as files.
+
+Ingest a corpus directory (`.pdf`/`.md`/`.txt`) and/or the course catalog.
+`ingest_corpus` is **not recursive**, so each source directory is ingested
+separately:
 
 ```bash
-uv run python manage.py ingest_corpus path/to/corpus --catalog
+for d in crawled canvas program; do
+  uv run python manage.py ingest_corpus rsm_thrive/data/corpus/$d
+done
+uv run python manage.py ingest_corpus --catalog
 ```
 
-This is idempotent per source (`file:<name>` / `catalog:<code>`), so re-runs
-just refresh chunks — safe to schedule as a cron once F5 adds Celery. The repo
-carries only a small fixture corpus at
-`rsm_thrive/tests/fixtures/corpus/`; the real syllabus PDFs and the program
-handbook live outside the repo (see the spec's deferred-work notes) and get
-ingested the same way, locally and on the server.
+This produces roughly 260 `Document`s / 2,450 `DocumentChunk`s at 1024
+embedding dimensions (TritonAI `api-tgpt-embeddings`). It is idempotent per
+source (`file:<name>` / `catalog:<code>`), so re-runs just refresh chunks —
+safe to schedule as a cron once F5 adds Celery. Ingestion only touches
+`Document`/`DocumentChunk` — it never reads or writes `JobPosting`, so
+re-ingesting the corpus never disturbs the Career feed. A crawled document's
+`destinations` are derived from its kind and source host (`destinations_for`
+in `ingest_corpus.py`): syllabi also reach `courses`, and
+career.ucsd.edu/career.rady.ucsd.edu pages also reach `career`; use
+`--rescope` to recompute `destinations` for already-ingested documents
+without re-embedding anything.
+
+The repo also carries a small fixture corpus at
+`rsm_thrive/tests/fixtures/corpus/`, used only by tests.
 
 Run the golden FAQ eval against whatever corpus is ingested:
 
@@ -65,6 +125,56 @@ calibrated to a policy-only corpus (the seeded handbook fixture); run against
 a larger mixed corpus (e.g. the fixture plus `--catalog`) and fake-embedding
 retrieval dilutes, so several cases fail by design — run the eval against the
 corpus the goldens target, or grow/tune the goldens as the corpus grows.
+
+### Course planner: interview → 50-unit plan → swaps → review
+
+The `courses` destination (`answer_electives` in `rsm_thrive/services/bots.py`,
+engine in `rsm_thrive/services/planner.py`) runs a stateful interview scoped
+to one `Conversation`, not a one-shot goal extraction:
+
+1. **Interview** (4 steps, tracked in `PlannerSession.intake` per
+   conversation): track (11-month vs 17-month), career goal(s) (validated
+   against `careers.json`), self-rated skill levels (Python/SQL/statistics/ML/
+   communication, 1–5 — accepted as free text or via the chat UI's rating-form
+   quick action), and desired workload. Skill ratings left unanswered after
+   `MAX_STEP_ATTEMPTS` (2) are assumed rather than asked a third time; a track
+   or career goal is never assumed.
+2. **Plan** (`build_plan`): once the interview is complete, deterministically
+   lays out every quarter of the chosen track with **50 total units** (22
+   core + 28 elective, the degree requirement), core courses fixed and
+   elective slots filled toward the stated career goal, excluding courses the
+   student has already taken (`Enrollment`) and filtered by the catalog's
+   offering terms and the student's workload preference. Rendered as Markdown
+   (`render_plan_markdown`) with one table per quarter — the frontend's
+   `richtext.ts`/`RichMessage.svelte` renders these as real HTML tables, not
+   raw pipes.
+3. **Swaps**: a student can replace one elective in one quarter/slot
+   (`apply_swap`); every other auto-filled elective is pinned so the rest of
+   the schedule doesn't shift, and a rejected swap (course not offered that
+   quarter, duplicate, wrong slot) comes back as a `ValueError` message rather
+   than a silently wrong plan.
+4. **Review** (`PlannerSession.review`, `review_quarter`/`review_intent`): a
+   student can ask to "walk through it a quarter at a time" and get 3
+   alternatives per elective slot with what each course teaches, before
+   finalizing swaps — driven entirely through chat, not a separate UI.
+
+REST surface (`rsm_thrive/views/planner.py`, all under
+`/api/thrive/plan*`, all `@profile_required`):
+
+- `GET /plan/intake` — the interview questions, this student's answers so
+  far, `hasPlan`, and `starter` (the opening question — what `/ask/courses`
+  shows before the student has said anything).
+- `GET /plan` — the built plan (404 `no_plan` before the intake is answered,
+  409 `intake_incomplete` mid-interview) as structured JSON plus a
+  ready-to-render `markdown` field.
+- `POST /plan` — submit a full `answers` object directly (bypassing the chat
+  interview); starts a fresh plan and clears prior swaps, since they were
+  chosen against a different intake.
+- `DELETE /plan` — clear this student's plan.
+- `GET /plan/alternatives?quarter=&slot=` — up to 4 alternative courses for
+  one elective slot.
+- `POST /plan/swap` — `{quarter, slot, courseId}`; swaps one elective,
+  pinning the rest.
 
 ## Jobs: ingest, sources, feed, and match reports
 
