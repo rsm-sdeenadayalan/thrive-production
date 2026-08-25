@@ -141,11 +141,14 @@ class TestSendMessage:
         response = _post(client, f"/api/thrive/conversations/conv-{conv.pk}/messages",
                          {"body": "recommend me electives"})
         last = response.json()["messages"][-1]
-        assert "11 month" in last["body"] and "17 month" in last["body"]
         assert "MGTA" not in last["body"]
-        # The track question is a closed set: it comes with buttons, not a form.
-        assert {"label": "11 month", "send": "11 month"} in last["quickReplies"]
-        assert {"label": "17 month", "send": "17 month"} in last["quickReplies"]
+        # The track question is a closed set: it comes with buttons, not a form,
+        # and each button carries its own explanation so the body does not
+        # repeat the list above them.
+        assert {"label": "11 month", "send": "11 month",
+                "description": "Summer through Spring"} in last["quickReplies"]
+        assert {"label": "17 month", "send": "17 month",
+                "description": "finishes the following Fall"} in last["quickReplies"]
         assert last["form"] is None
 
     def test_electives_skills_step_returns_a_rating_form(self, client, student,

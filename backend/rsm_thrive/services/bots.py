@@ -222,6 +222,29 @@ def _handle_change_request(user, answers, question):
                                  planner.taken_course_ids(user))), [], "plan")
 
 
+def _retitle_if_button_pressed(conversation, answers):
+    """Give a plan conversation a title that says what it is about.
+
+    A conversation is titled from the student's FIRST message, which works
+    everywhere a student opens by typing a question. It does not work here: the
+    course recommender opens by asking "Which track are you on?" with two
+    buttons, so the first message is usually the word "17 month" — and the
+    saved list filled with rows called "17 month", indistinguishable from each
+    other and silent about what each plan was for.
+
+    Only a title that IS one of those closed-set answers gets replaced. A
+    student who opened by typing "which electives suit a product manager" wrote
+    a better title than this function can compose, and it is left alone.
+    """
+    title = planner.conversation_title(answers)
+    if not title or conversation.title == title:
+        return
+    if conversation.title.strip().lower() not in planner.interview_answers():
+        return
+    conversation.title = title[:60]
+    conversation.save(update_fields=["title"])
+
+
 def answer_electives(llm, conversation, question, history):
     """Interview the student, then build and maintain their plan of study.
 
@@ -248,6 +271,7 @@ def answer_electives(llm, conversation, question, history):
     answers = planner.merge_intake(
         planner.load_session_intake(conversation), extracted)
     planner.save_session_intake(conversation, answers)
+    _retitle_if_button_pressed(conversation, answers)
 
     step = planner.next_intake_step(answers)
     if step:

@@ -1133,11 +1133,21 @@ def render_question(step, answers, unmatched_goal=""):
     lines.append(question["prompt"])
     if question.get("help"):
         lines += ["", f"_{question['help']}_"]
-    lines.append("")
-    for option in question["options"]:
-        label = option["label"]
-        description = option.get("description")
-        lines.append(f"- **{label}**" + (f" — {description}" if description else ""))
+
+    # The options are printed ONLY when this step has no buttons to carry them.
+    # Every step that does (`quick_replies_for`) now puts each option's
+    # explanation on its own button, and printing the same list above them made
+    # one question into five stacked blocks — a step counter, a prompt, a help
+    # line, a bullet list, and a button row saying the list again.
+    #
+    # The fallback still matters: a client that ignores `quickReplies` has to
+    # render a usable question, and this is the message body it renders.
+    if not quick_replies_for(step):
+        lines.append("")
+        for option in question["options"]:
+            label = option["label"]
+            description = option.get("description")
+            lines.append(f"- **{label}**" + (f" — {description}" if description else ""))
     return "\n".join(lines)
 
 
@@ -1169,6 +1179,39 @@ def load_session_intake(conversation):
 
     session = PlannerSession.objects.filter(conversation=conversation).first()
     return dict(session.intake) if session else {}
+
+
+def interview_answers():
+    """Every closed-set answer a student can send as a single message.
+
+    Used to recognise a conversation TITLE that is really a button press. The
+    title is taken from the student's first message, and on this destination
+    that message is usually one tap — so the saved list filled up with rows
+    called "17 month", several of them, none of which say what the plan was
+    for. See `conversation_title`.
+    """
+    values = {choice["value"].lower() for choice in TRACK_CHOICES}
+    values |= {choice["value"].lower() for choice in WORKLOAD_CHOICES}
+    values |= {role["label"].lower() for role in load_careers().values()}
+    return values
+
+
+def conversation_title(answers):
+    """What to call a saved plan conversation, or "" if it is too early to say.
+
+    Named after the two answers that identify the plan — the goal it targets
+    and the track it runs on — because those are what a student is looking for
+    when they come back to a list of them a week later. The track alone is not
+    enough: it is the first question, so titling on it would name every
+    conversation before any of them had a subject.
+    """
+    goals = answers.get("goals") or []
+    if not goals:
+        return ""
+    careers = load_careers()
+    label = careers.get(goals[0], {}).get("label") or goals[0]
+    track = answers.get("track")
+    return f"Course plan — {label}" + (f", {track}" if track else "")
 
 
 def supported_roles():
@@ -1251,6 +1294,20 @@ def compose_rating_message(ratings):
     return ", ".join(parts)
 
 
+def _choice_button(option):
+    """One closed-set option as a button, label split from its explanation.
+
+    The published labels are written as "11 month — Summer through Spring":
+    a name, an em dash, and what it means. The button face takes the name and
+    the `description` carries the rest, so the explanation travels WITH the
+    control instead of being repeated in a bullet list above it (see
+    `render_question`, which no longer prints one).
+    """
+    label, _, description = option["label"].partition(" — ")
+    return {"label": label, "send": option["value"],
+            "description": description or option.get("description", "")}
+
+
 def quick_replies_for(step):
     """Buttons to offer with a question, so a fixed choice need not be typed.
 
@@ -1260,8 +1317,7 @@ def quick_replies_for(step):
     """
     careers = load_careers()
     if step["key"] == "track":
-        return [{"label": option["label"].split(" — ")[0], "send": option["value"]}
-                for option in TRACK_CHOICES]
+        return [_choice_button(option) for option in TRACK_CHOICES]
     if step["key"] == "goals":
         # `short_label` comes from careers.json rather than being derived. A
         # slash means two different things in these labels — an alias in
@@ -1273,11 +1329,11 @@ def quick_replies_for(step):
         # might match on; only the button face is shortened.
         return [{"label": careers[role_id].get("short_label")
                           or careers[role_id]["label"],
-                 "send": careers[role_id]["label"]}
+                 "send": careers[role_id]["label"],
+                 "description": careers[role_id].get("description", "")}
                 for role_id in supported_roles()]
     if step["key"] == "workload":
-        return [{"label": option["label"].split(" — ")[0], "send": option["value"]}
-                for option in WORKLOAD_CHOICES]
+        return [_choice_button(option) for option in WORKLOAD_CHOICES]
     return []
 
 

@@ -16,12 +16,16 @@ import { parseInline, parseRichText, type InlineSpan, type RichBlock } from "$li
 
 /** The visible text of a span tree, ignoring which kind carried it. */
 function flatten(spans: InlineSpan[]): string {
-  return spans.map((s) => (s.kind === "bold" ? flatten(s.spans) : s.text)).join("");
+  return spans
+    .map((s) => (s.kind === "bold" || s.kind === "italic" ? flatten(s.spans) : s.text))
+    .join("");
 }
 
 function textOf(spans: InlineSpan[]): string[] {
   return spans.map((span) =>
-    span.kind === "bold" ? `bold:${flatten(span.spans)}` : `${span.kind}:${span.text}`,
+    span.kind === "bold" || span.kind === "italic"
+      ? `${span.kind}:${flatten(span.spans)}`
+      : `${span.kind}:${span.text}`,
   );
 }
 
@@ -79,6 +83,67 @@ describe("parseInline", () => {
 
   it("returns nothing for an empty line", () => {
     expect(parseInline("")).toEqual([]);
+  });
+});
+
+describe("parseInline emphasis", () => {
+  it("reads an underscore-delimited italic span", () => {
+    // The exact shape the course recommender writes its help line in. This
+    // rendered as literal underscores around the sentence before italics
+    // existed, on the first screen of the course recommender.
+    expect(textOf(parseInline("_It decides how many quarters the plan has._"))).toEqual([
+      "italic:It decides how many quarters the plan has.",
+    ]);
+  });
+
+  it("reads an asterisk-delimited italic span", () => {
+    expect(textOf(parseInline("that is *usually* true"))).toEqual([
+      "text:that is ",
+      "italic:usually",
+      "text: true",
+    ]);
+  });
+
+  it("leaves underscores inside an identifier alone", () => {
+    // `min_similarity` and friends are quoted verbatim by the bots. Naive
+    // emphasis scanning turns the run between two underscores into italics and
+    // mangles the name being quoted.
+    expect(parseInline("set min_similarity and lexical_floor")).toEqual([
+      { kind: "text", text: "set min_similarity and lexical_floor" },
+    ]);
+  });
+
+  it("does not read multiplication as emphasis", () => {
+    expect(parseInline("2 * 3 * 4 units")).toEqual([
+      { kind: "text", text: "2 * 3 * 4 units" },
+    ]);
+  });
+
+  it("keeps bold bold rather than reading it as empty italics", () => {
+    expect(textOf(parseInline("**CSE 251A**"))).toEqual(["bold:CSE 251A"]);
+  });
+
+  it("nests a link inside italics", () => {
+    expect(parseInline("_see [WebReg](https://act.ucsd.edu/webreg2)_")).toEqual([
+      {
+        kind: "italic",
+        spans: [
+          { kind: "text", text: "see " },
+          { kind: "link", text: "WebReg", href: "https://act.ucsd.edu/webreg2" },
+        ],
+      },
+    ]);
+  });
+
+  it("treats an unclosed marker as the literal character", () => {
+    expect(parseInline("a _ b")).toEqual([{ kind: "text", text: "a _ b" }]);
+    expect(parseInline("_unclosed emphasis")).toEqual([
+      { kind: "text", text: "_unclosed emphasis" },
+    ]);
+  });
+
+  it("reads bold inside italics", () => {
+    expect(textOf(parseInline("_a **b** c_"))).toEqual(["italic:a b c"]);
   });
 });
 

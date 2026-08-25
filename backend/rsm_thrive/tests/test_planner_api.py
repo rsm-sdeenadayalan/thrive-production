@@ -42,8 +42,10 @@ class TestIntakeEndpoint:
         """The chat opens ON the first question, not on an empty box."""
         body = student_client.get(INTAKE).json()
         starter = body["starter"]
-        assert "11 month" in starter["body"] and "17 month" in starter["body"]
+        # The choices ride on the buttons; the body asks the question.
         assert [q["send"] for q in starter["quickReplies"]] == ["11 month", "17 month"]
+        assert [q["description"] for q in starter["quickReplies"]] == [
+            "Summer through Spring", "finishes the following Fall"]
         assert "MGTA" not in starter["body"]
 
     def test_the_opening_prompt_is_the_same_text_the_bot_would_send(self, student_client):

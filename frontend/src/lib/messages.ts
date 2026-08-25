@@ -1229,6 +1229,17 @@ export const messages = {
 			logLabel: (destination: string) => `${destination} conversation`,
 			composerLabel: 'Ask a question',
 			placeholder: 'Type your question…',
+			/**
+			 * What the composer says while the bot is waiting on an ANSWER.
+			 *
+			 * The course recommender opens by asking a question and keeps asking for
+			 * four steps, and a field reading "Type your question…" underneath one
+			 * tells a student to do the opposite of what the screen is asking. It
+			 * also names the buttons as the shortcut, because the field is the thing
+			 * a student's eye lands on and the buttons are easy to miss above it.
+			 */
+			answerPlaceholder: 'Answer here, or tap a choice above…',
+			answerLabel: 'Answer the question',
 			send: 'Send',
 			/**
 			 * Spoken prefixes, so who said what does not rest on which side of the

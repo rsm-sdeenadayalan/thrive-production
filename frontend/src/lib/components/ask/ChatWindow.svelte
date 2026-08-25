@@ -155,6 +155,24 @@
 	const empty = $derived(saved.length === 0 && sent.length === 0);
 
 	/**
+	 * Whether the thing on screen is a QUESTION waiting on an answer.
+	 *
+	 * True whenever choices are showing — the opening question's, or those under
+	 * the newest reply. It is the same condition the buttons render on, derived
+	 * once so the composer and the buttons cannot disagree about whether a
+	 * question is open.
+	 *
+	 * The composer's own wording turns on this. "Type your question…" under a bot
+	 * that has just asked "Which track are you on?" tells a student to do the
+	 * opposite of what the screen is asking, and the course recommender asks four
+	 * of those in a row.
+	 */
+	const awaitingAnswer = $derived.by(() => {
+		if (empty) return Boolean(starter && (starter.quickReplies.length > 0 || starter.form));
+		return saved.length > 0 && showsChoices(saved.length - 1);
+	});
+
+	/**
 	 * Send a specific text, from a button rather than the field.
 	 *
 	 * Goes through exactly the same path as a typed message, and posts the words
@@ -431,13 +449,29 @@
 				class="mt-1 flex flex-wrap gap-1.5"
 			>
 				{#each replies as reply (reply.send)}
+					<!--
+						The description sits ON the button rather than in a bullet list
+						above it. The interview used to print both — a list of options
+						with their explanations, then a row of buttons repeating the
+						labels — which made one question five stacked blocks and split
+						each choice from what it means.
+
+						`items-start` and `text-left`: with two lines a centred button
+						reads as a heading with a caption, and these are controls.
+					-->
 					<button
 						type="button"
 						disabled={pending}
 						onclick={() => choose(reply.send)}
-						class="min-h-11 rounded-md border-[1.5px] border-line-strong bg-surface px-2.5 text-sm text-ink"
+						class={cn(
+							'flex min-h-11 flex-col justify-center rounded-md border-[1.5px] border-line-strong bg-surface px-2.5 text-left text-sm text-ink',
+							reply.description && 'py-1'
+						)}
 					>
-						{reply.label}
+						<span>{reply.label}</span>
+						{#if reply.description}
+							<span class="text-3xs font-normal text-muted-ink">{reply.description}</span>
+						{/if}
 					</button>
 				{/each}
 			</div>
@@ -614,7 +648,9 @@
 	</div>
 
 	<form onsubmit={send} class="flex items-end gap-2 border-t border-line bg-sunken p-2.5">
-		<label for="ask-composer" class="sr-only">{copy.chat.composerLabel}</label>
+		<label for="ask-composer" class="sr-only">
+			{awaitingAnswer ? copy.chat.answerLabel : copy.chat.composerLabel}
+		</label>
 
 		<input
 			id="ask-composer"
@@ -622,7 +658,7 @@
 			bind:value={draft}
 			autocomplete="off"
 			disabled={pending}
-			placeholder={copy.chat.placeholder}
+			placeholder={awaitingAnswer ? copy.chat.answerPlaceholder : copy.chat.placeholder}
 			class="min-h-11 min-w-0 flex-1 rounded-md border-[1.5px] border-line-strong bg-surface px-2.5 text-sm text-ink placeholder:text-muted-ink"
 		/>
 

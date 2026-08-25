@@ -43,6 +43,11 @@
 			<!-- Recursive: `inline` renders itself for the bold span's children, so
 			     an emphasised link stays a link. -->
 			<strong>{@render inline(span.spans)}</strong>
+		{:else if span.kind === 'italic'}
+			<!-- `<em>`, not `<i>`: this is emphasis in the text, not a typographic
+			     aside, and the parser only ever produces it from Markdown emphasis
+			     markers. Recursive for the same reason bold is. -->
+			<em>{@render inline(span.spans)}</em>
 		{:else if span.kind === 'link'}
 			<!--
 				`rel="noopener noreferrer"` with `target="_blank"`: these hrefs come

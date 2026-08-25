@@ -64,6 +64,11 @@ export type InlineSpan =
   // matched first and swallowed the link whole. Only bold nests: code is
   // literal by definition, and a link's label is plain text.
   | { kind: "bold"; spans: InlineSpan[] }
+  // Italic nests for the same reason bold does, and it is not decorative here:
+  // the course recommender writes its help line as `_It decides how many
+  // quarters the plan has._`, which rendered as literal underscores around the
+  // sentence until this existed.
+  | { kind: "italic"; spans: InlineSpan[] }
   | { kind: "code"; text: string }
   | { kind: "link"; text: string; href: string };
 
@@ -226,6 +231,55 @@ function linkAt(
   return { text, href, end: hrefEnd + 1 };
 }
 
+const ALPHANUMERIC = /[\p{L}\p{N}]/u;
+
+/**
+ * Find the closer for a single-character emphasis marker, or -1.
+ *
+ * Emphasis is the one inline marker that cannot be matched by "find the next
+ * one of these", because both characters it uses are ordinary punctuation in
+ * text this app actually renders:
+ *
+ *   - `_` appears inside identifiers the bots quote — `min_similarity`,
+ *     `resume_version`, `skill_python` — and a naive scan turns the run between
+ *     two of them into italics, mangling the very name being quoted.
+ *   - `*` appears as multiplication and as a literal bullet — "2 * 3 * 4".
+ *
+ * So this applies CommonMark's flanking rules, which is what distinguishes
+ * emphasis from punctuation in both cases:
+ *
+ *   - an OPENER may not be followed by whitespace ("2 * 3" cannot open), and
+ *   - a CLOSER may not be preceded by whitespace, and
+ *   - for `_` only, neither side may sit between two word characters
+ *     (`min_similarity` cannot open or close; CommonMark allows intraword `*`
+ *     but not intraword `_`, for exactly this reason).
+ *
+ * An unclosed marker returns -1 and is then rendered as the literal character
+ * it is, the same way `**` and `` ` `` already behave here.
+ */
+function emphasisCloser(line: string, start: number, marker: string): number {
+  const after = line[start + 1];
+  if (after === undefined || /\s/.test(after)) return -1;
+  if (marker === "_") {
+    const before = line[start - 1];
+    if (before !== undefined && ALPHANUMERIC.test(before)) return -1;
+  }
+
+  for (let j = start + 1; j < line.length; j += 1) {
+    if (line[j] !== marker) continue;
+    const preceding = line[j - 1];
+    if (preceding !== undefined && /\s/.test(preceding)) continue;
+    if (marker === "_") {
+      const following = line[j + 1];
+      if (following !== undefined && ALPHANUMERIC.test(following)) continue;
+    }
+    // An empty span (`__`, `**` handled elsewhere) is not emphasis.
+    if (j === start + 1) continue;
+    return j;
+  }
+  return -1;
+}
+
 export function parseInline(line: string): InlineSpan[] {
   const spans: InlineSpan[] = [];
   let buffer = "";
@@ -267,6 +321,21 @@ export function parseInline(line: string): InlineSpan[] {
       // Unclosed: the marker is literal, not a formatting instruction.
       buffer += "**";
       i += 2;
+      continue;
+    }
+
+    // AFTER the `**` branch above, which is what keeps `**bold**` from being
+    // read as an empty italic followed by a stray asterisk.
+    if (line[i] === "_" || line[i] === "*") {
+      const close = emphasisCloser(line, i, line[i]);
+      if (close !== -1) {
+        flushText();
+        spans.push({ kind: "italic", spans: parseInline(line.slice(i + 1, close)) });
+        i = close + 1;
+        continue;
+      }
+      buffer += line[i];
+      i += 1;
       continue;
     }
 

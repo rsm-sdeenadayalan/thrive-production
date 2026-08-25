@@ -624,6 +624,19 @@ export type ChatRole = "student" | "thrive";
 export interface QuickReply {
   label: string;
   send: string;
+  /**
+   * What this choice means, shown as a second line on the button.
+   *
+   * Optional and additive: a reply that omits it renders a plain button, which
+   * is what every choice with a self-explanatory label gets.
+   *
+   * It exists so a question can stop saying everything twice. The interview
+   * used to list its options as bullets ("**11 month** — Summer through
+   * Spring") AND repeat them as buttons ("11 month"), which put five stacked
+   * blocks on screen for one question and still split the label from its
+   * explanation. The description belongs ON the control it describes.
+   */
+  description?: string;
 }
 
 /**

@@ -43,14 +43,66 @@ def _extracted(**overrides):
     return json.dumps({**blank, **overrides})
 
 
+class TestConversationTitles:
+    """A saved list of plans has to say what each plan was FOR.
+
+    Titles come from the student's first message, and on this destination that
+    message is usually a button press — so the list filled up with rows called
+    "17 month" that were indistinguishable from one another.
+    """
+
+    def test_a_button_press_title_is_replaced_once_the_goal_is_known(self, user):
+        conversation = Conversation.objects.create(
+            user=user, destination="courses", title="17 month")
+        fake = FakeLLM(replies=[_extracted(track="17 month",
+                                           goals=["data-scientist"])])
+
+        answer_electives(fake, conversation, "data scientist", [])
+
+        conversation.refresh_from_db()
+        assert conversation.title == "Course plan — Data Scientist, 17 month"
+
+    def test_a_question_the_student_actually_typed_is_left_alone(self, user):
+        # They wrote a better title than this code can compose.
+        typed = "which electives suit a product manager"
+        conversation = Conversation.objects.create(
+            user=user, destination="courses", title=typed)
+        fake = FakeLLM(replies=[_extracted(track="17 month",
+                                           goals=["data-scientist"])])
+
+        answer_electives(fake, conversation, "data scientist", [])
+
+        conversation.refresh_from_db()
+        assert conversation.title == typed
+
+    def test_the_track_alone_is_not_enough_to_name_a_plan(self, user):
+        # The track is the FIRST question, so titling on it would name every
+        # conversation before any of them had a subject.
+        conversation = Conversation.objects.create(
+            user=user, destination="courses", title="17 month")
+        fake = FakeLLM(replies=[_extracted(track="17 month")])
+
+        answer_electives(fake, conversation, "17 month", [])
+
+        conversation.refresh_from_db()
+        assert conversation.title == "17 month"
+
+
 class TestTheInterview:
     def test_the_first_thing_asked_is_the_track(self, conversation):
-        """The brief: ask 11 month or 17 month before recommending anything."""
+        """The brief: ask 11 month or 17 month before recommending anything.
+
+        The two choices ride on the BUTTONS rather than in the message body —
+        each one carries its own explanation now, so printing the same list
+        above them would say everything twice.
+        """
         fake = FakeLLM(replies=[_extracted()])
         reply = answer_electives(fake, conversation, "recommend me some courses", [])
         assert reply.model_note == "intake"
-        assert "11 month" in reply.body and "17 month" in reply.body
         assert "Step 1 of 4" in reply.body
+        assert [r["label"] for r in reply.quick_replies] == ["11 month", "17 month"]
+        # And the explanation travels with the control it explains.
+        assert reply.quick_replies[0]["description"] == "Summer through Spring"
 
     def test_no_courses_are_named_before_the_interview_finishes(self, conversation):
         fake = FakeLLM(replies=[_extracted(track="11 month")])
@@ -62,7 +114,7 @@ class TestTheInterview:
         fake = FakeLLM(replies=[_extracted(track="11 month")])
         reply = answer_electives(fake, conversation, "11 month", [])
         assert "Step 2 of 4" in reply.body
-        assert "Data Scientist" in reply.body
+        assert "Data Scientist" in [r["label"] for r in reply.quick_replies]
 
     def test_then_it_asks_for_a_skill_level_in_each_area(self, conversation):
         fake = FakeLLM(replies=[_extracted(track="11 month",
