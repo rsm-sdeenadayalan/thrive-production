@@ -45,7 +45,7 @@ def _run_bot(conversation, destination, question, history):
     try:
         llm = llm_factory()
         if destination == "courses":
-            reply = answer_electives(llm, conversation.user, question, history)
+            reply = answer_electives(llm, conversation, question, history)
         elif destination == "career":
             reply = answer_career(llm, question, history)
         else:

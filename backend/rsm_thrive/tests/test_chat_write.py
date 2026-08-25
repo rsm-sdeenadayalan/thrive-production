@@ -127,13 +127,19 @@ class TestSendMessage:
         assert ChatMessage.objects.filter(
             conversation=conv, role="student", body="q").exists()
 
-    def test_electives_destination_dispatches_with_user(self, client, student, fake_llm):
+    def test_electives_destination_runs_the_planner_interview(self, client, student,
+                                                              fake_llm):
+        """The courses destination asks for the track before naming any course."""
         conv = self._conversation(student, destination="courses")
-        fake_llm([json.dumps({"reply": "Which role?", "ready": False,
-                              "career_roles": []})])
+        fake_llm([json.dumps({"track": None, "goals": [], "skill_python": None,
+                              "skill_sql": None, "skill_stats": None,
+                              "skill_ml": None, "skill_communication": None,
+                              "workload": None, "interests": []})])
         response = _post(client, f"/api/thrive/conversations/conv-{conv.pk}/messages",
                          {"body": "recommend me electives"})
-        assert response.json()["messages"][-1]["body"] == "Which role?"
+        body = response.json()["messages"][-1]["body"]
+        assert "11 month" in body and "17 month" in body
+        assert "MGTA" not in body
 
 
 class TestMethodGuards:

@@ -15,6 +15,7 @@ from .overlay import (  # noqa: F401
     CalendarPrefs, EventJoin, IgnoredEvent, SharedTask, StudentTask, TaskNote,
     TaskOverride,
 )
+from .planner import CoursePlan, PlannerSession  # noqa: F401
 from .personal import (  # noqa: F401
     CalendarItemLabel, CalendarItemUrgent, CustomCalendarEvent, QuickListItem,
 )

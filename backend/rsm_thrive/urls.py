@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import advisors, appointments, assignments, auth, chat, courses, degree, events, health, jobs, overlay, personal, requests, resources, resume, students, tasks
+from .views import advisors, appointments, assignments, auth, chat, courses, degree, events, health, jobs, overlay, personal, planner, requests, resources, resume, students, tasks
 
 app_name = "rsm_thrive"
 
@@ -37,6 +37,10 @@ urlpatterns = [
     path("requests/prefill", requests.prefill, name="request-prefill"),
     path("requests", requests.requests_dispatch, name="requests"),
     path("requests/<str:request_id>/submit", requests.submit_request, name="request-submit"),
+    path("plan", planner.plan, name="plan"),
+    path("plan/intake", planner.intake, name="plan-intake"),
+    path("plan/alternatives", planner.alternatives, name="plan-alternatives"),
+    path("plan/swap", planner.swap, name="plan-swap"),
     path("quick-items/<str:key>", personal.quick_item, name="quick-item"),
     path("resources", resources.resources, name="resources"),
     path("resume/current", resume.resume_current, name="resume-current"),
