@@ -6,6 +6,7 @@ import {
   jobsEmptyState,
   ringPercent,
   shareWidth,
+  targetResults,
   toJobFeedEntryView,
   toJobPostingDetailView,
   toJobResultView,
@@ -275,5 +276,55 @@ describe("ringPercent", () => {
   it("clamps out-of-range input rather than printing a nonsense ring", () => {
     expect(ringPercent(140)).toBe(100);
     expect(ringPercent(-10)).toBe(0);
+  });
+});
+
+describe("targetResults", () => {
+  function view(overrides: Partial<JobFeedEntry> = {}) {
+    return toJobFeedEntryView(feedEntry(overrides), true);
+  }
+
+  it("keeps at most `cap` entries, defaulting to 10", () => {
+    const entries = Array.from({ length: 15 }, (_, i) =>
+      view({ job: { ...feedEntry().job, id: `job-${i}` }, score: 90 - i }),
+    );
+    expect(targetResults(entries)).toHaveLength(10);
+    expect(targetResults(entries, { cap: 3 })).toHaveLength(3);
+  });
+
+  it("drops entries scoring below `floor`, defaulting to 45", () => {
+    const entries = [view({ score: 90 }), view({ score: 44 }), view({ score: 45 })];
+    const kept = targetResults(entries).map((e) => e.score);
+    expect(kept).toEqual([90, 45]);
+  });
+
+  it("drops a below-floor entry even when it would otherwise fit under the cap", () => {
+    const entries = [view({ score: 20 })];
+    expect(targetResults(entries, { cap: 10, floor: 45 })).toEqual([]);
+  });
+
+  it("never drops an entry with no score to judge -- no resume, no bar to clear", () => {
+    const entries = [view({ score: 90 }), toJobFeedEntryView(feedEntry({ score: 5 }), false)];
+    const kept = targetResults(entries);
+    expect(kept).toHaveLength(2);
+    expect(kept[1].score).toBeNull();
+  });
+
+  it("preserves input order rather than re-sorting", () => {
+    const entries = [view({ score: 50 }), view({ score: 95 }), view({ score: 60 })];
+    expect(targetResults(entries).map((e) => e.score)).toEqual([50, 95, 60]);
+  });
+
+  it("applies floor before cap, not cap before floor", () => {
+    // Five entries, three below the floor -- capping to 4 first would keep one
+    // of those three; filtering first must not.
+    const entries = [
+      view({ score: 90 }),
+      view({ score: 10 }),
+      view({ score: 80 }),
+      view({ score: 20 }),
+      view({ score: 70 }),
+    ];
+    expect(targetResults(entries, { cap: 4 }).map((e) => e.score)).toEqual([90, 80, 70]);
   });
 });

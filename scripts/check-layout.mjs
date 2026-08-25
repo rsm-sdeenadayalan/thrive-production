@@ -108,17 +108,23 @@ const TARGETS = [
 		label: '/appointments booking',
 		click: '[data-service]:not([disabled])'
 	},
+	/*
+	 * Step 1: the setup page -- intro, resume panel, role search and chips.
+	 * No feed here to overflow, but it is the page every Career visit lands
+	 * on, so a shell-level regression here would hide behind step 2 being the
+	 * only jobs route ever measured.
+	 */
 	{ route: '/jobs', label: '/jobs' },
 	/*
-	 * A real query, so this measures the two-column results-plus-benchmark
-	 * layout rather than the empty "search to see postings" state above.
+	 * Step 2, a real query, so this measures the two-column results-plus-
+	 * benchmark layout rather than an empty state.
 	 */
-	{ route: '/jobs?q=data', label: '/jobs results' },
+	{ route: '/jobs/results?q=data', label: '/jobs results' },
 	/*
 	 * The Liked tab, so a regression in the feed's other slices cannot hide
 	 * behind the default Recommended tab being the only one ever measured.
 	 */
-	{ route: '/jobs?tab=liked', label: '/jobs liked' },
+	{ route: '/jobs/results?tab=liked', label: '/jobs liked' },
 	{ route: '/jobs/job-1', label: '/jobs detail' },
 	{ route: '/ask', label: '/ask' },
 	/*

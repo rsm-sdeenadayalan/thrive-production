@@ -1,76 +1,45 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { enhance } from '$app/forms';
-	import Heart from '@lucide/svelte/icons/heart';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import Search from '@lucide/svelte/icons/search';
 
-	import BenchmarkPanel from '$lib/components/jobs/BenchmarkPanel.svelte';
-	import JobFeedCard from '$lib/components/jobs/JobFeedCard.svelte';
 	import Button, { buttonClasses } from '$lib/components/ui/Button.svelte';
-	import EmptyState from '$lib/components/ui/EmptyState.svelte';
-	import type { JobFeedTab } from '$lib/data';
-	import { feedEmptyState } from '$lib/jobs';
 	import { messages } from '$lib/messages';
 	import { pageTitle } from '$lib/title';
-	import { cn } from '$lib/utils';
 	import type { PageData } from './$types';
 
 	/**
-	 * The Career tab: a ranked feed, not a search box.
+	 * The Career tab, step 1: a focused setup page, not a feed.
 	 *
-	 * ## The empty state is only ever consulted once the tab is known empty
+	 * ## Why the ranked list is not here
 	 *
-	 * `feedEmptyState` takes no result count -- see its doc comment in
-	 * `$lib/jobs` -- so this guards on `data.results.length === 0` itself before
-	 * asking which of the three dead ends applies, the same split the function's
-	 * own tests draw.
+	 * A student optimizing for interview conversions is not well served by a
+	 * page that hands them fifty postings before they have said what they are
+	 * looking for. This page asks exactly one question -- what role? -- and the
+	 * search form below hands off to `/jobs/results`, which is the only place
+	 * the ranked, capped, floor-filtered list exists. See `targetResults` in
+	 * `$lib/jobs` for the arithmetic behind "capped, floor-filtered."
 	 *
-	 * ## The upload result is kept local, same reasoning as `BookingPanel`
+	 * ## Searching works with no resume on file
 	 *
-	 * Every branch of `enhance`'s callback ends in something on screen: a
-	 * redirect navigates by hand (which re-runs `load`, so the resume panel, the
-	 * tab counts and every card's like/dismiss state update themselves), a
-	 * `fail()` renders its message, and anything else gets the generic sentence.
+	 * The resume panel is not a gate in front of the search form -- a student
+	 * can search before uploading anything, and `/jobs/results` will show
+	 * postings with no score attached rather than refusing to show anything.
+	 * The panel stays on screen regardless, in whichever of its two shapes
+	 * applies, because a score-free result list is exactly the moment a resume
+	 * upload matters most.
 	 *
-	 * ## The resume panel is always on screen, in one of two shapes
+	 * ## The resume panel itself is untouched
 	 *
-	 * `data.profileAvailable` used to gate the whole panel -- a student with a
-	 * resume on file never saw a way to change it again. The backend now keeps
-	 * only the latest upload and deletes the rest, so a replace is always cheap
-	 * and safe, and the panel says so: the same `?/upload` action, a prominent
-	 * banner before a resume exists and a compact row once one does.
+	 * Same markup, same copy, same `?/upload` action as the single-page version
+	 * this replaced -- only `tab`/`q`/`minScore` hidden inputs are gone, because
+	 * this page carries none of those anymore.
 	 */
 	let { data }: { data: PageData } = $props();
 
 	const copy = messages.jobs;
-	const feedCopy = messages.jobs.feed;
-
-	const TABS: JobFeedTab[] = ['recommended', 'liked', 'all'];
-
-	/** A tab's link, carrying the current query and minimum score along with it. */
-	function tabHref(tab: JobFeedTab): string {
-		const params = new URLSearchParams();
-		if (tab !== 'recommended') params.set('tab', tab);
-		if (data.q.trim().length > 0) params.set('q', data.q);
-		if (data.minScore !== undefined) params.set('minScore', String(data.minScore));
-		const query = params.toString();
-		return query ? `/jobs?${query}` : '/jobs';
-	}
-
-	const emptyState = $derived(
-		data.results.length === 0 ? feedEmptyState(data.tab, data.q) : null
-	);
-
-	/**
-	 * Whether the benchmark rides along beside the list.
-	 *
-	 * Named rather than repeated: the same condition decides whether the grid
-	 * gets a second column at all, so the list can span the full width when
-	 * there is nothing to share it with instead of sitting in a fixed `2fr`
-	 * track with dead space where the panel would have gone.
-	 */
-	const showBenchmark = $derived(data.q.trim().length > 0 && Boolean(data.benchmark));
+	const setup = messages.jobs.setup;
 
 	let uploading = $state(false);
 	let uploadError = $state<string | null>(null);
@@ -84,6 +53,11 @@
 		const input = event.currentTarget as HTMLInputElement;
 		resumeFileName = input.files?.[0]?.name ?? null;
 	}
+
+	/** A quick-pick chip's link -- straight to the results this page exists to lead to. */
+	function roleHref(role: string): string {
+		return `/jobs/results?q=${encodeURIComponent(role)}`;
+	}
 </script>
 
 <svelte:head><title>{pageTitle(copy.documentTitle)}</title></svelte:head>
@@ -93,56 +67,14 @@
 		No `max-w-5xl` wrapper here: `max-w-5xl` (64rem) is narrower than the page
 		container (`--container-page`, 80rem), so `mx-auto max-w-5xl` on the header
 		alone re-centered it inside the page container -- pulling its left edge in
-		from the search box, tab bar and job cards below, which fill the full
-		width. Long-line wrapping is handled by `max-w-measure` on the intro
-		paragraph alone.
+		from the cards below it, which fill the full width. Long-line wrapping is
+		handled by `max-w-measure` on the intro paragraph alone.
 	-->
 	<header class="w-full">
 		<p class="thrive-eyebrow">{copy.eyebrow}</p>
 		<h1 class="mt-1 text-3xl font-bold text-ink">{copy.title}</h1>
 		<p class="mt-1.5 max-w-measure text-sm text-body">{copy.intro}</p>
 	</header>
-
-	<form method="GET" role="search" class="flex flex-wrap items-end gap-2.5">
-		<input type="hidden" name="tab" value={data.tab} />
-		<div class="min-w-0 flex-1">
-			<label for="jobs-query" class="thrive-eyebrow mb-1.5 block">
-				{copy.search.label}
-			</label>
-			<input
-				id="jobs-query"
-				type="search"
-				name="q"
-				value={data.q}
-				placeholder={copy.search.placeholder}
-				class="min-h-11 w-full rounded-sm border-[1.5px] border-line-strong bg-surface px-2.5 text-sm text-ink placeholder:text-muted-ink"
-			/>
-		</div>
-		<!-- `min-h-11` to match the search input beside it -- the same pairing
-		     `ChatWindow`'s composer and `ItemDetail`'s export/delete row use, so a
-		     button next to a full-height field is never the short one in the row. -->
-		<Button type="submit" variant="primary" class="min-h-11">
-			<Search aria-hidden="true" class="size-4" />
-			{copy.search.button}
-		</Button>
-	</form>
-
-	<nav aria-label={feedCopy.tabsLabel} class="flex flex-wrap gap-1.5">
-		{#each TABS as tab (tab)}
-			<a
-				href={tabHref(tab)}
-				aria-current={data.tab === tab ? 'page' : undefined}
-				class={cn(
-					'rounded-sm px-2.5 py-1.5 text-2xs font-medium',
-					data.tab === tab
-						? 'bg-primary text-on-primary'
-						: 'text-body hover:bg-sunken hover:text-ink'
-				)}
-			>
-				{feedCopy.tabs[tab](data.counts[tab])}
-			</a>
-		{/each}
-	</nav>
 
 	{#if data.profileAvailable}
 		<!-- A resume is already on file. Compact, and upload stays reachable at
@@ -164,7 +96,6 @@
 						uploading = false;
 
 						if (result.type === 'redirect') {
-							// Back to the same feed, now scored against the new resume.
 							await goto(result.location, { invalidateAll: true });
 							return;
 						}
@@ -181,11 +112,6 @@
 					};
 				}}
 			>
-				<input type="hidden" name="tab" value={data.tab} />
-				<input type="hidden" name="q" value={data.q} />
-				{#if data.minScore !== undefined}
-					<input type="hidden" name="minScore" value={data.minScore} />
-				{/if}
 				<div class="min-w-0">
 					<span class="thrive-eyebrow mb-1.5 block">
 						{copy.profileBanner.hasResume.fileLabel}
@@ -228,7 +154,8 @@
 			{/if}
 		</div>
 	{:else}
-		<!-- No resume yet -- the prominent banner. -->
+		<!-- No resume yet -- the prominent banner. Searching still works without
+		     one; this stays visible so upload is never more than a scroll away. -->
 		<div data-tone="sunken" class="thrive-panel space-y-2.5 p-3">
 			<p class="text-sm text-body">{copy.profileBanner.message}</p>
 
@@ -245,7 +172,6 @@
 						uploading = false;
 
 						if (result.type === 'redirect') {
-							// Back to the same feed, now that a resume is on file.
 							await goto(result.location, { invalidateAll: true });
 							return;
 						}
@@ -262,11 +188,6 @@
 					};
 				}}
 			>
-				<input type="hidden" name="tab" value={data.tab} />
-				<input type="hidden" name="q" value={data.q} />
-				{#if data.minScore !== undefined}
-					<input type="hidden" name="minScore" value={data.minScore} />
-				{/if}
 				<div class="min-w-0">
 					<span class="thrive-eyebrow mb-1.5 block">
 						{copy.profileBanner.fileLabel}
@@ -308,34 +229,46 @@
 		</div>
 	{/if}
 
-	{#if emptyState === 'no-jobs-at-all'}
-		<EmptyState icon={Search} message={feedCopy.empty.noJobsAtAll} />
-	{:else if emptyState === 'no-matches-for-query'}
-		<EmptyState icon={Search} message={feedCopy.empty.noMatchesForQuery(data.q)} />
-	{:else if emptyState === 'liked-tab-empty'}
-		<EmptyState icon={Heart} message={feedCopy.empty.likedTabEmpty} />
-	{:else}
-		<!--
-			`items-start`, not the grid default `stretch`: with a benchmark this
-			panel is almost always shorter than the results list, and stretching it
-			to match left a card with a wall of blank space below its last skill bar.
+	<!--
+		The page's one real question. `thrive-panel` rather than a bare form so it
+		reads as the page's focal point next to the resume panel above it, not as
+		a stray control floating on the page background.
+	-->
+	<section class="thrive-panel space-y-3 p-4">
+		<form method="GET" action="/jobs/results" class="flex flex-wrap items-end gap-2.5">
+			<div class="min-w-0 flex-1">
+				<label for="jobs-role" class="thrive-eyebrow mb-1.5 block">
+					{setup.roleLabel}
+				</label>
+				<input
+					id="jobs-role"
+					type="search"
+					name="q"
+					placeholder={setup.rolePlaceholder}
+					class="min-h-11 w-full rounded-sm border-[1.5px] border-line-strong bg-surface px-2.5 text-sm text-ink placeholder:text-muted-ink"
+				/>
+			</div>
+			<!-- `min-h-11` to match the search input beside it, the same pairing
+			     `ChatWindow`'s composer and `ItemDetail`'s export/delete row use. -->
+			<Button type="submit" variant="primary" class="min-h-11">
+				<Search aria-hidden="true" class="size-4" />
+				{setup.roleButton}
+			</Button>
+		</form>
 
-			Without one, `showBenchmark` drops the second column's track entirely
-			(rather than leaving it an empty `1fr`) so the list takes the full
-			width instead of sitting narrower than the page for no reason.
-		-->
-		<div class={cn('grid items-start gap-4', showBenchmark && 'lg:grid-cols-[2fr_1fr]')}>
-			<ul aria-label={copy.title} class="space-y-3">
-				{#each data.results as entry (entry.id)}
+		<div>
+			<p class="thrive-eyebrow mb-1.5">{setup.quickPicksLabel}</p>
+			<ul class="flex flex-wrap gap-1.5">
+				{#each setup.quickPicks as role (role)}
 					<li>
-						<JobFeedCard {entry} tab={data.tab} q={data.q} minScore={data.minScore} />
+						<a href={roleHref(role)} class={buttonClasses('secondary', 'sm')}>{role}</a>
 					</li>
 				{/each}
 			</ul>
-
-			{#if showBenchmark && data.benchmark}
-				<BenchmarkPanel benchmark={data.benchmark} />
-			{/if}
 		</div>
-	{/if}
+
+		<a href="/jobs/results?tab=liked" class="inline-block text-2xs font-medium text-primary hover:underline">
+			{setup.likedLink}
+		</a>
+	</section>
 </div>

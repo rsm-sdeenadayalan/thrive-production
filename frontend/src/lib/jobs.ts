@@ -213,3 +213,33 @@ export function feedEmptyState(tab: JobFeedTab, q: string): JobFeedEmptyState {
 export function ringPercent(score: number): number {
   return Math.max(0, Math.min(100, score));
 }
+
+// ---------------------------------------------------------------------------
+// Targeted results (Career, step 2)
+// ---------------------------------------------------------------------------
+
+/**
+ * The Recommended tab's whole reason to exist: a SHORT list, not a feed.
+ *
+ * A student optimizing for interview conversions is worse off staring at
+ * fifty ranked postings than at the ten that are actually worth the hour it
+ * takes to prep one -- and worse off still if the tenth spot is filled by
+ * something scoring 30, dragged in only because the query had few results.
+ * `cap` bounds the length; `floor` bounds the quality, independently -- a
+ * search with three strong matches shows three, not padded out to ten.
+ *
+ * An entry with a `null` score (no resume on file yet, see
+ * `toJobFeedEntryView`) always clears `floor`: there is no number to judge it
+ * against, so silently dropping it would read as the search coming back
+ * emptier than it is, not as "upload a resume for a real score."
+ *
+ * Pure and order-preserving -- `entries` is trusted to already be sorted by
+ * display score, descending, the same trust `JobFeedCard` already places in
+ * `getJobFeed`'s ranking.
+ */
+export function targetResults(
+  entries: JobFeedEntryView[],
+  { cap = 10, floor = 45 }: { cap?: number; floor?: number } = {},
+): JobFeedEntryView[] {
+  return entries.filter((entry) => entry.score === null || entry.score >= floor).slice(0, cap);
+}

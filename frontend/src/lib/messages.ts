@@ -860,6 +860,29 @@ export const messages = {
 		},
 
 		/**
+		 * Step 1 of the two-page Career flow: setup, not results.
+		 *
+		 * `title`/`intro`/`eyebrow` above stay as they are -- they describe the
+		 * product, not a page shape, and still hold true once the ranked list
+		 * moved to its own page. This block is only the one thing step 1 adds: a
+		 * role search that hands off to `/jobs/results`.
+		 */
+		setup: {
+			roleLabel: 'What role are you targeting?',
+			rolePlaceholder: 'e.g. Data Analyst',
+			roleButton: 'Find matches',
+			/** Above the quick-pick chips. */
+			quickPicksLabel: 'Or start from a common role:',
+			/**
+			 * Three to five roles, not the whole catalog -- a chip row is a
+			 * shortcut past typing, not a second search box.
+			 */
+			quickPicks: ['Data Analyst', 'Data Scientist', 'Business Analyst', 'Product Analyst'],
+			/** Saved jobs stay reachable without running a search first. */
+			likedLink: 'See your liked roles'
+		},
+
+		/**
 		 * The feed's three tabs and their counts, and the three dead ends a tab
 		 * can land on.
 		 *
@@ -881,8 +904,28 @@ export const messages = {
 				noMatchesForQuery: (query: string) =>
 					`No postings match “${query}”. Try different words.`,
 				likedTabEmpty:
-					'No liked postings yet. Like one from Recommended or All and it will show up here.'
+					'No liked postings yet. Like one from Recommended or All and it will show up here.',
+				/**
+				 * Recommended only: postings matched the search, but none scored high
+				 * enough to clear the interview-worthy bar. Different from
+				 * `noMatchesForQuery` -- the search worked, the fit didn't -- so it gets
+				 * its own sentence rather than reusing "try different words."
+				 */
+				belowBar: (query: string) =>
+					query.trim().length > 0
+						? `No postings for “${query}” score high enough to recommend. Broaden your search or upload a resume for sharper scores.`
+						: 'No postings score high enough to recommend yet. Broaden your search or upload a resume for sharper scores.'
 			},
+
+			/**
+			 * Recommended only, and only once 1-2 postings clear the bar. Shown
+			 * ABOVE the (short) list rather than replacing it -- a thin result is
+			 * still worth seeing, just worth knowing it is thin.
+			 */
+			thin: (query: string) =>
+				query.trim().length > 0
+					? `Only a couple of postings for “${query}” clear the bar. Broaden your search or upload a resume for sharper scores.`
+					: 'Only a couple of postings clear the bar right now. Broaden your search or upload a resume for sharper scores.',
 
 			card: {
 				/** The ring's accessible name -- the visual is decorative without it. */
@@ -939,6 +982,44 @@ export const messages = {
 				uploading: 'Replacing…',
 				/** Says plainly what the backend does, so a re-upload is never a surprise. */
 				note: 'Uploading a new resume replaces the previous one and refreshes every match score.'
+			}
+		},
+
+		/**
+		 * Step 2 of the two-page Career flow: the ranked list itself.
+		 *
+		 * Named separately from `feed` above (which still owns the tabs, the
+		 * empty states and the card copy every tab shares) because this is the
+		 * page-level frame around them: the heading, the refine control and the
+		 * per-tab one-liner that says what a student is looking at.
+		 */
+		results: {
+			documentTitle: 'Career matches',
+			eyebrow: 'career',
+			/**
+			 * Keyed by tab, so the headline is honest about which list is on
+			 * screen: "top matches" is a claim only Recommended gets to make.
+			 */
+			headings: {
+				recommended: (query: string) =>
+					query.trim().length > 0 ? `Top matches for “${query}”` : 'Your top matches',
+				liked: (query: string) =>
+					query.trim().length > 0 ? `Liked matches for “${query}”` : 'Your liked roles',
+				all: (query: string) =>
+					query.trim().length > 0 ? `All postings for “${query}”` : 'All postings'
+			},
+			/** Shown under the heading on Recommended only. */
+			count: (n: number) =>
+				n === 1 ? '1 posting worth prepping for' : `${n} postings worth prepping for`,
+			refineLabel: 'Refine search',
+			refinePlaceholder: 'e.g. Data Analyst',
+			refineButton: 'Search',
+			backToSetup: 'Manage resume',
+			/** One line under the tab bar, naming what THIS tab actually is. */
+			tabHints: {
+				recommended: 'The short list -- capped to the top 10, and only postings worth prepping an interview for.',
+				liked: 'Postings you have liked, saved here for later.',
+				all: 'Every posting matching your search, unranked and unfiltered -- the full list, not the short one.'
 			}
 		},
 
