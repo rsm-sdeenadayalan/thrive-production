@@ -53,11 +53,18 @@ and 9,911 live job postings.
    appointment is booked. *Blocks: real emails from the server. Bookings work
    without it; the invitations just do not arrive.*
 
-7. **Component wiring preference** — our Django component lives in
-   `github.com/rsm-sdeenadayalan/thrive-production` (`backend/`). For the
-   platform checkout (`/srv/django/rsm-guild-ai-brain`, branch
-   `feat/msba-brain`): symlink, pip path-install, or mirrored push? Your call,
-   we will follow it. *Blocks: F5 integration.*
+7. **Where the component should live, and how it gets there** — our Django
+   component is `backend/` in
+   `github.com/rsm-sdeenadayalan/thrive-production` (public). We do not have a
+   checkout on the box and no location has been agreed, so this is an open
+   question rather than a preference between known options: where would you
+   like it to sit, and would you rather we clone and pull there ourselves, or
+   have it installed some other way? *Blocks: F5 integration.*
+
+   (An earlier version of this doc named `/srv/django/rsm-guild-ai-brain`,
+   branch `feat/msba-brain`, as the target. That came from the original design
+   note and we have no such checkout — treat it as a proposal that was never
+   set up, not as something already in place.)
 
 ## Needs other admins (Vincent may know who to ask)
 
