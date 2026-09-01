@@ -1,0 +1,306 @@
+{
+  "business-data-analyst": {
+    "profile": "Business / Data Analyst",
+    "anchor": [
+      "MGTA 464",
+      "MGTA 457",
+      "MGTA 458"
+    ],
+    "differentiator": [
+      "MGTA 459",
+      "MGTA 456",
+      "MGTA 466",
+      "MGTA 479",
+      "MGTA 461",
+      "MGTF 405"
+    ],
+    "universal": [
+      "MGTA 402",
+      "MGTA 460"
+    ],
+    "anchor_units": 8,
+    "non_msba_units": 0,
+    "differentiator_added_by_us": [
+      "MGTA 461",
+      "MGTF 405"
+    ]
+  },
+  "bi-analyst": {
+    "profile": "BI Analyst / BI Developer",
+    "anchor": [
+      "MGTA 457",
+      "MGTA 464",
+      "MGTA 466"
+    ],
+    "differentiator": [
+      "MGTA 458",
+      "MGTA 459",
+      "MGTA 456",
+      "MGTF 405"
+    ],
+    "universal": [
+      "MGTA 402",
+      "MGTA 460"
+    ],
+    "anchor_units": 6,
+    "non_msba_units": 4
+  },
+  "product-analyst": {
+    "profile": "Product Analyst / Product Data Scientist",
+    "anchor": [
+      "MGTA 458",
+      "MGTA 464",
+      "MGTA 461"
+    ],
+    "differentiator": [
+      "MGTA 457",
+      "MGT 477",
+      "MGTA 459",
+      "MGTA 466"
+    ],
+    "universal": [
+      "MGTA 402",
+      "MGTA 460"
+    ],
+    "anchor_units": 10,
+    "non_msba_units": 4
+  },
+  "data-scientist": {
+    "profile": "Data Scientist",
+    "anchor": [
+      "MGTA 461",
+      "CSE 251A",
+      "MGTA 466",
+      "MGTA 464"
+    ],
+    "differentiator": [
+      "MGTA 463",
+      "MGTA 458",
+      "CSE 254",
+      "MGTA 457"
+    ],
+    "universal": [
+      "MGTA 402",
+      "MGTA 460"
+    ],
+    "anchor_units": 12,
+    "non_msba_units": 8,
+    "differentiator_added_by_us": [
+      "MGTA 457"
+    ]
+  },
+  "analytics-engineer": {
+    "profile": "Analytics Engineer",
+    "anchor": [
+      "MGTA 464",
+      "MGTA 466",
+      "MGTA 457"
+    ],
+    "differentiator": [
+      "MGTA 461",
+      "MGTA 456",
+      "MGTA 458",
+      "MGTA 459"
+    ],
+    "universal": [
+      "MGTA 402",
+      "MGTA 460"
+    ],
+    "anchor_units": 6,
+    "non_msba_units": 0
+  },
+  "marketing-analyst": {
+    "profile": "Marketing / Growth Analytics",
+    "anchor": [
+      "MGTA 458",
+      "MGT 477",
+      "MGTA 479"
+    ],
+    "differentiator": [
+      "MGTA 461",
+      "MGTA 464",
+      "MGTA 457",
+      "MGTA 495-MKTG"
+    ],
+    "universal": [
+      "MGTA 402",
+      "MGTA 460"
+    ],
+    "anchor_units": 12,
+    "non_msba_units": 4
+  },
+  "consultant": {
+    "profile": "Analytics / Data Consultant",
+    "anchor": [
+      "MGTA 402",
+      "MGTA 459",
+      "MGTA 460",
+      "MGTA 457"
+    ],
+    "differentiator": [
+      "MGTA 464",
+      "MGTA 456",
+      "MGTA 479",
+      "MGT 451",
+      "MGTA 458",
+      "MGTA 466"
+    ],
+    "universal": [],
+    "anchor_units": 10,
+    "non_msba_units": 4,
+    "differentiator_added_by_us": [
+      "MGTA 466"
+    ]
+  },
+  "fraud-risk-analyst": {
+    "profile": "Risk & Fraud Analytics",
+    "anchor": [
+      "MGTA 463",
+      "MGTA 464",
+      "MGTA 466"
+    ],
+    "differentiator": [
+      "CSE 251A",
+      "MGTF 405",
+      "MGTA 459",
+      "MGTF 406",
+      "MGTA 457"
+    ],
+    "universal": [
+      "MGTA 402",
+      "MGTA 460"
+    ],
+    "anchor_units": 8,
+    "non_msba_units": 12,
+    "differentiator_added_by_us": [
+      "MGTA 457"
+    ]
+  },
+  "operations-supply-chain": {
+    "profile": "Supply Chain / Operations Analytics",
+    "anchor": [
+      "MGTA 456",
+      "MGTF 405",
+      "MGTA 464"
+    ],
+    "differentiator": [
+      "MGTA 466",
+      "MGTA 479",
+      "MGTA 457",
+      "MGTA 459"
+    ],
+    "universal": [
+      "MGTA 402",
+      "MGTA 460"
+    ],
+    "anchor_units": 10,
+    "non_msba_units": 4
+  },
+  "pricing-analyst": {
+    "profile": "Pricing & Revenue Management",
+    "anchor": [
+      "MGTA 479",
+      "MGT 477",
+      "MGTA 458"
+    ],
+    "differentiator": [
+      "MGTF 405",
+      "MGTA 456",
+      "MGTA 459",
+      "MGTF 406"
+    ],
+    "universal": [
+      "MGTA 402",
+      "MGTA 460"
+    ],
+    "anchor_units": 12,
+    "non_msba_units": 12
+  },
+  "decision-scientist": {
+    "profile": "Decision Scientist / Experimentation",
+    "anchor": [
+      "MGTA 458",
+      "MGTA 459",
+      "MGTA 464"
+    ],
+    "differentiator": [
+      "MGTA 461",
+      "MGT 477",
+      "MGTA 479",
+      "MGTA 457"
+    ],
+    "universal": [
+      "MGTA 402",
+      "MGTA 460"
+    ],
+    "anchor_units": 10,
+    "non_msba_units": 4
+  },
+  "ml-engineer": {
+    "profile": "AI / ML Engineer & GenAI Solutions",
+    "anchor": [
+      "CSE 251A",
+      "CSE 251B",
+      "CSE 256"
+    ],
+    "differentiator": [
+      "MGTA 466",
+      "MGTA 461",
+      "MGTA 464",
+      "MGTA 415",
+      "MGTA 495-GENAI"
+    ],
+    "universal": [
+      "MGTA 402",
+      "MGTA 460"
+    ],
+    "anchor_units": 12,
+    "non_msba_units": 12
+  },
+  "healthcare-analyst": {
+    "profile": "Healthcare / Life Sciences Analytics",
+    "anchor": [
+      "MGTA 464",
+      "MGTA 458",
+      "MGTA 495-HC"
+    ],
+    "differentiator": [
+      "MGTA 463",
+      "MGTA 456",
+      "MGTA 466",
+      "MGTA 459",
+      "MGTA 457"
+    ],
+    "universal": [
+      "MGTA 402",
+      "MGTA 460"
+    ],
+    "anchor_units": 8,
+    "non_msba_units": 0
+  },
+  "finance-quant": {
+    "profile": "Financial Analytics",
+    "anchor": [
+      "MGTF 405",
+      "MGTA 464",
+      "MGTA 457"
+    ],
+    "differentiator": [
+      "MGTF 406",
+      "MGTA 463",
+      "MGTA 479",
+      "MGTA 459",
+      "MGTA 466"
+    ],
+    "universal": [
+      "MGTA 402",
+      "MGTA 460"
+    ],
+    "anchor_units": 8,
+    "non_msba_units": 8,
+    "differentiator_added_by_us": [
+      "MGTA 466"
+    ]
+  },
+  "_comment": "Per-profile elective bundles from MSBA-Elective-Recommender-Design.md Part IV, with course codes corrected against the live catalog (CSE 250B -> CSE 251A, CSE 253 -> CSE 251B) and MGTA 464/466 at their real 2 units rather than the 4 the document's footnote assumed. Some bundles carry differentiators BEYOND the document, listed per profile under `differentiator_added_by_us`: a bundle must close at the elective budget and the document's own list could not reach it -- data-scientist needed 10 units from options of 4/4/4, and consultant, fraud-risk-analyst and finance-quant each needed 14 from 4/4/4/4. Every addition is a 2-unit course, which is the size that was missing."
+}

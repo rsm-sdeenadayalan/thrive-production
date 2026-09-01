@@ -488,3 +488,176 @@ class TestSimilarity:
         catalog = {c["id"]: c for c in load_catalog()}
         shared = planner.shared_skills(catalog["CSE 251A"], catalog["CSE 251B"])
         assert all(s in catalog["CSE 251B"]["skills"] for s in shared)
+
+
+class TestAShortPlanSaysSo:
+    """The defect: a plan that could not be filled reported the units it
+    WANTED rather than the units it had.
+
+    Fall publishes exactly two 2-unit electives (MGTA 402, MGTA 457), so a
+    student who has already taken both leaves the Fall 2-unit slot unfillable.
+    The row rendered "nothing available for this slot" -- and the header two
+    lines above it still read "50 units ... which is what the degree requires",
+    because every total summed the placeholder row's `units` alongside the real
+    ones. A student could have planned a degree on a 48-unit plan that told
+    them it was complete.
+    """
+
+    TAKEN = frozenset({"MGTA 402", "MGTA 457"})
+
+    def test_totals_count_only_what_is_scheduled(self):
+        plan = planner.build_plan(ANSWERS, self.TAKEN)
+        scheduled = sum(row["units"] for quarter in plan["quarters"]
+                        for row in quarter["courses"] if row["courseId"])
+        assert plan["unfilled"], "expected an unfillable slot for this fixture"
+        assert plan["totals"]["total"] == scheduled == 48
+        assert plan["totals"]["elective"] == 26
+
+    def test_a_quarter_reports_the_units_it_holds(self):
+        plan = planner.build_plan(ANSWERS, self.TAKEN)
+        for quarter in plan["quarters"]:
+            held = sum(row["units"] for row in quarter["courses"] if row["courseId"])
+            assert quarter["unitsPlanned"] == held, quarter["key"]
+
+    def test_the_markdown_warns_instead_of_claiming_completeness(self):
+        body = planner.render_plan_markdown(planner.build_plan(ANSWERS, self.TAKEN))
+        assert "2 units short of the 50" in body
+        assert "complete 50-unit plan" not in body
+
+    def test_a_full_plan_still_reads_as_complete_and_never_warns(self):
+        plan = planner.build_plan(ANSWERS)
+        assert plan["unfilled"] == []
+        assert plan["totals"]["total"] == 50
+        assert "short of the" not in planner.render_plan_markdown(plan)
+
+
+class TestTheExtractorKnowsJobTitles:
+    """The defect: the taxonomy moved to fourteen profiles and took the job
+    titles with it, so a student naming an ordinary title was told their
+    career was not covered.
+
+    `resolve_role` repairs a stored role id. It never sees free text, so the
+    other half of the migration is that the extractor is handed the titles each
+    profile is actually called by -- including the retired role names.
+    """
+
+    def test_every_profile_offers_the_titles_it_is_called_by(self):
+        from rsm_thrive.services.electives import load_careers
+
+        for role_id, role in load_careers().items():
+            assert role.get("titles"), f"{role_id} has no titles"
+
+    def test_the_vocabulary_names_retired_roles_against_their_successor(self):
+        vocabulary = planner.role_vocabulary()
+        for said, role_id in [("product manager", "product-analyst"),
+                              ("data engineer", "analytics-engineer"),
+                              ("financial analyst", "finance-quant")]:
+            line = next(l for l in vocabulary.splitlines() if l.startswith(role_id))
+            assert said in line.lower(), f"{said!r} missing from {role_id}"
+
+    def test_the_extract_prompt_carries_the_vocabulary(self):
+        placeholders = planner.intake_extract_placeholders()
+        assert "product manager" in placeholders["role_ids"].lower()
+        # One line per role, so the model reads it as a lookup rather than prose.
+        assert len(placeholders["role_ids"].splitlines()) == 14
+
+
+class TestAQuestionIsNotAReviewCommand:
+    """The defect: `review_intent` matched bare substrings, so ordinary
+    questions asked during the walk-through were executed as commands.
+
+    "can you confirm what MGTA 458 is?" contains "confirm" and FINALISED the
+    plan. "what should I review?" restarted the walk-through, and "is next
+    quarter heavy?" advanced it. A student asking about their plan was changing
+    it, and `review_intent` runs before anything that could answer them.
+    """
+
+    @pytest.mark.parametrize("text", [
+        "what's next?", "what should I review?",
+        "can you confirm what MGTA 458 is?", "is next quarter heavy?",
+        "what does review mean?", "why continue with this?",
+        "does this look good to you?", "what comes next after winter?",
+        "should I confirm this with advising?",
+    ])
+    def test_questions_are_not_commands(self, text):
+        assert planner.review_intent(text) is None
+
+    @pytest.mark.parametrize("text,intent", [
+        ("next", "next"), ("Next", "next"), ("next quarter", "next"),
+        ("continue", "next"), ("keep going", "next"),
+        ("walk me through it", "start"), ("quarter by quarter", "start"),
+        ("can you walk me through it?", "start"),
+        ("finalise", "finalise"), ("looks good", "finalise"),
+        ("Looks good, finalise it", "finalise"), ("done", "finalise"),
+    ])
+    def test_the_real_commands_still_work(self, text, intent):
+        # The buttons send fixed strings; those must keep working exactly.
+        assert planner.review_intent(text) == intent
+
+    def test_every_button_send_is_understood(self):
+        for button in planner.review_intro_replies():
+            assert planner.review_intent(button["send"]) is not None, button
+
+
+class TestTheCatalogAnswersCourseQuestions:
+    """The course planner answers from `data/catalog/courses.json` rather than
+    the document corpus. That file IS the answer to a course question -- units,
+    seasons, prerequisites, tools and workload as fields -- where a retrieved
+    prose chunk carries whatever a web page happened to say. Retrieval also
+    answered questions this bot has no business answering: asked about tuition
+    it found a fee page and replied, which belongs to the FAQ bot."""
+
+    def test_a_named_course_returns_that_course_alone(self):
+        from rsm_thrive.services.electives import search_catalog
+
+        hits = search_catalog("what is MGTA 458 about")
+        assert [c["code"] for c in hits] == ["MGTA 458"]
+
+    def test_a_tool_finds_the_course_that_teaches_it(self):
+        from rsm_thrive.services.electives import search_catalog
+
+        codes = [c["code"] for c in search_catalog("which courses use Tableau")]
+        assert "MGTA 457" in codes
+
+    def test_a_season_is_searchable_by_name(self):
+        """Students ask for "winter", never for "WI"."""
+        from rsm_thrive.services.electives import search_catalog
+
+        hits = search_catalog("which electives are offered in winter")
+        assert hits, "a season name must reach the catalog"
+
+    @pytest.mark.parametrize("question", [
+        "what are the tuition fees",
+        "how do i set up zoom",
+        "what's the weather in san diego",
+        "when is orientation",
+    ])
+    def test_non_course_questions_reach_nothing(self, question):
+        """The word "tuition" appears in a course description, so a bare term
+        match answered a fee question from a course. A question has to be ABOUT
+        courses before the catalog is consulted."""
+        from rsm_thrive.services.electives import search_catalog
+
+        assert search_catalog(question) == []
+
+    @pytest.mark.parametrize("question,expected", [
+        ("what courses do you have", True),
+        ("which electives have no prerequisites", True),
+        ("how many units is it", True),
+        ("what's the weather", False),
+        ("how do i set up zoom", False),
+    ])
+    def test_course_questions_are_recognised(self, question, expected):
+        from rsm_thrive.services.electives import is_course_question
+
+        assert is_course_question(question) is expected
+
+    def test_the_overview_carries_enough_to_answer_from(self):
+        """A code list cannot answer "which run in winter" or "which have no
+        prerequisites", and that is what it used to return."""
+        from rsm_thrive.services.bots import _catalog_context
+
+        context = _catalog_context("what courses do you have")
+        assert context
+        assert "prereq" in context and "offered" in context
+        assert "MGTA 458" in context and "CSE 251A" in context

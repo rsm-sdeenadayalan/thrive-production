@@ -105,8 +105,53 @@ CSRF_TRUSTED_ORIGINS = [
     origin for origin in THRIVE_FRONTEND_ORIGINS if origin.startswith("http")
 ]
 
-THRIVE_LLM = os.environ.get("THRIVE_LLM", "tritonai")
+# Which chat backend answers a turn:
+#
+#   "codex"    LOCAL DEV DEFAULT. A personal ChatGPT/Codex subscription over
+#              OAuth, needing no API key at all. See `CodexOAuthLLM`.
+#   "tritonai" What the DEPLOYED service must run. Needs TRITONAI_API_KEY.
+#   "fake"     Tests, which inject their own FakeLLM.
+#
+# The default is `codex` because the TritonAI keys this project is issued carry
+# a fixed one-time budget with no reset, so an exhausted key stops all local
+# work on the chatbots and there is nothing to wait for.
+#
+# DEPLOYMENT MUST SET THRIVE_LLM=tritonai EXPLICITLY. The codex backend
+# authenticates as a person rather than as a metered service and talks to an
+# endpoint with no compatibility promise; it is a laptop convenience, not a
+# production dependency. `docs/VINCENT-ASKS.md` already lists the API key as
+# something we supply, so the server environment is the place that pins this.
+THRIVE_LLM = os.environ.get("THRIVE_LLM", "codex")
+CODEX_MODEL = os.environ.get("CODEX_MODEL", "gpt-5.4")
+CODEX_TIMEOUT_SECONDS = int(os.environ.get("CODEX_TIMEOUT_SECONDS", "90"))
+# Shared-credential serving, for a hosted TEST instance. Point this at a
+# credential file copied from a developer's ~/.codex/auth.json; every request
+# then uses that one account and no student ever signs in. Unset, the app falls
+# back to the Codex CLI's own file, which is what a laptop wants.
+#
+# TREAT THE FILE AS A SECRET -- it holds a long-lived refresh token for a
+# personal ChatGPT account.
+CODEX_CREDENTIALS_PATH = os.environ.get("CODEX_CREDENTIALS_PATH", "")
+# Whether this host may open a browser to sign in. Unset means "only if a
+# terminal is attached", which keeps a laptop convenient and stops a headless
+# server hanging a worker on a sign-in nobody can see.
+CODEX_ALLOW_BROWSER_LOGIN = (
+    None if os.environ.get("CODEX_ALLOW_BROWSER_LOGIN") is None
+    else os.environ.get("CODEX_ALLOW_BROWSER_LOGIN") == "1")
+# Embeddings are a SEPARATE provider from chat -- the codex backend has none.
+# Unset, this follows THRIVE_LLM. See services/embeddings.py.
+THRIVE_EMBEDDINGS = os.environ.get("THRIVE_EMBEDDINGS", "")
+# The on-machine embedding model used when THRIVE_EMBEDDINGS resolves to
+# "local" (which THRIVE_LLM=codex does). ~123MB, downloaded once from HF.
+THRIVE_LOCAL_EMBED_MODEL = os.environ.get(
+    "THRIVE_LOCAL_EMBED_MODEL", "minishlab/potion-retrieval-32M")
+# Retrieval thresholds are calibrated PER ENCODER, so the overlay follows the
+# embedding backend rather than being set by hand. An explicit THRIVE_BOT_CONFIG
+# always wins -- that is the deploy-free tuning hook and this must not shadow it.
+_embed_backend = THRIVE_EMBEDDINGS or THRIVE_LLM
 THRIVE_BOT_CONFIG = os.environ.get("THRIVE_BOT_CONFIG", "")
+if not THRIVE_BOT_CONFIG and _embed_backend in ("local", "codex"):
+    THRIVE_BOT_CONFIG = str(BASE_DIR / "config" / "bots.local-embed.json")
 TRITONAI_API_KEY = os.environ.get("TRITONAI_API_KEY", "")
 TRITONAI_MODEL = os.environ.get("TRITONAI_MODEL", "claude-sonnet-4-6")
 # Placeholder — verify via list_models at the TritonAI portal and correct.

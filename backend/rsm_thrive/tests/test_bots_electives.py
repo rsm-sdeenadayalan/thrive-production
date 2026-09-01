@@ -4,6 +4,7 @@ import pytest
 from django.contrib.auth.models import User
 
 from rsm_thrive.models import Conversation, CoursePlan, PlannerSession
+from rsm_thrive.services import planner
 from rsm_thrive.services.bots import answer_electives
 from rsm_thrive.services.llm import FakeLLM
 
@@ -133,12 +134,18 @@ class TestTheInterview:
         assert "Python programming" not in reply.body
         assert "Machine learning" in reply.body
 
-    def test_then_it_asks_about_workload(self, conversation):
+    def test_then_it_asks_how_the_units_are_spread(self, conversation):
+        """Replaced "light / moderate / heavy". A word could not be scheduled;
+        units per quarter is the same question asked concretely."""
         answers = {**FULL, "workload": None}
         fake = FakeLLM(replies=[_extracted(**answers)])
         reply = answer_electives(fake, conversation, "all basic", [])
         assert "Step 4 of 4" in reply.body
-        assert "course load" in reply.body
+        assert "units" in reply.body.lower()
+        assert reply.form and reply.form["kind"] == "units"
+        # Seeded with the published plan, and every row inside its own bounds.
+        for row in reply.form["rows"]:
+            assert row["min"] <= row["default"] <= row["max"], row
 
     def test_an_invented_answer_is_dropped_and_re_asked(self, conversation):
         """A guessed value becomes a plan the student never agreed to."""
@@ -345,69 +352,80 @@ class TestAmbiguousCourseCodes:
 
 class TestAnUnknownCareer:
     """Reported: asking to become an esports analyst produced a plan instead of
-    a question — and then, once it asked, it answered with a menu of ten roles
-    the student had not asked about."""
+    a question -- and then, once it asked, it answered with a menu of ten roles
+    the student had not asked about.
+
+    It now does something better than either: looks up what that job actually
+    needs (on the web, see `services/role_lookup.py`) and recommends the
+    courses this catalog really has for those skills. The old guarantees still
+    hold -- no plan, no role menu -- and are still asserted below.
+    """
 
     UNKNOWN = {"track": "11 month", "goals": [], "skill_python": None,
                "skill_sql": None, "skill_stats": None, "skill_ml": None,
                "skill_communication": None, "workload": None, "interests": [],
                "unmatched_goal": "esports analyst"}
 
-    def test_it_says_it_has_no_material_for_that_career(self, conversation):
-        fake = FakeLLM(replies=[json.dumps(self.UNKNOWN)])
-        reply = answer_electives(fake, conversation,
-                                 "i want to be an esports analyst", [])
-        assert reply.model_note == "no-track"
-        assert "esports analyst" in reply.body
+    # What `skills_for_role` gets back. Skills, never courses: the model does
+    # not know this catalog and the mapping happens in Python.
+    ROLE = json.dumps({
+        "known": True, "role": "esports analyst",
+        "summary": "Turns match and player data into insight.",
+        "skills": ["sql", "data analysis", "data visualization"],
+        "tools": ["python", "tableau"], "topics": ["statistics"]})
 
-    def test_it_points_at_advising_and_the_appointments_tab(self, conversation):
-        fake = FakeLLM(replies=[json.dumps(self.UNKNOWN)])
+    def _replies(self, *extra):
+        return FakeLLM(replies=[json.dumps(self.UNKNOWN), *extra])
+
+    def test_it_recommends_real_courses_for_the_role(self, conversation):
+        fake = self._replies(self.ROLE, "MGTA 464 covers SQL. MGTA 457 covers Tableau.")
+        reply = answer_electives(fake, conversation, "esports analyst", [])
+        assert "MGTA 464" in reply.body
+
+    def test_it_never_produces_a_plan_for_an_uncovered_career(self, conversation):
+        fake = self._replies(self.ROLE, "MGTA 464 covers SQL.")
         body = answer_electives(fake, conversation, "esports analyst", []).body
-        assert "MSBA advising" in body
-        assert "Appointments" in body
+        assert "## Summer III" not in body, "a plan needs answers nobody gave"
 
     def test_it_does_not_spam_the_list_of_roles(self, conversation):
-        """The whole point of the change: no menu of ten roles."""
-        fake = FakeLLM(replies=[json.dumps(self.UNKNOWN)])
+        """The whole point of the original change: no menu of ten roles."""
+        fake = self._replies(self.ROLE, "MGTA 464 covers SQL.")
         body = answer_electives(fake, conversation, "esports analyst", []).body
         for label in ("Data Scientist", "Data Engineer", "Product Manager",
                       "Analytics Consultant"):
             assert label not in body
-        assert "Step 2 of 4" not in body
 
-    def test_no_plan_is_produced_for_an_uncovered_career(self, conversation):
-        fake = FakeLLM(replies=[json.dumps({
-            **self.UNKNOWN, "skill_python": "basic", "skill_sql": "basic",
-            "skill_stats": "basic", "skill_ml": "basic",
-            "skill_communication": "basic", "workload": "moderate"})])
-        body = answer_electives(fake, conversation, "esports analyst", []).body
-        assert "## Summer III" not in body
-        assert "MGTA" not in body
+    def test_a_real_job_the_catalog_cannot_serve_still_points_at_advising(
+            self, conversation):
+        """The fallback that survives: a genuine job with nothing in the
+        catalog teaching it gets the honest answer, not a stretched match."""
+        nothing = json.dumps({
+            "known": True, "role": "sommelier", "summary": "Tastes wine.",
+            "skills": ["wine tasting", "cellar management"], "tools": [],
+            "topics": ["viticulture"]})
+        fake = self._replies(nothing)
+        reply = answer_electives(fake, conversation, "sommelier", [])
+        assert reply.model_note == "no-track"
+        assert "MSBA advising" in reply.body and "Appointments" in reply.body
 
-    def test_it_still_leaves_a_way_forward(self, conversation):
-        fake = FakeLLM(replies=[json.dumps(self.UNKNOWN)])
-        body = answer_electives(fake, conversation, "esports analyst", []).body
-        assert "tell me which one" in body.lower()
+    def test_something_that_is_not_a_job_is_not_treated_as_a_career(
+            self, conversation):
+        """"how do i set up zoom" was being answered with "your career is not
+        covered". The role lookup reports it is not a job, and the turn falls
+        through to the aside instead."""
+        from rsm_thrive.services.bots import ASIDE_UNKNOWN
 
-    def test_naming_a_covered_role_afterwards_resumes_the_interview(self, conversation):
-        answer_electives(FakeLLM(replies=[json.dumps(self.UNKNOWN)]),
-                         conversation, "esports analyst", [])
-        resumed = FakeLLM(replies=[_extracted(track="11 month",
-                                              goals=["data-scientist"])])
-        reply = answer_electives(resumed, conversation, "data scientist ok", [])
-        assert reply.model_note == "intake"
-        assert "Step 3 of 4" in reply.body
-
-    def test_a_recognised_goal_is_never_diverted_to_advising(self, conversation):
-        """An unmatched mention alongside a real choice must not block the plan."""
-        fake = FakeLLM(replies=[json.dumps({
-            **self.UNKNOWN, "goals": ["data-scientist"],
-            "skill_python": "basic", "skill_sql": "basic", "skill_stats": "basic",
-            "skill_ml": "basic", "skill_communication": "basic",
-            "workload": "moderate"})])
-        reply = answer_electives(fake, conversation,
-                                 "esports, but data scientist works", [])
-        assert reply.model_note == "plan"
+        not_a_job = json.dumps({"known": False, "role": "", "summary": "",
+                                "skills": [], "tools": [], "topics": []})
+        # No track in this extraction: a student typing a question does not
+        # also state their track in the same breath, and including one made the
+        # turn "teach the interview something", which suppresses the aside.
+        fake = FakeLLM(replies=[json.dumps({**self.UNKNOWN, "track": None,
+                                            "unmatched_goal": "how do i set up zoom"}),
+                                not_a_job])
+        reply = answer_electives(fake, conversation, "how do i set up zoom", [])
+        assert reply.model_note != "no-track"
+        assert ASIDE_UNKNOWN in reply.body
 
 
 class TestJobButtons:
@@ -613,8 +631,22 @@ class TestTheGuidedReview:
     def test_a_finished_plan_offers_to_walk_through_it(self, conversation):
         reply = answer_electives(FakeLLM(replies=[_extracted(**FULL)]),
                                  conversation, "go", [])
+        # Three now: the route switch leads, because it changes the whole plan
+        # rather than one slot of it.
         assert [q["send"] for q in reply.quick_replies] == [
-            "walk me through it", "finalise"]
+            "use the recommended bundle", "walk me through it", "finalise"]
+
+    def test_the_route_switch_is_offered_and_leads_somewhere(self, conversation):
+        """The plan is built the custom way, so the button offers the other
+        route -- and the value it sends has to be one `route_intent` reads back,
+        or the button does nothing."""
+        from rsm_thrive.services import planner
+
+        reply = answer_electives(FakeLLM(replies=[_extracted(**FULL)]),
+                                 conversation, "go", [])
+        switch = reply.quick_replies[0]
+        assert planner.route_intent(switch["send"]) == "fixed"
+        assert switch["description"], "a route button has to say what it does"
 
     def test_the_walk_starts_at_the_first_quarter(self, conversation):
         self._planned(conversation)
@@ -766,3 +798,273 @@ class TestChangingACourse:
         fake = FakeLLM(replies=[_extracted(**FULL)])
         reply = answer_electives(fake, conversation, "change MGTA 451", [])
         assert "cannot be changed" in reply.body
+
+
+class TestAQuestionIsNotAnAnswer:
+    """The defect: asked "what if I switch to 17 month?", the extractor
+    reported track="17 month" and the student's committed plan was rebuilt on
+    the other track -- `CoursePlan` included, which is per-user, outlives the
+    conversation and is what `/api/thrive/plan` serves. A what-if replaced the
+    real plan of study.
+    """
+
+    def test_a_hypothetical_does_not_overwrite_an_answer_on_file(self):
+        from rsm_thrive.services import planner
+
+        stored = {"track": "11 month", "goals": ["data-scientist"]}
+        merged = planner.merge_intake(stored, {"track": "17 month"}, asking=True)
+        assert merged["track"] == "11 month"
+
+    def test_a_question_commits_nothing_not_even_into_a_blank(self):
+        """Narrowed after measurement. Allowing a question to fill BLANKS was
+        the original rule, on the theory that "what if I want to be a data
+        scientist?" carries real information. It carries the same risk in a
+        quieter form: probing every step of the interview, "is next quarter
+        heavy?" wrote workload="heavy" from a turn that stated no preference.
+        The interview asks again instead."""
+        from rsm_thrive.services import planner
+
+        merged = planner.merge_intake({"track": "11 month"},
+                                      {"goals": ["data-scientist"]}, asking=True)
+        assert "goals" not in merged
+        assert merged["track"] == "11 month", "what was on file stays on file"
+
+    def test_a_plain_answer_still_overwrites(self):
+        from rsm_thrive.services import planner
+
+        merged = planner.merge_intake({"track": "17 month"},
+                                      {"track": "11 month"}, asking=False)
+        assert merged["track"] == "11 month"
+
+    @pytest.mark.parametrize("text", [
+        "what if I switch to 17 month?", "should I have said data engineer?",
+        "what electives are there?", "why do you need my track?",
+        "can I change this later?",
+    ])
+    def test_these_read_as_questions(self, text):
+        from rsm_thrive.services import planner
+
+        assert planner.is_question(text)
+
+    @pytest.mark.parametrize("text", [
+        "11 month", "data scientist", "moderate", "11 month?",
+        "python 4 sql 3", "",
+    ])
+    def test_these_read_as_answers(self, text):
+        from rsm_thrive.services import planner
+
+        # "11 month?" is a hedged ANSWER, not a question -- a trailing "?" alone
+        # must not be enough, or an uncertain student stops being heard.
+        assert not planner.is_question(text)
+
+
+class TestTheAsideDoesNotInventOrDoubleAsk:
+    """Two defects in the mid-interview answer path itself.
+
+    With no retrieved context the model answered "what's the weather in san
+    diego?" and volunteered "have you completed MGB 290 (Analytics
+    Practicum)?" -- a course that is not in the catalog. And asked "are you an
+    AI?" it answered, then asked a question of its own, which landed directly
+    above the interview's own different question.
+    """
+
+    def test_no_context_refuses_deterministically(self):
+        from rsm_thrive.services import bots
+        from rsm_thrive.services.llm import FakeLLM
+
+        # An exhausted FakeLLM raises if it is called at all.
+        prefix, cited = bots._aside(FakeLLM(replies=[]), "what is the recipe for lasagna")
+        assert bots.ASIDE_UNKNOWN in prefix
+        assert cited == []
+
+    def test_the_refusal_states_its_scope_rather_than_deferring(self):
+        """"I don't have material -- MSBA advising can" is a fair answer about a
+        fee schedule and a silly one about the weather, which advising cannot
+        help with either. The refusal names what this bot does instead."""
+        from rsm_thrive.services import bots
+
+        lowered = bots.ASIDE_UNKNOWN.lower()
+        assert "course planner" in lowered
+        assert "electives" in lowered and "plan of study" in lowered
+        # It may still point elsewhere, but not as the whole answer.
+        assert not lowered.startswith("i don't have material")
+
+    @pytest.mark.parametrize("body,expected", [
+        ("Yes I am an AI. Which quarter are you in?", "Yes I am an AI."),
+        ("Answer line.\n\nAnd a question?", "Answer line."),
+        ("Fine. Now — **which quarter are you in?**", "Fine."),
+        ("Only a question?", ""),
+        ("A. B? C.", "A. B? C."),
+        ("Tuition is **50 units**", "Tuition is **50 units**"),
+        ("", ""),
+        (None, ""),
+    ])
+    def test_a_trailing_question_is_removed(self, body, expected):
+        from rsm_thrive.services.bots import _without_trailing_question
+
+        assert _without_trailing_question(body) == expected
+
+
+class TestThePlanIsNotReprintedAtEveryTurn:
+    """The defect: `_plan_reply` was the unconditional fallthrough, so "ok",
+    "thanks!" and "how do I enrol?" each reprinted the whole 3,680-character
+    plan of study -- 24 of 25 probes."""
+
+    @pytest.mark.parametrize("text", [
+        "show me the plan", "print it again", "the plan again", "my plan",
+    ])
+    def test_these_ask_for_the_plan(self, text):
+        from rsm_thrive.services.bots import _wants_the_plan
+
+        assert _wants_the_plan(text)
+
+    @pytest.mark.parametrize("text", [
+        "thanks!", "ok", "hmm", "how do I enrol?", "can you email this to me?",
+    ])
+    def test_these_do_not(self, text):
+        from rsm_thrive.services.bots import _wants_the_plan
+
+        assert not _wants_the_plan(text)
+
+
+class TestTheStepCounterSurvivesAnAside:
+    """The defect: the attempt counter matched with `startswith`, so once a
+    step could be preceded by the answer to a question, the marker was no
+    longer first in the body and the count stayed at zero.
+
+    That is the counter the skills escape hatch reads, so a student who asked
+    anything during the skills step could be asked for them forever.
+    """
+
+    def test_the_marker_is_found_even_when_an_aside_precedes_it(self):
+        from rsm_thrive.services import planner
+
+        step = {"key": "skills", "missing": []}
+        marker = f"**Step {planner.step_position(step)} of"
+        with_aside = ("Electives are listed in the catalog.\n\n---\n\n"
+                      f"{marker} 4.**\n\nHow would you rate...")
+        assert marker in with_aside
+        assert not with_aside.startswith(marker), "otherwise this proves nothing"
+
+
+class TestTheOpeningQuestionIsPartOfTheRecord:
+    """The defect: the courses interview shows its first question as a
+    client-side `starter`, so the conversation a send created began with the
+    student's answer and nothing above it -- "11 month", answering a question
+    that was never a message and was gone on reload."""
+
+    def test_a_courses_conversation_opens_with_the_question(self, client):
+        from rsm_thrive.testing import make_student
+        from rsm_thrive.services import planner
+        from rsm_thrive.views import chat as chat_views
+
+        profile = make_student(username="seeded")
+        client.force_login(profile.user)
+        chat_views.llm_factory = lambda: FakeLLM(replies=[json.dumps({
+            "track": "11 month", "goals": [], "workload": None,
+            "interests": [], "unmatched_goal": None})])
+        response = client.post(
+            "/api/thrive/conversations",
+            data=json.dumps({"destination": "courses", "body": "11 month"}),
+            content_type="application/json")
+        assert response.status_code == 201, response.content[:200]
+        messages = response.json()["messages"]
+        assert messages[0]["role"] == "thrive"
+        assert messages[0]["body"] == planner.opening_prompt()["body"]
+        assert [q["send"] for q in messages[0]["quickReplies"]] == ["11 month", "17 month"]
+        assert messages[1]["role"] == "student"
+
+    def test_other_destinations_are_not_seeded(self, client):
+        from rsm_thrive.testing import make_student
+        from rsm_thrive.views import chat as chat_views
+
+        profile = make_student(username="unseeded")
+        client.force_login(profile.user)
+        chat_views.llm_factory = lambda: FakeLLM(replies=["an answer"])
+        response = client.post(
+            "/api/thrive/conversations",
+            data=json.dumps({"destination": "resources", "body": "hello"}),
+            content_type="application/json")
+        assert response.status_code == 201, response.content[:200]
+        assert response.json()["messages"][0]["role"] == "student"
+
+
+class TestAQuestionWithoutAQuestionMark:
+    """The defect: "What classes do you have access to" got the step repeated
+    back with no answer.
+
+    Two things had to line up. `is_question` requires a literal "?", so the
+    strict test said no -- correctly, since its other job is refusing to
+    overwrite a stored answer. The fallback was `not extracted`, which sounds
+    right and never fires: the extractor is handed the whole transcript every
+    turn and re-reports what the student already said, so `extracted` came back
+    as {"track": "11 month"} from three turns earlier and the aside was skipped.
+
+    The signal that works is whether the turn taught the interview anything NEW.
+    """
+
+    def _conversation(self, profile):
+        return Conversation.objects.create(
+            user=profile.user, destination="courses", title="t")
+
+    def test_a_turn_that_adds_nothing_new_gets_an_answer(self, conversation):
+        # The extractor re-reports the stored track and nothing else, which is
+        # exactly what it does live. With no corpus in the test database the
+        # aside refuses deterministically and consumes no second reply.
+        planner.save_session_intake(conversation, {"track": "11 month"})
+        fake = FakeLLM(replies=[_extracted(track="11 month")])
+        reply = answer_electives(fake, conversation,
+                                 "What classes do you have access to", [])
+        from rsm_thrive.services.bots import ASIDE_UNKNOWN
+
+        assert ASIDE_UNKNOWN in reply.body, reply.body[:200]
+        assert "**Step 2 of 4" in reply.body, "the step must still be asked"
+        assert not reply.body.startswith("**Step"), "the answer comes first"
+
+    def test_a_real_answer_is_not_treated_as_a_question(self, conversation):
+        planner.save_session_intake(conversation, {"track": "11 month"})
+        fake = FakeLLM(replies=[_extracted(track="11 month",
+                                           goals=["data-scientist"])])
+        reply = answer_electives(fake, conversation, "data scientist", [])
+        from rsm_thrive.services.bots import ASIDE_UNKNOWN
+
+        # It taught the interview something, so it gets no aside -- just the
+        # next step.
+        assert ASIDE_UNKNOWN not in reply.body
+        assert reply.body.startswith("**Step 3 of 4")
+
+
+class TestAnIncidentalWordIsNotAnAnswer:
+    """Found by probing a question at every point in the interview: the word
+    "heavy" inside "is next quarter heavy?" was recorded as the student's
+    workload preference. The turn stated no preference at all."""
+
+    @pytest.mark.parametrize("text", [
+        "is next quarter heavy?", "is the workload heavy?",
+        "are these courses light?", "does it get heavy later?",
+        "will it be a light quarter?", "can I do 11 month?",
+        "should I pick data scientist?", "was 17 month the longer one?",
+    ])
+    def test_these_read_as_questions(self, text):
+        from rsm_thrive.services import planner
+
+        assert planner.is_question(text), text
+
+    @pytest.mark.parametrize("text", [
+        "heavy", "light", "11 month", "11 month?", "moderate",
+        "data scientist", "python 4 sql 3",
+    ])
+    def test_answers_are_still_answers(self, text):
+        # A hedged answer starts with its own value, never with an auxiliary.
+        from rsm_thrive.services import planner
+
+        assert not planner.is_question(text), text
+
+    def test_the_measured_case_end_to_end(self):
+        from rsm_thrive.services import planner
+
+        extracted = planner.normalise_intake({"workload": "heavy"})
+        assert extracted == {"workload": "heavy"}, "the extractor does report it"
+        merged = planner.merge_intake({}, extracted,
+                                      asking=planner.is_question("is next quarter heavy?"))
+        assert merged == {}, "but a question must not turn it into an answer"

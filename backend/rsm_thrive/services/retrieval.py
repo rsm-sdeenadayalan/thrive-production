@@ -84,6 +84,111 @@ WORD_RE = re.compile(r"[a-z0-9][a-z0-9$.,/-]*")
 # enough that ranking stays embedding-led).
 KEYWORD_WEIGHT = 0.25
 
+# ---------------------------------------------------------------------------
+# Lexical-only mode: BM25. See `NullEmbeddings` for why this mode exists.
+# ---------------------------------------------------------------------------
+#
+# The first attempt reused the lexical TIER's rule -- every distinctive term of
+# the question present in one chunk -- and it scored 3/9 on the golden eval
+# against a documented 6/9, refusing five questions the corpus answers. The
+# measurement that explains it: "What is the laptop requirement for MSBA?"
+# reaches 0.82 term coverage and "How much is MSBA tuition per unit?" 0.71,
+# because no single chunk holds EVERY word of a natural-language question. That
+# rule was never meant to stand alone; cosine is what caught the rest, and the
+# hand-picked probes it passed were short and keyword-shaped.
+#
+# BM25 is the standard answer: it ranks PARTIAL matches instead of demanding
+# all of them, and its IDF term down-weights words that appear everywhere --
+# which is also the guard `lexical_floor` provided and that a vector-free mode
+# otherwise loses ("president" is common; "immunization" is not).
+BM25_K1 = 1.5     # term-frequency saturation, standard default
+BM25_B = 0.75     # length normalisation, standard default
+
+# Admission when there are no vectors at all (see `NullEmbeddings`).
+#
+# Swept 2026-08-29 over the shipped corpus, 14 answerable questions against 10
+# off-corpus controls. Relaxing the bar below 1.0 was tried FIRST, on the theory
+# that "every distinctive term present" is strict because cosine is there to
+# catch what it misses. The measurement says otherwise: 0.70 answered 14/14 but
+# leaked 5 of 10, and 0.80 leaked 2 while answering no more than 1.0 does. So
+# the strict bar is right with or without vectors, and the only cost is
+# "what is the laptop requirement", which no threshold rescued.
+# Absolute floor: below this, nothing in the corpus matched meaningfully at all.
+#
+# Calibrated 2026-08-29 against `faq_golden.json`, and the calibration is the
+# finding: BM25 CANNOT separate on-topic from off-topic here. The answerable
+# cases score 10.47-18.60 and the must-refuse cases 6.53-11.41, so
+# `refuse-do-my-work` (11.41) outranks both `msba-per-unit-tuition` (10.47) and
+# `laptop` (10.91). No absolute threshold and no best/second ratio splits them.
+# Deciding that "how do I drop a class" is in scope and "do my homework" is not
+# is exactly the semantic judgement embeddings make, and this mode has none.
+#
+# So the floor is set for COVERAGE, and safety is left to the layer that can
+# still provide it: the FAQ prompt answers only from retrieved passages, and on
+# the three must-refuse controls it correctly replies that the material does not
+# cover them rather than inventing an answer. The DETERMINISTIC refusal (no
+# chunks, no LLM call) is what is lost -- `eval_bots` counts those three as
+# failures for that reason, and it is right to.
+BM25_MIN_SCORE = 6.0
+# Keep chunks within this fraction of the best score. Calibrated below.
+BM25_RELATIVE_CUT = 0.45
+
+# ...and one guard that CANNOT come with it, left off deliberately.
+#
+# `lexical_floor` exists because "every term present" means little when there is
+# only ONE term -- it is what stops "who is the president" being admitted off
+# the word "president" in a Fellowships page. It is a COSINE floor, so it cannot
+# run here, and that exact leak returns: 1 of 10 controls.
+#
+# Requiring two distinctive terms was tried as a vector-free substitute for it
+# and REJECTED on measurement. It does close the leak, but stopwords mean a
+# great many real questions carry one distinctive term: "when is orientation" is
+# {orientation}, "how do i get my student id" is {student}, and "how do i get
+# zooom" is {zooom} -- so it also took typo tolerance out entirely. Coverage
+# 13/14 -> 11/14 to remove one leak on a question the corpus cannot answer
+# anyway, and whose retrieved chunk the FAQ prompt then declines to answer from.
+# Losing "when is orientation" is the worse failure of the two.
+
+
+def _term_counts(text):
+    """Distinctive terms with their frequencies. BM25 needs counts, not presence."""
+    counts = {}
+    for word in WORD_RE.findall((text or "").lower()):
+        word = word.strip(".,/-")
+        if len(word) > 2 and word not in STOPWORDS:
+            counts[word] = counts.get(word, 0) + 1
+    return counts
+
+
+def bm25_scores(query_groups, doc_counts, doc_lengths):
+    """BM25 for one query over every chunk, as a list parallel to `doc_counts`.
+
+    `query_groups` are the typo-expanded spellings of each query term, so a
+    term matches if ANY of its spellings occurs -- the same tolerance the
+    keyword tier has, kept rather than rebuilt.
+    """
+    total = len(doc_counts)
+    if not total or not query_groups:
+        return [0.0] * total
+    average = sum(doc_lengths) / total or 1.0
+
+    scores = [0.0] * total
+    for group in query_groups:
+        # How many chunks contain any spelling of this term -> its IDF.
+        containing = sum(1 for counts in doc_counts
+                         if any(spelling in counts for spelling in group))
+        if not containing:
+            continue
+        idf = math.log(1 + (total - containing + 0.5) / (containing + 0.5))
+        for index, counts in enumerate(doc_counts):
+            frequency = sum(counts.get(spelling, 0) for spelling in group)
+            if not frequency:
+                continue
+            norm = 1 - BM25_B + BM25_B * (doc_lengths[index] / average)
+            scores[index] += idf * (frequency * (BM25_K1 + 1)) / (
+                frequency + BM25_K1 * norm)
+    return scores
+
 
 def _terms(text):
     """Distinctive lowercase terms in a string, stopwords removed."""
@@ -219,18 +324,45 @@ def retrieve(query, destination, top_k, min_similarity, lexical_min=None,
     """
     embeddings = embeddings or get_embeddings()
     [query_vector] = embeddings.embed([query])
+    # No vectors at all (see `NullEmbeddings`): rank on the keyword half alone
+    # rather than returning nothing. Everything below still runs -- the same
+    # tokenising, the same typo repair, the same `_score` -- only the cosine
+    # contribution is absent, which is what `lexical_only` accounts for.
+    lexical_only = not query_vector
     # Tokenise each in-scope chunk ONCE and keep it: the vocabulary and the
     # keyword score both need it, and scoring used to redo this work per chunk.
-    scoped, haystacks = [], []
+    scoped, haystacks, counts = [], [], []
     for chunk in DocumentChunk.objects.select_related("document"):
         if destination not in (chunk.document.destinations or []):
             continue
+        text = f"{chunk.heading or ''} {chunk.text or ''}"
         scoped.append(chunk)
-        haystacks.append(_terms(f"{chunk.heading or ''} {chunk.text or ''}"))
+        haystacks.append(_terms(text))
+        # Only BM25 needs frequencies, and only lexical-only mode runs BM25.
+        counts.append(_term_counts(text) if lexical_only else None)
 
     # Group each term with the corpus spellings it may be a misspelling of, so
     # one typo cannot close the lexical tier on an answerable question.
     query_terms = expand_terms(_terms(query), vocabulary_of(haystacks))
+
+    if lexical_only:
+        # BM25 over the whole in-scope corpus, then a relative cut. The score is
+        # unbounded and scales with how many rare terms matched, so an ABSOLUTE
+        # threshold cannot separate "answered" from "off-topic" across questions
+        # of different lengths -- but the SHAPE does: a question the corpus
+        # answers has a few chunks far above the rest, and one it does not has a
+        # flat tail of incidental word matches.
+        lengths = [sum(c.values()) for c in counts]
+        bm25 = bm25_scores(query_terms, counts, lengths)
+        best = max(bm25) if bm25 else 0.0
+        if best < BM25_MIN_SCORE:
+            return []
+        cut = best * BM25_RELATIVE_CUT
+        ranked = sorted(
+            ((chunk, 0.0, score) for chunk, score in zip(scoped, bm25)
+             if score >= cut),
+            key=lambda triple: -triple[2])
+        return [(chunk, similarity) for chunk, similarity, _ in ranked[:top_k]]
 
     scored = []
     for chunk, haystack in zip(scoped, haystacks):

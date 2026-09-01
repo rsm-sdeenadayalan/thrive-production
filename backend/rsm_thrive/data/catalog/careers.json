@@ -1,165 +1,536 @@
 {
-  "product-manager": {
-    "label": "Product Manager",
-    "short_label": "Product Manager",
-    "description": "Owns product strategy and execution; needs experimentation literacy, customer insight, tech strategy, and communication.",
+  "business-data-analyst": {
+    "label": "Business / Data Analyst",
+    "short_label": "Business Analyst",
+    "description": "Own a business area's numbers: pull data, build recurring and ad-hoc analysis, answer what happened and why.",
     "career_tags": [
-      "product",
       "strategy-consulting",
       "communication",
-      "people-decisions"
+      "data-engineering"
     ],
     "boost_courses": {
-      "MGTA 458": 2.0,
-      "MGT 451": 2.0,
+      "MGTA 464": 3.0,
+      "MGTA 457": 3.0,
+      "MGTA 458": 3.0,
+      "MGTA 459": 1.5,
+      "MGTA 456": 1.5,
+      "MGTA 466": 1.5,
+      "MGTA 479": 1.5,
+      "MGTA 402": 0.5,
+      "MGTA 460": 0.5
+    },
+    "work": "Own a business area's numbers: pull data, build recurring and ad-hoc analysis, answer what happened and why.",
+    "gate": "SQL fluency plus communication. The widest door in, and the most crowded.",
+    "legacy_ids": [],
+    "demand": {
+      "volume": 5,
+      "growth": 3,
+      "accessibility": 5,
+      "compensation": 3,
+      "composite": 4.2
+    },
+    "titles": [
+      "business analyst",
+      "data analyst",
+      "senior analyst",
+      "insights analyst",
+      "reporting analyst"
+    ]
+  },
+  "bi-analyst": {
+    "label": "BI Analyst / BI Developer",
+    "short_label": "BI Developer",
+    "description": "Design the semantic layer, build the dashboards the org runs on, define the metrics.",
+    "career_tags": [
+      "data-engineering",
+      "communication",
+      "strategy-consulting"
+    ],
+    "boost_courses": {
+      "MGTA 457": 3.0,
+      "MGTA 464": 3.0,
+      "MGTA 466": 3.0,
+      "MGTA 458": 1.5,
+      "MGTA 459": 1.5,
+      "MGTA 456": 1.5,
+      "MGTF 405": 1.5,
+      "MGTA 402": 0.5,
+      "MGTA 460": 0.5
+    },
+    "work": "Design the semantic layer, build the dashboards the org runs on, define the metrics.",
+    "gate": "SQL plus a BI platform plus data-modeling instinct.",
+    "legacy_ids": [],
+    "demand": {
+      "volume": 4,
+      "growth": 3,
+      "accessibility": 5,
+      "compensation": 3,
+      "composite": 3.9
+    },
+    "titles": [
+      "bi analyst",
+      "bi developer",
+      "bi engineer",
+      "business intelligence analyst",
+      "analytics reporting lead"
+    ]
+  },
+  "product-analyst": {
+    "label": "Product Analyst / Product Data Scientist",
+    "short_label": "Product Analyst",
+    "description": "Instrument and interpret a digital product: funnels, retention, A/B tests, metric definition.",
+    "career_tags": [
+      "product",
+      "marketing",
+      "machine-learning",
+      "communication"
+    ],
+    "boost_courses": {
+      "MGTA 458": 3.0,
+      "MGTA 464": 3.0,
+      "MGTA 461": 3.0,
+      "MGTA 457": 1.5,
       "MGT 477": 1.5,
-      "MGTA 460": 1.5,
-      "MGTA 495-GENAI": 1.5,
-      "MGTA 402": 1.0,
-      "MGTA 479": 1.0,
-      "MGTA 461": 0.5
-    }
+      "MGTA 459": 1.5,
+      "MGTA 466": 1.5,
+      "MGTA 402": 0.5,
+      "MGTA 460": 0.5
+    },
+    "work": "Instrument and interpret a digital product: funnels, retention, A/B tests, metric definition.",
+    "gate": "SQL plus experimentation literacy plus product sense.",
+    "legacy_ids": [
+      "product-manager"
+    ],
+    "demand": {
+      "volume": 4,
+      "growth": 4,
+      "accessibility": 4,
+      "compensation": 4,
+      "composite": 4.0
+    },
+    "titles": [
+      "product analyst",
+      "product data scientist",
+      "growth analyst",
+      "product manager",
+      "data scientist - product"
+    ]
   },
   "data-scientist": {
     "label": "Data Scientist",
     "short_label": "Data Scientist",
-    "description": "Builds statistical and ML models end-to-end; needs modeling depth, causal inference, and production awareness.",
+    "description": "Build predictive and prescriptive models that ship, including the model lifecycle.",
     "career_tags": [
       "machine-learning",
       "data-engineering",
       "ai-genai"
     ],
     "boost_courses": {
-      "CSE 251A": 1.5,
-      "MGTA 463": 3.0,
-      "MGTA 495-MKTG": 1.0,
-      "MGTA 466": 1.0,
-      "MGTA 415": 1.0,
-      "MGTA 461": 1.0,
-      "CSE 251B": 1.0,
-      "MGTA 458": 0.5,
-      "CSE 256": 0.5
-    }
+      "MGTA 461": 3.0,
+      "CSE 251A": 3.0,
+      "MGTA 466": 3.0,
+      "MGTA 464": 3.0,
+      "MGTA 463": 1.5,
+      "MGTA 458": 1.5,
+      "CSE 254": 1.5,
+      "MGTA 402": 0.5,
+      "MGTA 460": 0.5
+    },
+    "work": "Build predictive and prescriptive models that ship, including the model lifecycle.",
+    "gate": "Genuine Python plus ML fundamentals plus enough engineering to deploy.",
+    "legacy_ids": [],
+    "demand": {
+      "volume": 4,
+      "growth": 5,
+      "accessibility": 3,
+      "compensation": 5,
+      "composite": 4.1
+    },
+    "titles": [
+      "data scientist",
+      "applied scientist",
+      "ml analyst",
+      "senior data scientist"
+    ]
   },
-  "data-engineer": {
-    "label": "Data Engineer",
-    "short_label": "Data Engineer",
-    "description": "Builds data pipelines and platforms; needs SQL/ETL, distributed computing, and BI tooling.",
+  "analytics-engineer": {
+    "label": "Analytics Engineer",
+    "short_label": "Analytics Engineer",
+    "description": "The layer between data engineering and analysis: transformation pipelines, warehouse design, testing.",
     "career_tags": [
       "data-engineering",
       "machine-learning"
     ],
     "boost_courses": {
-      "MGTA 464": 2.0,
-      "MGTA 466": 2.0,
-      "MGTA 457": 1.0,
-      "MGTA 461": 0.5
-    }
-  },
-  "ml-engineer": {
-    "label": "Machine Learning Engineer",
-    "short_label": "ML Engineer",
-    "description": "Ships ML systems to production; needs deep ML theory, deep learning, and scalable computing.",
-    "career_tags": [
-      "machine-learning",
-      "data-engineering",
-      "ai-genai"
-    ],
-    "boost_courses": {
-      "CSE 251A": 2.0,
-      "CSE 251B": 2.0,
-      "MGTA 466": 1.5,
+      "MGTA 464": 3.0,
+      "MGTA 466": 3.0,
+      "MGTA 457": 3.0,
       "MGTA 461": 1.5,
-      "CSE 256": 1.0,
-      "MGTA 415": 1.0
-    }
+      "MGTA 456": 1.5,
+      "MGTA 458": 1.5,
+      "MGTA 459": 1.5,
+      "MGTA 402": 0.5,
+      "MGTA 460": 0.5
+    },
+    "work": "The layer between data engineering and analysis: transformation pipelines, warehouse design, testing.",
+    "gate": "Advanced SQL plus ETL/warehouse design plus software hygiene.",
+    "legacy_ids": [
+      "data-engineer"
+    ],
+    "demand": {
+      "volume": 3,
+      "growth": 5,
+      "accessibility": 4,
+      "compensation": 4,
+      "composite": 3.95
+    },
+    "titles": [
+      "analytics engineer",
+      "data engineer",
+      "data engineer - analytics",
+      "data platform analyst"
+    ]
   },
   "marketing-analyst": {
-    "label": "Marketing Analyst / Marketing Data Scientist",
+    "label": "Marketing / Growth Analytics",
     "short_label": "Marketing Analyst",
-    "description": "Drives marketing decisions with data; needs experimentation, consumer insight, pricing, and segmentation methods.",
+    "description": "Measure and optimise acquisition and retention: attribution, media mix, CRM, lifecycle testing.",
     "career_tags": [
       "marketing",
-      "pricing",
-      "machine-learning"
+      "product",
+      "pricing"
     ],
     "boost_courses": {
-      "MGTA 495-MKTG": 2.0,
-      "MGTA 479": 1.5,
-      "MGTA 458": 1.5,
-      "MGT 477": 1.0
-    }
+      "MGTA 458": 3.0,
+      "MGT 477": 3.0,
+      "MGTA 479": 3.0,
+      "MGTA 461": 1.5,
+      "MGTA 464": 1.5,
+      "MGTA 457": 1.5,
+      "MGTA 495-MKTG": 1.5,
+      "MGTA 402": 0.5,
+      "MGTA 460": 0.5
+    },
+    "work": "Measure and optimise acquisition and retention: attribution, media mix, CRM, lifecycle testing.",
+    "gate": "SQL plus causal/experimentation plus marketing vocabulary.",
+    "legacy_ids": [],
+    "demand": {
+      "volume": 4,
+      "growth": 3,
+      "accessibility": 5,
+      "compensation": 4,
+      "composite": 4.05
+    },
+    "titles": [
+      "marketing analyst",
+      "growth analyst",
+      "marketing data scientist",
+      "crm analyst",
+      "media analytics manager"
+    ]
   },
   "consultant": {
-    "label": "Analytics Consultant / Strategy",
-    "short_label": "Analytics Consultant",
-    "description": "Advises clients using analytics; needs problem framing, influence, and communication.",
+    "label": "Analytics / Data Consultant",
+    "short_label": "Consultant",
+    "description": "Parachute into client problems, scope them, deliver analysis, present to executives, move on.",
     "career_tags": [
       "strategy-consulting",
       "communication",
       "people-decisions"
     ],
     "boost_courses": {
-      "MGTA 459": 1.5,
-      "MGTA 402": 1.5,
-      "MGTA 460": 1.0
-    }
-  },
-  "finance-quant": {
-    "label": "Finance / Quantitative Analyst",
-    "short_label": "Finance / Quant",
-    "description": "Applies analytics to financial decisions; needs forecasting, behavioral finance, and risk modeling.",
-    "career_tags": [
-      "finance",
-      "machine-learning"
-    ],
-    "boost_courses": {
-      "MGTF 405": 2.0,
-      "MGTF 406": 1.5,
-      "MGTA 463": 1.0
-    }
-  },
-  "operations-supply-chain": {
-    "label": "Operations / Supply Chain Analyst",
-    "short_label": "Supply Chain",
-    "description": "Optimizes operations and supply chains; needs forecasting, inventory models, and prescriptive analytics.",
-    "career_tags": [
-      "operations",
-      "supply-chain"
-    ],
-    "boost_courses": {
-      "MGTA 456": 2.0,
-      "MGTA 495-AIPA": 1.0,
-      "MGTA 460": 1.0
-    }
-  },
-  "healthcare-analyst": {
-    "label": "Healthcare Analytics",
-    "short_label": "Healthcare Analytics",
-    "description": "Analytics for health systems and policy; needs decision modeling and cost-effectiveness methods.",
-    "career_tags": [
-      "healthcare",
-      "operations",
-      "machine-learning"
-    ],
-    "boost_courses": {
-      "MGTA 495-HC": 2.0,
-      "MGTA 495-AIPA": 1.5
-    }
+      "MGTA 402": 3.0,
+      "MGTA 459": 3.0,
+      "MGTA 460": 3.0,
+      "MGTA 457": 3.0,
+      "MGTA 464": 1.5,
+      "MGTA 456": 1.5,
+      "MGTA 479": 1.5,
+      "MGT 451": 1.5,
+      "MGTA 458": 1.5
+    },
+    "work": "Parachute into client problems, scope them, deliver analysis, present to executives, move on.",
+    "gate": "Communication and structured problem-solving over technical depth.",
+    "legacy_ids": [],
+    "demand": {
+      "volume": 4,
+      "growth": 3,
+      "accessibility": 4,
+      "compensation": 3,
+      "composite": 3.6
+    },
+    "titles": [
+      "analytics consultant",
+      "data & analytics consultant",
+      "technology consultant",
+      "management consultant",
+      "strategy consultant"
+    ]
   },
   "fraud-risk-analyst": {
-    "label": "Fraud / Risk Analyst",
-    "short_label": "Fraud & Risk",
-    "description": "Detects fraud and manages risk with ML; needs anomaly detection and feature engineering on messy data.",
+    "label": "Risk & Fraud Analytics",
+    "short_label": "Risk / Fraud",
+    "description": "Build and monitor models that detect fraud, score credit, or quantify risk.",
     "career_tags": [
       "fraud-risk",
       "machine-learning",
       "finance"
     ],
     "boost_courses": {
-      "MGTA 463": 2.5,
-      "MGTA 464": 1.0,
-      "MGTA 466": 0.5
-    }
+      "MGTA 463": 3.0,
+      "MGTA 464": 3.0,
+      "MGTA 466": 3.0,
+      "CSE 251A": 1.5,
+      "MGTF 405": 1.5,
+      "MGTA 459": 1.5,
+      "MGTF 406": 1.5,
+      "MGTA 402": 0.5,
+      "MGTA 460": 0.5
+    },
+    "work": "Build and monitor models that detect fraud, score credit, or quantify risk.",
+    "gate": "ML modelling plus domain-specific feature construction.",
+    "legacy_ids": [],
+    "demand": {
+      "volume": 3,
+      "growth": 4,
+      "accessibility": 4,
+      "compensation": 4,
+      "composite": 3.7
+    },
+    "titles": [
+      "fraud analyst",
+      "risk analyst",
+      "credit risk modeler",
+      "financial crimes analytics",
+      "aml analyst"
+    ]
+  },
+  "operations-supply-chain": {
+    "label": "Supply Chain / Operations Analytics",
+    "short_label": "Supply Chain",
+    "description": "Forecasting, inventory optimisation, network and capacity planning, logistics analytics.",
+    "career_tags": [
+      "supply-chain",
+      "operations"
+    ],
+    "boost_courses": {
+      "MGTA 456": 3.0,
+      "MGTF 405": 3.0,
+      "MGTA 464": 3.0,
+      "MGTA 466": 1.5,
+      "MGTA 479": 1.5,
+      "MGTA 457": 1.5,
+      "MGTA 459": 1.5,
+      "MGTA 402": 0.5,
+      "MGTA 460": 0.5
+    },
+    "work": "Forecasting, inventory optimisation, network and capacity planning, logistics analytics.",
+    "gate": "Optimisation plus forecasting plus operations literacy.",
+    "legacy_ids": [],
+    "demand": {
+      "volume": 3,
+      "growth": 4,
+      "accessibility": 4,
+      "compensation": 3,
+      "composite": 3.55
+    },
+    "titles": [
+      "supply chain analyst",
+      "operations analyst",
+      "demand planner",
+      "s&op analyst",
+      "logistics analytics manager"
+    ]
+  },
+  "pricing-analyst": {
+    "label": "Pricing & Revenue Management",
+    "short_label": "Pricing Analyst",
+    "description": "Set and optimise prices: elasticity, willingness-to-pay, promotion and revenue management.",
+    "career_tags": [
+      "pricing",
+      "marketing",
+      "finance"
+    ],
+    "boost_courses": {
+      "MGTA 479": 3.0,
+      "MGT 477": 3.0,
+      "MGTA 458": 3.0,
+      "MGTF 405": 1.5,
+      "MGTA 456": 1.5,
+      "MGTA 459": 1.5,
+      "MGTF 406": 1.5,
+      "MGTA 402": 0.5,
+      "MGTA 460": 0.5
+    },
+    "work": "Set and optimise prices: elasticity, willingness-to-pay, promotion and revenue management.",
+    "gate": "Econometrics plus pricing theory plus business judgement. Needs working R.",
+    "legacy_ids": [],
+    "demand": {
+      "volume": 2,
+      "growth": 4,
+      "accessibility": 4,
+      "compensation": 4,
+      "composite": 3.4
+    },
+    "titles": [
+      "pricing analyst",
+      "revenue management analyst",
+      "monetization analyst",
+      "commercial analytics"
+    ]
+  },
+  "decision-scientist": {
+    "label": "Decision Scientist / Experimentation",
+    "short_label": "Decision Scientist",
+    "description": "Causal inference as a job: design and analyse experiments, tell the org what actually caused what.",
+    "career_tags": [
+      "product",
+      "people-decisions",
+      "machine-learning"
+    ],
+    "boost_courses": {
+      "MGTA 458": 3.0,
+      "MGTA 459": 3.0,
+      "MGTA 464": 3.0,
+      "MGTA 461": 1.5,
+      "MGT 477": 1.5,
+      "MGTA 479": 1.5,
+      "MGTA 457": 1.5,
+      "MGTA 402": 0.5,
+      "MGTA 460": 0.5
+    },
+    "work": "Causal inference as a job: design and analyse experiments, tell the org what actually caused what.",
+    "gate": "Rigorous causal inference plus the political skill to deliver unwelcome findings.",
+    "legacy_ids": [],
+    "demand": {
+      "volume": 2,
+      "growth": 4,
+      "accessibility": 3,
+      "compensation": 5,
+      "composite": 3.25
+    },
+    "titles": [
+      "decision scientist",
+      "experimentation analyst",
+      "causal inference analyst",
+      "data scientist - experimentation"
+    ]
+  },
+  "ml-engineer": {
+    "label": "AI / ML Engineer & GenAI Solutions",
+    "short_label": "ML / AI Engineer",
+    "description": "Build and deploy ML and LLM systems: retrieval pipelines, model serving, evaluation, agentic workflows.",
+    "career_tags": [
+      "ai-genai",
+      "machine-learning",
+      "data-engineering"
+    ],
+    "boost_courses": {
+      "CSE 251A": 3.0,
+      "CSE 251B": 3.0,
+      "CSE 256": 3.0,
+      "MGTA 466": 1.5,
+      "MGTA 461": 1.5,
+      "MGTA 464": 1.5,
+      "MGTA 415": 1.5,
+      "MGTA 495-GENAI": 1.5,
+      "MGTA 402": 0.5,
+      "MGTA 460": 0.5
+    },
+    "work": "Build and deploy ML and LLM systems: retrieval pipelines, model serving, evaluation, agentic workflows.",
+    "gate": "The steepest gate: real software engineering plus deep learning plus systems thinking.",
+    "legacy_ids": [],
+    "demand": {
+      "volume": 4,
+      "growth": 5,
+      "accessibility": 2,
+      "compensation": 5,
+      "composite": 3.8
+    },
+    "titles": [
+      "ml engineer",
+      "machine learning engineer",
+      "ai engineer",
+      "ai solutions engineer",
+      "applied ai analyst",
+      "forward-deployed engineer"
+    ]
+  },
+  "healthcare-analyst": {
+    "label": "Healthcare / Life Sciences Analytics",
+    "short_label": "Healthcare Analytics",
+    "description": "Claims and clinical analytics, HEOR, commercial analytics for pharma and devices, population health.",
+    "career_tags": [
+      "healthcare",
+      "machine-learning",
+      "operations"
+    ],
+    "boost_courses": {
+      "MGTA 464": 3.0,
+      "MGTA 458": 3.0,
+      "MGTA 495-HC": 3.0,
+      "MGTA 463": 1.5,
+      "MGTA 456": 1.5,
+      "MGTA 466": 1.5,
+      "MGTA 459": 1.5,
+      "MGTA 457": 1.5,
+      "MGTA 402": 0.5,
+      "MGTA 460": 0.5
+    },
+    "work": "Claims and clinical analytics, HEOR, commercial analytics for pharma and devices, population health.",
+    "gate": "Analytics fundamentals plus domain vocabulary and regulatory context.",
+    "legacy_ids": [],
+    "demand": {
+      "volume": 3,
+      "growth": 4,
+      "accessibility": 4,
+      "compensation": 3,
+      "composite": 3.55
+    },
+    "titles": [
+      "healthcare data analyst",
+      "clinical data analyst",
+      "heor analyst",
+      "commercial analytics - pharma",
+      "payer analytics"
+    ]
+  },
+  "finance-quant": {
+    "label": "Financial Analytics",
+    "short_label": "Finance / Quant",
+    "description": "Forecasting and planning, corporate finance analytics, investment and treasury analytics.",
+    "career_tags": [
+      "finance",
+      "pricing",
+      "fraud-risk"
+    ],
+    "boost_courses": {
+      "MGTF 405": 3.0,
+      "MGTA 464": 3.0,
+      "MGTA 457": 3.0,
+      "MGTF 406": 1.5,
+      "MGTA 463": 1.5,
+      "MGTA 479": 1.5,
+      "MGTA 459": 1.5,
+      "MGTA 402": 0.5,
+      "MGTA 460": 0.5
+    },
+    "work": "Forecasting and planning, corporate finance analytics, investment and treasury analytics.",
+    "gate": "Forecasting and time series plus financial domain fluency.",
+    "legacy_ids": [],
+    "demand": {
+      "volume": 3,
+      "growth": 3,
+      "accessibility": 4,
+      "compensation": 3,
+      "composite": 3.3
+    },
+    "titles": [
+      "financial analyst",
+      "fp&a analyst",
+      "finance data analyst",
+      "investment analytics",
+      "quantitative analyst"
+    ]
   }
 }

@@ -10,6 +10,7 @@ from rsm_thrive.http import (BadRequest, api_login_required, json_error,
 from rsm_thrive.models import ChatMessage, ChatTurnLog, Conversation
 from rsm_thrive.serializers.chat import conversation_payload
 from rsm_thrive.services.bots import BotReply, answer_career, answer_electives, answer_faq
+from rsm_thrive.services import planner
 from rsm_thrive.services.llm import get_llm
 
 logger = logging.getLogger("rsm_thrive.chat")
@@ -85,6 +86,32 @@ def _append_turn(conversation, destination, question):
         conversation.save(update_fields=["updated_at"])
 
 
+def _seed_opening_question(conversation, destination):
+    """Write the question the student was answering into the transcript.
+
+    A destination with a scripted opening (only `courses`) shows its first
+    question as a client-side `starter` before any conversation exists, so the
+    student answers a question that was never a message. The conversation the
+    send then creates began "11 month" -- an answer, with nothing above it, and
+    the question gone for good on the next reload.
+
+    Seeding it fixes the record rather than the display: `ChatMessage` already
+    stores `quick_replies` precisely so that "the question a student was asked
+    is part of the record", and this is the one question that was exempt from
+    that. It carries its buttons too, so a reopened conversation shows the
+    choices it actually offered.
+    """
+    if destination != "courses":
+        return
+    opening = planner.opening_prompt()
+    if not opening:
+        return
+    ChatMessage.objects.create(
+        conversation=conversation, role="thrive", body=opening["body"],
+        quick_replies=opening.get("quickReplies") or [],
+        form=opening.get("form"))
+
+
 @api_login_required
 @require_http_methods(["GET", "POST"])
 def conversations(request):
@@ -103,6 +130,7 @@ def conversations(request):
         return json_error("bad_request", str(exc), 400)
     conversation_row = Conversation.objects.create(
         user=request.user, destination=destination, title=question[:60])
+    _seed_opening_question(conversation_row, destination)
     _append_turn(conversation_row, destination, question)
     conversation_row = (Conversation.objects.filter(pk=conversation_row.pk)
                         .prefetch_related("messages").first())

@@ -37,7 +37,8 @@ from functools import lru_cache
 
 from rsm_thrive.models import Enrollment
 from rsm_thrive.services.electives import (WORKLOAD_LEVEL, load_careers,
-                                            load_catalog, rank_electives)
+                                            load_catalog, rank_electives,
+                                            resolve_role)
 
 # ---------------------------------------------------------------------------
 # The published skeletons
@@ -212,10 +213,153 @@ SKILL_AREAS = [
 # ready for PySpark.
 TECHNICAL_AREAS = [area["key"] for area in SKILL_AREAS if area["prereq_words"]]
 
+# ---------------------------------------------------------------------------
+# Units per quarter, which replaced "light / moderate / heavy"
+# ---------------------------------------------------------------------------
+#
+# The old question asked how hard a load the student wanted and answered it with
+# a word. A word cannot be scheduled: it fed the scorer a tolerance and told the
+# student nothing about what their year would look like. Units per quarter is
+# the same question asked concretely -- it is the number a student actually
+# feels, and it decides how many courses land in each term.
+#
+# The floor is what the university enforces rather than a preference. Full-time
+# graduate standing is 12 units a quarter, so a slider that can go below it
+# would offer something a student cannot take.
+QUARTER_UNIT_MIN = 12
+QUARTER_UNIT_MAX = 18
+
+# The 17-month track's final quarter is the exception, and it has to be: the
+# plan is 50 units and the four quarters before it already carry 46 at the
+# published shape, so a 12-unit floor there would put the degree over 50. It is
+# a short finishing term by design.
+FINAL_QUARTER_MIN = 2
+FINAL_QUARTER_MAX = 8
+
+
+def adjustable_quarters(track):
+    """Quarters whose load the student may move, with their published default.
+
+    Summer is excluded and cannot be adjusted: the published plan fills it
+    entirely with required courses (MGTA 451, 403 and 464), so there is no
+    elective room to move and nothing to decide.
+    """
+    skeleton = TRACK_SKELETONS.get(track) or []
+    catalog = _catalog_by_id()
+    out = []
+    for quarter in skeleton:
+        electives = [slot for slot in quarter["slots"] if slot["kind"] == "elective"]
+        if not electives:
+            continue
+        spent = sum(catalog[slot["course_id"]]["units"] for slot in quarter["slots"]
+                    if slot["kind"] in ("core", "fixed"))
+        # A short finishing term is identified by its PUBLISHED load, not by
+        # being last. The 11-month track's Spring is also last and carries a
+        # full 14 units; only the 17-month track's Fall (second year) is the
+        # 4-unit tail the floor has to make room for.
+        last = quarter["units"] < QUARTER_UNIT_MIN
+        out.append({
+            "key": quarter["key"], "label": quarter["label"],
+            "default": quarter["units"],
+            "min": max(FINAL_QUARTER_MIN if last else QUARTER_UNIT_MIN, spent),
+            "max": FINAL_QUARTER_MAX if last else QUARTER_UNIT_MAX,
+            # A quarter can never go below what its own core courses cost.
+            "core_units": spent,
+        })
+    return out
+
+
+def fixed_quarter_units(track):
+    """Units in quarters the student cannot move (Summer)."""
+    adjustable = {q["key"] for q in adjustable_quarters(track)}
+    return sum(q["units"] for q in (TRACK_SKELETONS.get(track) or [])
+               if q["key"] not in adjustable)
+
+
+def quarter_units_of(answers):
+    """The student's chosen load per quarter, or the published default.
+
+    Absent means the published plan, which is what every plan built before this
+    question existed used.
+    """
+    track = (answers or {}).get("track") or "11 month"
+    chosen = (answers or {}).get("quarter_units") or {}
+    return {q["key"]: int(chosen.get(q["key"], q["default"]))
+            for q in adjustable_quarters(track)}
+
+
+def quarter_units_problems(track, chosen):
+    """Human-readable reasons a distribution cannot be scheduled, if any."""
+    problems = []
+    quarters = adjustable_quarters(track)
+    if not quarters:
+        return problems
+    for quarter in quarters:
+        value = chosen.get(quarter["key"])
+        if not isinstance(value, int):
+            problems.append(f"{quarter['label']}: give a number of units")
+            continue
+        if value < quarter["min"] or value > quarter["max"]:
+            problems.append(
+                f"{quarter['label']}: {quarter['min']}-{quarter['max']} units")
+    total = sum(v for v in chosen.values() if isinstance(v, int))
+    required = TOTAL_UNITS - fixed_quarter_units(track)
+    if not problems and total != required:
+        problems.append(
+            f"those add up to {total + fixed_quarter_units(track)} units and the "
+            f"degree is {TOTAL_UNITS} — move {abs(required - total)} "
+            f"{'out of' if total > required else 'into'} a quarter")
+    return problems
+
+
+def quarter_units_form_for(track):
+    """The slider form: one row per adjustable quarter, seeded with the plan."""
+    quarters = adjustable_quarters(track)
+    if not quarters:
+        return None
+    fixed = fixed_quarter_units(track)
+    adjustable_keys = {q["key"] for q in quarters}
+    # LOCKED quarters are listed too, greyed rather than hidden. Summer is
+    # entirely required courses, so there is nothing to move -- but leaving it
+    # out made the form add up to 42 with no visible reason, and a student
+    # comparing that against the 50-unit degree has to be told where the other
+    # 8 went rather than work it out from a parenthetical.
+    locked = [{"key": q["key"], "label": q["label"], "units": q["units"],
+               "locked": True}
+              for q in (TRACK_SKELETONS.get(track) or [])
+              if q["key"] not in adjustable_keys]
+    return {
+        "kind": "units",
+        "rows": [{"key": q["key"], "label": q["label"], "min": q["min"],
+                  "max": q["max"], "step": 2, "default": q["default"],
+                  "locked": False}
+                 for q in quarters],
+        "lockedRows": locked,
+        # Sliders move independently, so the running total is what tells a
+        # student their plan still adds up. The submit is theirs to fix.
+        "total": TOTAL_UNITS - fixed,
+        "lockedTotal": fixed,
+        "grandTotal": TOTAL_UNITS,
+        "totalLabel": f"{TOTAL_UNITS - fixed} units to place",
+        "submitLabel": "Use this load",
+    }
+
+
 WORKLOAD_CHOICES = [
     {"value": "light", "label": "Lighter — I have commitments outside class"},
     {"value": "moderate", "label": "Moderate — a normal full load"},
     {"value": "heavy", "label": "Heavy — I want to be pushed"},
+]
+
+ROUTE_CHOICES = [
+    {"value": "fixed",
+     "label": "Use the recommended bundle",
+     "description": "The set of electives this career path is built from — the "
+                    "same plan every student aiming at it gets"},
+    {"value": "custom",
+     "label": "Build it around me",
+     "description": "Fill the electives against your own skills, workload and "
+                    "interests, then swap anything you like"},
 ]
 
 TRACK_CHOICES = [
@@ -271,11 +415,21 @@ def intake_questions():
          "options": TRACK_CHOICES},
         {"key": "goals", "kind": "multi", "required": True, "max": 3,
          "prompt": "What role are you aiming for after the program?",
-         "help": "Pick up to three. The first one counts most.",
+         "help": "Pick the one closest to what you want.",
          "options": [{"value": role_id, "label": role["label"],
                       "description": role.get("description", "")}
                      for role_id, role in sorted(careers.items(),
                                                  key=lambda kv: kv[1]["label"])]},
+        # Asked in the interview (it is in INTAKE_STEPS) but NOT required for a
+        # valid intake. `POST /api/thrive/plan` takes an answers object
+        # directly, and every plan built before this choice existed was a custom
+        # one -- so an intake without a route is complete and means custom,
+        # rather than a 400 for a field that did not exist yesterday.
+        {"key": "route", "kind": "single", "required": False,
+         "prompt": "How should I fill your electives?",
+         "help": "You can change your mind later — either way you can swap any "
+                 "course once you see the plan.",
+         "options": ROUTE_CHOICES},
         *[{"key": f"skill_{area['key']}", "kind": "single", "required": True,
            "prompt": f"How would you rate your {area['label']} right now?",
            "help": "Honest answers give a better plan — this is used to keep "
@@ -284,7 +438,13 @@ def intake_questions():
                         "description": lvl["help"]}
                        for lvl in SKILL_SCALE]}
           for area in SKILL_AREAS],
-        {"key": "workload", "kind": "single", "required": True,
+        {"key": "quarter_units", "kind": "units", "required": False,
+         "prompt": "How many units do you want in each quarter?",
+         "help": "Starts on the published plan. Move them around if you would "
+                 "rather front-load or finish light — the total stays at 50, "
+                 "and full-time standing needs 12 a quarter.",
+         "options": []},
+        {"key": "workload", "kind": "single", "required": False,
          "prompt": "How heavy a course load do you want?",
          "options": WORKLOAD_CHOICES},
         {"key": "interests", "kind": "multi", "required": False,
@@ -292,6 +452,24 @@ def intake_questions():
          "help": "Optional. These are matched against course topics and tools.",
          "options": [{"value": tag, "label": tag.replace("-", " ")} for tag in tags]},
     ]
+
+
+def _is_allowed(value, allowed):
+    """Membership test that survives whatever JSON a client actually sends.
+
+    `allowed` is a set, so an unhashable value raised TypeError from inside
+    `in` rather than failing validation. `POST /api/thrive/plan` takes an
+    `answers` object straight from the caller, so `{"answers": {"track":
+    {"a": 1}}}` -- a dict where a string belongs -- crashed the request and any
+    logged-in student could turn a malformed body into a 500.
+
+    An unhashable value is simply not one of the allowed strings, so it is
+    invalid rather than exceptional, and the caller gets the 400 that says so.
+    """
+    try:
+        return value in allowed
+    except TypeError:
+        return False
 
 
 def validate_intake(answers):
@@ -308,7 +486,7 @@ def validate_intake(answers):
                 problems.append(f"{question['key']}: rate 1-5")
         elif question["kind"] == "single":
             allowed = {opt["value"] for opt in question["options"]}
-            if question["required"] and value not in allowed:
+            if question["required"] and not _is_allowed(value, allowed):
                 problems.append(f"{question['key']}: pick one of {sorted(allowed)}")
         else:
             allowed = {opt["value"] for opt in question["options"]}
@@ -318,12 +496,33 @@ def validate_intake(answers):
                 continue
             if question["required"] and not chosen:
                 problems.append(f"{question['key']}: choose at least one")
-            unknown = [c for c in chosen if c not in allowed]
+            unknown = [c for c in chosen if not _is_allowed(c, allowed)]
             if unknown:
                 problems.append(f"{question['key']}: unknown {unknown}")
             if question.get("max") and len(chosen) > question["max"]:
                 problems.append(f"{question['key']}: at most {question['max']}")
     return problems
+
+
+def workload_from_units(answers):
+    """The old light/moderate/heavy, read off the load the student chose.
+
+    `rank_electives` still wants a tolerance word, and asking for one separately
+    would be asking the same question twice: someone who puts 18 units in a
+    quarter has told us they will take a heavy term. An explicit `workload` on
+    the intake still wins, so a plan saved before this question changed keeps
+    the answer it was given.
+    """
+    stated = (answers or {}).get("workload")
+    if stated:
+        return stated
+    chosen = (answers or {}).get("quarter_units")
+    if not chosen:
+        return "moderate"
+    heaviest = max(quarter_units_of(answers).values(), default=14)
+    if heaviest >= 16:
+        return "heavy"
+    return "light" if heaviest <= 12 else "moderate"
 
 
 def profile_from_intake(answers):
@@ -335,7 +534,7 @@ def profile_from_intake(answers):
         "career_roles": list(answers.get("goals") or []),
         "career_tags": list(answers.get("interests") or []),
         "technical_comfort": comfort,
-        "workload_preference": answers.get("workload") or "moderate",
+        "workload_preference": workload_from_units(answers),
         "interests": [tag.replace("-", " ") for tag in (answers.get("interests") or [])],
     }
 
@@ -541,7 +740,41 @@ def _entry(course, kind, *, swappable, reasons=None, cautions=None, note="",
     }
 
 
-def build_plan(answers, taken_ids=frozenset(), selections=None):
+def _resized(skeleton, answers):
+    """The skeleton with each quarter's elective slots matching the chosen load.
+
+    The student sets units per quarter (see `adjustable_quarters`), and that has
+    to change the PLAN, not just a number on a form. A quarter asked to carry 18
+    units instead of 14 needs somewhere to put the extra four, so the elective
+    slots are re-cut to the new budget: 4-unit slots first, with a 2-unit slot
+    for a remainder that is not a multiple of four.
+
+    Untouched when the student has chosen nothing, so a plan built without this
+    question is byte-identical to what it was before the question existed.
+    """
+    chosen = (answers or {}).get("quarter_units")
+    if not chosen:
+        return skeleton
+    catalog = _catalog_by_id()
+    wanted = quarter_units_of(answers)
+    resized = []
+    for quarter in skeleton:
+        target = wanted.get(quarter["key"])
+        if target is None or target == quarter["units"]:
+            resized.append(quarter)
+            continue
+        keep = [dict(slot) for slot in quarter["slots"]
+                if slot["kind"] in ("core", "fixed")]
+        budget = target - sum(catalog[slot["course_id"]]["units"] for slot in keep)
+        for _ in range(max(0, budget) // 4):
+            keep.append({"kind": "elective", "units": 4})
+        if max(0, budget) % 4:
+            keep.append({"kind": "elective", "units": max(0, budget) % 4})
+        resized.append({**quarter, "units": target, "slots": keep})
+    return resized
+
+
+def build_plan(answers, taken_ids=frozenset(), selections=None, skeleton=None):
     """Build the whole plan of study for one student.
 
     `selections` is {quarter_key: {slot_index: course_id}} and wins over the
@@ -557,9 +790,17 @@ def build_plan(answers, taken_ids=frozenset(), selections=None):
     catalog = _catalog_by_id()
     profile = profile_from_intake(answers)
     track = answers.get("track") or "11 month"
-    skeleton = TRACK_SKELETONS.get(track)
+    # `skeleton` overrides the published shape, and only a FIXED route passes
+    # one. A bundle is a known set of courses, so it can declare slots sized to
+    # those courses instead of squeezing them into the generic `[4, 2]` /
+    # `[4, 4]` shapes -- which fit 0 of 14 bundles on the 17-month track,
+    # because every bundle needs two 2-unit courses and that track has no
+    # 2-unit slot. See `services/bundles.py`. Core and fixed slots are the
+    # published sequence either way; only the elective shape differs.
+    skeleton = skeleton or TRACK_SKELETONS.get(track)
     if skeleton is None:
         raise ValueError(f"unknown track {track!r}")
+    skeleton = _resized(skeleton, answers)
 
     ranked = rank_electives(load_catalog(), profile, load_careers())
     fit = {row["course"]["id"]: row for row in ranked}
@@ -636,15 +877,20 @@ def build_plan(answers, taken_ids=frozenset(), selections=None):
         quarters.append({
             "key": quarter["key"], "label": quarter["label"],
             "season": quarter["season"],
-            "unitsPlanned": sum(r["units"] for r in rows),
+            # SCHEDULED units, not slot capacity. An unfilled slot keeps its
+            # `units` on the row so the table can show how big the hole is, but
+            # counting it here made a plan claim units it does not contain: a
+            # student who had already taken both of Fall's 2-unit electives got
+            # a 48-unit plan whose header said 50. See `unfilled` below.
+            "unitsPlanned": sum(r["units"] for r in rows if r["courseId"]),
             "unitsExpected": quarter["units"],
             "courses": rows,
         })
 
     core_units = sum(r["units"] for q in quarters for r in q["courses"]
-                     if r["kind"] == "core")
+                     if r["kind"] == "core" and r["courseId"])
     elective_units = sum(r["units"] for q in quarters for r in q["courses"]
-                         if r["kind"] == "elective")
+                         if r["kind"] == "elective" and r["courseId"])
     return {
         "track": track,
         "quarters": quarters,
@@ -827,6 +1073,52 @@ def apply_swap(answers, selections, quarter_key, slot, course_id, taken_ids=froz
     return updated
 
 
+def route_of(answers):
+    """"fixed" or "custom". Defaults to custom, which is what every plan built
+    before this choice existed was."""
+    return (answers or {}).get("route") or "custom"
+
+
+def fixed_plan_inputs(answers, taken_ids=frozenset()):
+    """(skeleton, selections) for a fixed route, or (None, None).
+
+    (None, None) whenever the route is custom, no goal is on file, or the
+    bundle cannot be scheduled once the student's completed courses are taken
+    out. Every one of those falls back to the ordinary ranked plan rather than
+    failing, so a fixed route can never leave a student with no plan at all.
+    """
+    from rsm_thrive.services import bundles
+
+    if route_of(answers) != "fixed":
+        return None, None
+    goals = answers.get("goals") or []
+    if not goals:
+        return None, None
+    skeleton, selections, _courses = bundles.skeleton_for(
+        goals[0], answers.get("track") or "11 month", taken_ids)
+    return skeleton, selections
+
+
+def build_for(answers, taken_ids=frozenset(), selections=None):
+    """Build this student's plan by whichever route they chose.
+
+    The one place that decides. A fixed route hands `build_plan` a skeleton
+    shaped to its bundle and the bundle pinned into it; a custom route calls
+    `build_plan` exactly as everything did before.
+
+    A student's own `selections` still win in both -- a swap is a swap, and on
+    a fixed route it is also a DIVERGENCE, which `bundles.divergence` reports so
+    the reply can say what was given up.
+    """
+    skeleton, pinned = fixed_plan_inputs(answers, taken_ids)
+    if skeleton is None:
+        return build_plan(answers, taken_ids, selections)
+    merged = {key: dict(value) for key, value in (pinned or {}).items()}
+    for quarter_key, chosen in (selections or {}).items():
+        merged.setdefault(quarter_key, {}).update(chosen)
+    return build_plan(answers, taken_ids, merged, skeleton=skeleton)
+
+
 def taken_course_ids(user):
     """Catalog ids for courses the student has already enrolled in."""
     codes = {enrollment.course.code for enrollment
@@ -854,11 +1146,25 @@ def render_plan_markdown(plan):
         f"# Your {plan['track']} MSBA plan of study",
         "",
         f"**{totals['total']} units** — {totals['core']} core and "
-        f"{totals['elective']} elective, which is what the degree requires "
-        f"({totals['totalRequired']} units: {totals['coreRequired']} core, "
-        f"{totals['electiveRequired']} elective).",
+        f"{totals['elective']} elective, against the "
+        f"{totals['totalRequired']} the degree requires "
+        f"({totals['coreRequired']} core, {totals['electiveRequired']} elective).",
         "",
     ]
+    # A short plan must say so where the total is, not leave the reader to add
+    # the table up. The rows already show "nothing available for this slot";
+    # what was missing is that the HEADER used to claim the full 50 anyway.
+    if plan["unfilled"]:
+        short = totals["totalRequired"] - totals["total"]
+        lines += [
+            f"> ⚠️ **This plan is {short} units short of the {totals['totalRequired']} "
+            f"you need to graduate.** "
+            + " ".join(u["why"].capitalize() + "." for u in plan["unfilled"])
+            + " Take this to MSBA advising — book them from the **Appointments** "
+              "tab — so the remaining units can be filled from outside this "
+              "catalog or by petition.",
+            "",
+        ]
     for quarter in plan["quarters"]:
         lines += [
             f"## {quarter['label']} — {quarter['unitsPlanned']} units",
@@ -926,8 +1232,13 @@ def render_plan_markdown(plan):
             f"elective slots line up with "
             f"{' and '.join(targeting['goals'])} — the rest are breadth, because "
             f"the courses aimed at that path are not all offered in the quarters "
-            f"and sizes this plan needs. It is still a complete 50-unit plan, and "
-            f"MSBA advising can advise on getting closer to that goal — book them "
+            f"and sizes this plan needs. "
+            # Only claim completeness when the plan IS complete. This sentence
+            # used to hardcode "a complete 50-unit plan" and printed it directly
+            # under a table containing an empty slot.
+            + (f"It is still a complete {plan['totals']['totalRequired']}-unit plan, and "
+               if not plan["unfilled"] else "")
+            + f"MSBA advising can advise on getting closer to that goal — book them "
             f"from the **Appointments** tab.", ""]
 
     lines += ["## Booking and detail", ""]
@@ -949,12 +1260,18 @@ INTAKE_STEPS = [
     {"key": "track", "fields": ["track"]},
     {"key": "goals", "fields": ["goals"]},
     {"key": "skills", "fields": [f"skill_{area['key']}" for area in SKILL_AREAS]},
-    {"key": "workload", "fields": ["workload"]},
+    {"key": "quarter_units", "fields": ["quarter_units"]},
 ]
 
 # `interests` is deliberately absent above: it improves a plan and is not
 # required to build one, so it is never a gate between a student and their plan.
-OPTIONAL_FIELDS = {"interests"}
+# `route` joins `interests` here rather than becoming a fifth question. The
+# interview is four steps and the design document is emphatic about keeping it
+# short; more to the point, asking someone to choose between "the recommended
+# bundle" and "built around me" BEFORE they have seen either is asking them to
+# decide with nothing to look at. The plan is built the way every plan was
+# built, and the other route is then offered as a button underneath it.
+OPTIONAL_FIELDS = {"interests", "route", "workload"}
 
 
 def _allowed_values():
@@ -1061,10 +1378,35 @@ def normalise_intake(raw):
     answers = {}
     for key, values in allowed.items():
         value = raw.get(key)
-        if key in ("goals", "interests"):
+        if key == "goals":
+            # Resolved, not just filtered: a stored plan or a mid-interview
+            # extraction may name a role id from before the taxonomy moved to
+            # the fourteen profiles. `resolve_role` maps those forward and
+            # still returns None for a role nobody has ever offered, so an
+            # invented goal is dropped and re-asked exactly as before.
+            chosen, seen = [], set()
+            for v in (value or []):
+                resolved = resolve_role(v) if isinstance(v, str) else None
+                if resolved and resolved not in seen:
+                    seen.add(resolved)
+                    chosen.append(resolved)
+            if chosen:
+                answers[key] = chosen[:3]
+        elif key == "quarter_units":
+            # A dict of {quarter: units}, kept only when it is a legal
+            # distribution. A partial or impossible one is dropped so the step
+            # asks again, exactly like every other answer the extractor gets
+            # wrong -- a plan must never be built on a load that cannot be taken.
+            track = raw.get("track") or answers.get("track") or "11 month"
+            if isinstance(value, dict):
+                cleaned = {k: int(v) for k, v in value.items()
+                           if isinstance(v, (int, float)) and not isinstance(v, bool)}
+                if cleaned and not quarter_units_problems(track, cleaned):
+                    answers[key] = cleaned
+        elif key == "interests":
             chosen = [v for v in (value or []) if isinstance(v, str) and v in values]
             if chosen:
-                answers[key] = chosen[:3] if key == "goals" else chosen
+                answers[key] = chosen
         elif key.startswith("skill_"):
             # Stored as 1-5 whatever it arrived as, so everything downstream
             # reads one type: an extractor may send 4, "4" or "comfortable".
@@ -1108,6 +1450,14 @@ def next_intake_step(answers):
     for step in INTAKE_STEPS:
         missing = [field for field in step["fields"]
                    if field not in OPTIONAL_FIELDS and not answers.get(field)]
+        # The load question replaced "light / moderate / heavy", and an intake
+        # answered before it existed carries the old word instead. That word is
+        # the same information in coarser form, so a saved plan is COMPLETE and
+        # keeps working -- without this, every plan built before the change
+        # answered `GET /api/thrive/plan` with a 409 asking for a question its
+        # student was never shown.
+        if step["key"] == "quarter_units" and answers.get("workload"):
+            continue
         if missing:
             return {"key": step["key"], "missing": missing}
     return None
@@ -1182,7 +1532,51 @@ def render_question(step, answers, unmatched_goal=""):
     return "\n".join(lines)
 
 
-def merge_intake(stored, extracted):
+# A turn shaped like a question rather than an answer. Deterministic, for the
+# same reason `review_intent` is: the decision has two outcomes and an extra
+# model call would add a round trip and a failure mode to each one.
+_QUESTION_OPENERS = (
+    "what", "why", "how", "when", "where", "who", "which", "whose",
+    "can i", "can you", "can we", "could i", "could you", "could we",
+    "should i", "should we", "would it", "would i", "would you",
+    "do i", "do you", "do we", "does it", "does this", "did you", "have you",
+    "is it", "is this", "is there", "are you", "are there", "are we",
+    "will it", "will you", "am i", "tell me", "explain", "show me what",
+    # Bare auxiliaries, because a question does not have to name its subject in
+    # the second word: "is next quarter heavy?" is one, and with only "is it" /
+    # "is this" listed it read as an ANSWER -- so "heavy" was recorded as the
+    # student's workload preference from a question that stated no preference.
+    # Safe alongside the trailing-"?" requirement: a hedged answer starts with
+    # its own value ("11 month?", "heavy?"), not with an auxiliary.
+    "is ", "are ", "was ", "were ", "does ", "do ", "did ", "can ", "could ",
+    "should ", "would ", "will ", "has ", "have ", "am ",
+)
+_HYPOTHETICAL = ("what if", "what happens if", "should i have", "would it be",
+                 "instead of", "rather than", "suppose i", "if i switched",
+                 "if i switch", "if i chose", "if i picked")
+
+
+def is_question(text):
+    """Is this turn asking something rather than answering?
+
+    Used for two different refusals, and it is deliberately the same test for
+    both: a question must not overwrite an answer already on file
+    (`merge_intake`), and a question must not be treated as a request to
+    reprint the plan (`answer_electives`).
+
+    Trailing "?" alone is not enough -- a student answering uncertainly types
+    "11 month?" -- so the opener has to look interrogative too. That keeps a
+    hedged ANSWER an answer while catching "what if I switch to 17 month?".
+    """
+    lowered = (text or "").strip().lower()
+    if not lowered:
+        return False
+    if any(phrase in lowered for phrase in _HYPOTHETICAL):
+        return True
+    return lowered.endswith("?") and lowered.startswith(_QUESTION_OPENERS)
+
+
+def merge_intake(stored, extracted, asking=False):
     """Accumulate interview answers across turns.
 
     Newly extracted values win, so a student correcting themselves ("actually
@@ -1190,10 +1584,33 @@ def merge_intake(stored, extracted):
     the value already on file. This is the piece that makes the interview
     stateful without a state machine — and without trusting a language model to
     remember what it was told three messages ago.
+
+    `asking` narrows that to filling BLANKS only. A question mentions values
+    without choosing them, and the extractor cannot tell the difference: asked
+    "what if I switch to 17 month?", it dutifully reported track="17 month" and
+    the student's committed plan of study was rebuilt on the other track --
+    `CoursePlan` included, which is per-user, outlives the conversation and is
+    what `/api/thrive/plan` serves. A student asking what-if got their actual
+    plan replaced.
+
+    Blanks are still filled, because a question can carry genuinely new
+    information ("what if I want to be a data scientist?" when no goal is on
+    file yet is worth acting on). Only OVERWRITING is refused, which is where
+    the harm was.
     """
     merged = dict(stored or {})
     for key, value in (extracted or {}).items():
         if value in (None, "", []):
+            continue
+        if asking:
+            # A question commits NOTHING -- not even into a blank. Letting one
+            # fill blanks looked harmless ("what if I want to be a data
+            # scientist?" naming a goal) and is the same mistake in a quieter
+            # form: measured live, "is next quarter heavy?" wrote
+            # workload="heavy" from a turn that expressed no preference at all.
+            # The interview asks again instead, which is what the design calls
+            # for -- a value the student did not give must never become part of
+            # a plan they are then shown.
             continue
         merged[key] = value
     return merged
@@ -1274,7 +1691,23 @@ def supported_roles():
                                    careers[rid]["label"]))
 
 
-def rating_form_for(step):
+def rating_form_for(step, answers=None):
+    """The form a step offers, if it has one.
+
+    Two steps do. Skills asks about five areas at once, where twenty-five flat
+    buttons would be a wall; the load question needs a slider per quarter and a
+    running total, which no set of buttons can express. Everything else answers
+    with words or a quick reply and gets None.
+
+    `answers` is needed because the load form depends on the TRACK -- the two
+    tracks have different quarters and different published defaults.
+    """
+    if step.get("key") == "quarter_units":
+        return quarter_units_form_for((answers or {}).get("track") or "11 month")
+    return _rating_form_for(step)
+
+
+def _rating_form_for(step):
     """A pre-filled 1-5 rating per area, so the skills step needs no typing.
 
     The one step with no useful quick replies: it asks about five areas at once,
@@ -1385,7 +1818,7 @@ def opening_prompt():
     # here would silently drop the form if the interview order ever changed.
     return {"body": render_question(step, {}),
             "quickReplies": quick_replies_for(step),
-            "form": rating_form_for(step)}
+            "form": rating_form_for(step, {})}
 
 
 def load_session_review(conversation):
@@ -1435,18 +1868,47 @@ def save_intake(user, answers):
     return record
 
 
+def role_vocabulary():
+    """Each role id with the job titles that mean it, for the extractor.
+
+    The prompt tells the model to map a goal ONLY when the student named that
+    job or an exact synonym of it. Handing it bare ids made that instruction
+    bite: a student who said "product manager", "data engineer" or "financial
+    analyst" -- all jobs this catalog serves -- was told their career was not
+    covered, because none of those strings is a synonym of "Product Analyst /
+    Product Data Scientist", "Analytics Engineer" or "Financial Analytics".
+
+    The titles come from the taxonomy itself (`titles` on each profile), so the
+    vocabulary a student is understood in and the vocabulary the profile is
+    defined by cannot drift apart. Retired role names live in the same list,
+    which is what makes the taxonomy change invisible to someone still using
+    the old job title. `resolve_role` handles the same problem for stored ids;
+    this is its free-text half.
+    """
+    careers = load_careers()
+    lines = []
+    for role_id in sorted(careers):
+        titles = careers[role_id].get("titles") or []
+        named = "; ".join(dict.fromkeys([careers[role_id]["label"], *titles]))
+        lines.append(f"{role_id} (said as: {named})")
+    return "\n".join(lines)
+
+
 def intake_extract_placeholders():
     """The vocabularies the extractor prompt has to be told about."""
     allowed = _allowed_values()
     return {
         "tracks": ", ".join(sorted(allowed["track"])),
-        "role_ids": ", ".join(sorted(allowed["goals"])),
+        "role_ids": role_vocabulary(),
         "levels": ("an integer 1-5, where "
                    + ", ".join(f"{lvl['value']} means {lvl['help'].lower()}"
                                for lvl in SKILL_SCALE)),
         "workloads": ", ".join(sorted(allowed["workload"])),
         "interest_tags": ", ".join(sorted(allowed["interests"])),
         "skill_keys": ", ".join(f"skill_{area['key']}" for area in SKILL_AREAS),
+        "quarter_keys": ", ".join(sorted({
+            quarter["key"] for skeleton in TRACK_SKELETONS.values()
+            for quarter in skeleton})),
     }
 
 
@@ -1621,6 +2083,19 @@ def review_quarter(plan, answers, index, taken_ids=frozenset()):
     return "\n".join(line for line in lines if line is not None), replies, is_last
 
 
+# The exact strings the review buttons send, plus the handful of ways a student
+# types the same thing. Whole-message matches only -- see `review_intent`.
+FINALISE_WORDS = frozenset({
+    "finalise", "finalize", "looks good", "looks good finalise it", "that works",
+    "i'm happy", "im happy", "confirm", "confirmed", "done", "perfect",
+    "thats it", "that's it", "keep it", "yes", "yep", "sounds good",
+})
+NEXT_WORDS = frozenset({
+    "next", "next quarter", "next one", "continue", "keep going", "go on",
+    "carry on", "onwards", "then", "and then",
+})
+
+
 def review_intent(text):
     """What a message is asking of the review, if anything.
 
@@ -1629,27 +2104,78 @@ def review_intent(text):
     easy to list. An LLM here would add a round trip and a failure mode to a
     decision that has three outcomes.
     """
-    lowered = (text or "").strip().lower()
+    lowered = re.sub(r"[^a-z0-9' ]+", "", (text or "").strip().lower()).strip()
     if not lowered:
         return None
-    if any(phrase in lowered for phrase in
-           ("finalise", "finalize", "looks good", "that works", "i'm happy",
-            "im happy", "confirm")):
+    # WHOLE-message matching for the one-word intents, because these arrive
+    # from buttons that send a fixed string. Substring matching read them out
+    # of ordinary questions instead: "can you confirm what MGTA 458 is?"
+    # finalised the plan, "what should I review?" restarted the walk-through,
+    # and "is next quarter heavy?" advanced it. A student asking about the plan
+    # was changing it.
+    if lowered in FINALISE_WORDS:
         return "finalise"
-    if any(phrase in lowered for phrase in
-           ("next quarter", "next", "continue", "keep going", "go on")):
+    if lowered in NEXT_WORDS:
         return "next"
+    # These stay substrings: they are several words long and unambiguous, so
+    # "can you walk me through it?" is still a request to walk through it.
     if any(phrase in lowered for phrase in
-           ("walk me through", "go through", "review", "one at a time",
+           ("walk me through", "go through it", "one at a time",
             "quarter by quarter", "step through")):
         return "start"
     return None
 
 
-def review_intro_replies():
-    """Offered with a finished plan: walk it, or take it as it stands."""
-    return [{"label": "Walk me through it", "send": "walk me through it"},
-            {"label": "Looks good", "send": "finalise"}]
+# What a student types or presses to move between routes. Whole-message
+# matching, like `review_intent`, because these arrive from buttons.
+ROUTE_WORDS = {
+    "use the recommended bundle": "fixed",
+    "use the recommended electives": "fixed",
+    "recommended bundle": "fixed",
+    "use the bundle": "fixed",
+    "build it around me": "custom",
+    "build one around me": "custom",
+    "tailor it to me": "custom",
+    "custom": "custom",
+}
+
+
+def route_intent(text):
+    """"fixed", "custom", or None -- a request to switch how electives are filled."""
+    lowered = re.sub(r"[^a-z0-9' ]+", "", (text or "").strip().lower()).strip()
+    return ROUTE_WORDS.get(lowered)
+
+
+def route_switch_reply(answers):
+    """The button offering the OTHER route, or nothing when there is no other.
+
+    Only shown when a bundle actually exists for the student's goal -- offering
+    "use the recommended bundle" to someone whose profile has none would be a
+    button that cannot work.
+    """
+    from rsm_thrive.services import bundles
+
+    goals = answers.get("goals") or []
+    if not goals or not bundles.bundle_for(goals[0]):
+        return []
+    if route_of(answers) == "fixed":
+        return [{"label": "Build it around me", "send": "build it around me",
+                 "description": "Fill the electives against your own skills, "
+                                "workload and interests instead"}]
+    return [{"label": "Use the recommended bundle",
+             "send": "use the recommended bundle",
+             "description": "The electives this career path is built from — the "
+                            "same plan everyone aiming at it gets"}]
+
+
+def review_intro_replies(answers=None):
+    """Offered with a finished plan: walk it, switch route, or take it as it is."""
+    return (route_switch_reply(answers or {})
+            + [{"label": "Review it quarter by quarter",
+                "send": "walk me through it",
+                "description": "See each quarter's electives and what else fits"},
+               {"label": "Looks good, finalise it", "send": "finalise",
+                "description": "Keep the plan exactly as it is"}])
 
 
 def finalised_markdown(plan):
