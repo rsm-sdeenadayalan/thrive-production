@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  THRIVE web (SvelteKit under adapter-node), 127.0.0.1:8040.
+
+  The pair to com.rsm.thrive.api. Two daemons rather than one wrapper, which is
+  the fleet's own shape: it runs .web, .celery, .beat and .daphne as separate
+  jobs, so each restarts on its own and each has its own log.
+
+  Install:
+    sudo cp deploy/com.rsm.thrive.web.plist /Library/LaunchDaemons/
+    sudo chown root:wheel /Library/LaunchDaemons/com.rsm.thrive.web.plist
+    sudo chmod 644 /Library/LaunchDaemons/com.rsm.thrive.web.plist
+    sudo launchctl bootstrap system /Library/LaunchDaemons/com.rsm.thrive.web.plist
+
+  Stop / remove:
+    sudo launchctl bootout system/com.rsm.thrive.web
+-->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.rsm.thrive.web</string>
+  <key>ProgramArguments</key><array>
+    <string>/opt/homebrew/bin/node</string>
+    <string>/Users/sdeenadayalan/thrive/frontend/build-node/index.js</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/sdeenadayalan/thrive/frontend</string>
+  <key>UserName</key><string>sdeenadayalan</string>
+  <key>GroupName</key><string>staff</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>10</integer>
+  <key>StandardOutPath</key><string>/Users/sdeenadayalan/thrive/logs/com.rsm.thrive.web.out.log</string>
+  <key>StandardErrorPath</key><string>/Users/sdeenadayalan/thrive/logs/com.rsm.thrive.web.err.log</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>HOME</key><string>/Users/sdeenadayalan</string>
+    <key>PATH</key><string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>HOST</key><string>127.0.0.1</string>
+    <key>PORT</key><string>8040</string>
+    <!-- adapter-node checks the Origin header of every form POST against this
+         and rejects a mismatch with a 403. It has to be the URL the BROWSER
+         sees, which is the Tailscale Serve address, not the loopback port this
+         process binds. Getting this wrong fails silently until the first form
+         submit, which is how a login page ends up looking broken for no
+         visible reason. -->
+    <key>ORIGIN</key><string>https://ms-macos.tail37260b.ts.net:8443</string>
+    <!-- Server-side calls go straight to gunicorn on loopback, never back out
+         through the tunnel. -->
+    <key>THRIVE_API_ORIGIN</key><string>http://127.0.0.1:8039</string>
+    <!-- Relative, so the redirect keeps the student on the public hostname
+         rather than sending their browser to a loopback address it cannot
+         reach. -->
+    <key>THRIVE_LOGIN_URL</key><string>/api/thrive/dev-login</string>
+  </dict>
+</dict></plist>

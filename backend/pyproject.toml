@@ -5,6 +5,10 @@ description = "THRIVE backend component (Rady MSBA)"
 requires-python = ">=3.12"
 dependencies = [
     "django>=5.2",
+    # The server the LaunchDaemon runs. `manage.py runserver` is a development
+    # server that Django itself says not to deploy, and it was the only way this
+    # project had ever been started. See `gunicorn.conf.py`.
+    "gunicorn>=23.0",
     "openai>=1.40",
     "psycopg[binary]>=3.2",
     "pypdf>=5.0",

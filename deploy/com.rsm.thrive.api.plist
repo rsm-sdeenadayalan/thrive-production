@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  THRIVE API (Django under gunicorn), 127.0.0.1:8039.
+
+  Keys and their order follow the fleet's own daemons, read off the box from
+  com.rsm.rsm-msba-brain.web.plist, so this reads like its neighbours rather
+  than like something imported.
+
+  Two departures from that template, both deliberate:
+
+  - UserName is sdeenadayalan, not vnijs, because the code lives in that
+    user's home. /srv/django is drwx------ vnijs and not writable by the
+    student who maintains this, so the fleet's usual location was not
+    available.
+  - The daemon runs gunicorn directly rather than through
+    /srv/django/_migration/scripts/svc/run_web.sh. That runner is unreadable
+    from this account, so calling it would mean depending on a script whose
+    contract could not be checked.
+
+  Install:
+    sudo cp deploy/com.rsm.thrive.api.plist /Library/LaunchDaemons/
+    sudo chown root:wheel /Library/LaunchDaemons/com.rsm.thrive.api.plist
+    sudo chmod 644 /Library/LaunchDaemons/com.rsm.thrive.api.plist
+    sudo launchctl bootstrap system /Library/LaunchDaemons/com.rsm.thrive.api.plist
+
+  Stop / remove:
+    sudo launchctl bootout system/com.rsm.thrive.api
+-->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.rsm.thrive.api</string>
+  <key>ProgramArguments</key><array>
+    <string>/Users/sdeenadayalan/thrive/backend/.venv/bin/gunicorn</string>
+    <string>--config</string>
+    <string>/Users/sdeenadayalan/thrive/backend/gunicorn.conf.py</string>
+    <string>config.wsgi:application</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/sdeenadayalan/thrive/backend</string>
+  <key>UserName</key><string>sdeenadayalan</string>
+  <key>GroupName</key><string>staff</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>10</integer>
+  <key>StandardOutPath</key><string>/Users/sdeenadayalan/thrive/logs/com.rsm.thrive.api.out.log</string>
+  <key>StandardErrorPath</key><string>/Users/sdeenadayalan/thrive/logs/com.rsm.thrive.api.err.log</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>HOME</key><string>/Users/sdeenadayalan</string>
+    <key>PATH</key><string>/Users/sdeenadayalan/thrive/backend/.venv/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/sdeenadayalan/.local/bin</string>
+    <!-- Off. It defaults to ON in settings.py, which is right for a laptop and
+         wrong for anything a student can reach: DEBUG leaks settings and a full
+         traceback on every error page. -->
+    <key>THRIVE_DEBUG</key><string>0</string>
+    <!-- ALLOWED_HOSTS already covers loopback. This adds the tailnet name the
+         browser actually sends, without which Django answers every request with
+         a 400 DisallowedHost. -->
+    <key>THRIVE_EXTRA_HOSTS</key><string>ms-macos.tail37260b.ts.net</string>
+    <!-- Cookies are host-scoped and the app is served over HTTPS on 8443, so
+         the origin Django trusts for CSRF has to carry the scheme and port
+         exactly as the browser sees them. -->
+    <key>THRIVE_FRONTEND_ORIGINS</key><string>https://ms-macos.tail37260b.ts.net:8443</string>
+  </dict>
+</dict></plist>
