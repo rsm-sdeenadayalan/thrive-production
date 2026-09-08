@@ -492,7 +492,10 @@
       "clinical data analyst",
       "heor analyst",
       "commercial analytics - pharma",
-      "payer analytics"
+      "payer analytics",
+      "healthcare analyst",
+      "health analyst",
+      "healthcare analytics"
     ]
   },
   "finance-quant": {
@@ -530,7 +533,11 @@
       "fp&a analyst",
       "finance data analyst",
       "investment analytics",
-      "quantitative analyst"
+      "quantitative analyst",
+      "quant analyst",
+      "quant",
+      "fintech",
+      "financial technology"
     ]
   }
 }
