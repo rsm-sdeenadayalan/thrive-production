@@ -1304,6 +1304,26 @@ export const messages = {
 			quickRepliesLabel: 'Suggested answers',
 			quickRepliesHint: 'Tap one, or type your own answer.',
 
+			/**
+			 * The thumbs under a reply.
+			 *
+			 * "Was this useful?" rather than "Rate this answer": the question is
+			 * about whether it helped, which is what a tester can actually judge,
+			 * and it invites a quick answer rather than an assessment.
+			 */
+			verdictLabel: 'Was this useful?',
+			thumbUp: 'Yes, this was useful',
+			thumbDown: 'No, this was not useful',
+			verdictThanks: 'Thanks — noted.',
+			verdictNoted: 'Thanks — your note is saved.',
+			verdictFailed: "Couldn't save that — try again.",
+
+			/** The optional "what was wrong?" box, opened after a thumbs-down. */
+			noteLabel: 'What was wrong? (optional)',
+			notePlaceholder: 'e.g. it gave the wrong deadline, or missed the course I asked about',
+			noteSend: 'Send',
+			noteSkip: 'Skip',
+
 			/** The rating form on the skills step. */
 			ratingLabel: 'Rate yourself, 1 to 5',
 			ratingHint: 'Every row starts at 3 — move the ones that are wrong, then submit.',

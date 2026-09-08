@@ -2,10 +2,12 @@
 	import { tick } from 'svelte';
 	import CornerDownLeft from '@lucide/svelte/icons/corner-down-left';
 	import Sparkles from '@lucide/svelte/icons/sparkles';
+	import ThumbsDown from '@lucide/svelte/icons/thumbs-down';
+	import ThumbsUp from '@lucide/svelte/icons/thumbs-up';
 
 	import { goto } from '$app/navigation';
 	import { showsDayLabel, type ChatMessageView, type ConversationDetailView } from '$lib/ask';
-	import type { ConversationStarter, RatingForm } from '$lib/data';
+	import type { ConversationStarter, RatingForm, TurnFeedback, UnitsForm } from '$lib/data';
 	import RichMessage from '$lib/components/ask/RichMessage.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import { messages } from '$lib/messages';
@@ -115,6 +117,35 @@
 	 */
 	let ratings = $state<Record<string, number>>({});
 
+	/**
+	 * The load form's current values, keyed by quarter. Seeded from each row's
+	 * own `default` -- unlike the rating form there is no single default, because
+	 * the published plan gives every quarter a different one.
+	 */
+	let unitsChosen = $state<Record<string, number>>({});
+
+	function unitsOf(form: UnitsForm, key: string) {
+		const row = form.rows.find((r) => r.key === key);
+		return unitsChosen[key] ?? row?.default ?? 0;
+	}
+
+	function unitsTotal(form: UnitsForm) {
+		return form.rows.reduce((sum, row) => sum + unitsOf(form, row.key), 0);
+	}
+
+	/**
+	 * Submit as one ordinary sentence, the same way the rating form does, so the
+	 * transcript reads as something a person said rather than as a payload.
+	 */
+	function submitUnits(form: UnitsForm) {
+		if (pending || unitsTotal(form) !== form.total) return;
+		const said = form.rows
+			.map((row) => `${row.label} ${unitsOf(form, row.key)} units`)
+			.join(', ');
+		unitsChosen = {};
+		choose(said);
+	}
+
 	function ratingOf(form: RatingForm, key: string) {
 		return ratings[key] ?? form.default;
 	}
@@ -127,6 +158,111 @@
 			.join(', ');
 		ratings = {};
 		choose(said);
+	}
+
+	/**
+	 * Verdicts pressed in this tab, keyed by message id.
+	 *
+	 * Layered OVER what the server sent rather than replacing it, so a thumb
+	 * shows the instant it is pressed without waiting on a round trip and without
+	 * re-fetching the conversation to see one bit change. `verdictOf` reads this
+	 * first and falls back to `message.feedback`, which is what makes a reload
+	 * show back the thumb pressed yesterday.
+	 *
+	 * A failed write is put BACK to what the server last said, not left showing
+	 * the optimistic value. A thumb that looks recorded and is not is worse than
+	 * no thumb at all: the whole point of collecting these is that the count can
+	 * be trusted a fortnight from now.
+	 */
+	let verdicts = $state<Record<string, TurnFeedback | null>>({});
+	/** Which message's "what was wrong?" box is open. At most one. */
+	let noteOpenFor = $state<string | null>(null);
+	let noteDraft = $state('');
+	/** Messages whose last write failed, so the row can say so. */
+	let rateFailed = $state<Record<string, boolean>>({});
+
+	function verdictOf(message: ChatMessageView): TurnFeedback | null {
+		return message.id in verdicts ? verdicts[message.id] : message.feedback;
+	}
+
+	/**
+	 * Whether this row should offer a thumb at all.
+	 *
+	 * `live` because offline there is no turn log to rate against, and `rateable`
+	 * because a reply written before the log existed has no trace to hang a
+	 * verdict on. Both come from somewhere real; neither is a guess.
+	 */
+	function isRateable(message: ChatMessageView) {
+		return live && message.role === 'thrive' && message.rateable;
+	}
+
+	async function postVerdict(messageId: string, payload: Record<string, unknown>) {
+		if (!conversation) return null;
+		const response = await fetch('/ask-sync', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				action: 'rate',
+				conversationId: conversation.id,
+				messageId,
+				...payload
+			})
+		});
+		if (!response.ok) throw new Error('rate failed');
+		const body = (await response.json()) as { feedback: TurnFeedback | { rating: null } };
+		return body.feedback.rating === null ? null : (body.feedback as TurnFeedback);
+	}
+
+	/**
+	 * Press a thumb, or press the pressed one again to clear it.
+	 *
+	 * The thumb is sent on its own; the note box only opens afterwards, and only
+	 * for a thumbs-down. Asking what was wrong before the click is recorded is
+	 * how twenty testers become three.
+	 */
+	async function rate(message: ChatMessageView, rating: 'up' | 'down') {
+		const current = verdictOf(message);
+		const clearing = current?.rating === rating;
+		const previous = current;
+		verdicts = {
+			...verdicts,
+			[message.id]: clearing ? null : { rating, note: current?.note ?? '' }
+		};
+		rateFailed = { ...rateFailed, [message.id]: false };
+		if (clearing) {
+			noteOpenFor = noteOpenFor === message.id ? null : noteOpenFor;
+		} else if (rating === 'down') {
+			noteOpenFor = message.id;
+			noteDraft = current?.note ?? '';
+		} else {
+			noteOpenFor = noteOpenFor === message.id ? null : noteOpenFor;
+		}
+		try {
+			const saved = await postVerdict(message.id, { rating: clearing ? null : rating });
+			verdicts = { ...verdicts, [message.id]: saved };
+		} catch {
+			verdicts = { ...verdicts, [message.id]: previous ?? null };
+			rateFailed = { ...rateFailed, [message.id]: true };
+			noteOpenFor = noteOpenFor === message.id ? null : noteOpenFor;
+		}
+	}
+
+	async function submitNote(message: ChatMessageView) {
+		const note = noteDraft.trim();
+		noteOpenFor = null;
+		noteDraft = '';
+		const current = verdictOf(message);
+		verdicts = {
+			...verdicts,
+			[message.id]: current ? { ...current, note } : current
+		};
+		try {
+			const saved = await postVerdict(message.id, { note });
+			verdicts = { ...verdicts, [message.id]: saved };
+		} catch {
+			verdicts = { ...verdicts, [message.id]: current };
+			rateFailed = { ...rateFailed, [message.id]: true };
+		}
 	}
 
 	/**
@@ -234,7 +370,7 @@
 		sent = [
 			...sent,
 			{ id: `sent-${nextId++}`, role: 'student', body, timeLabel: '', dayLabel: '',
-			  quickReplies: [], form: null },
+			  quickReplies: [], form: null, rateable: false, feedback: null },
 			{
 				id: `sent-${nextId++}`,
 				role: 'thrive',
@@ -242,7 +378,9 @@
 				timeLabel: '',
 				dayLabel: '',
 				quickReplies: [],
-				form: null
+				form: null,
+				rateable: false,
+				feedback: null
 			}
 		];
 
@@ -257,7 +395,7 @@
 		sent = [
 			...sent,
 			{ id: `sent-${nextId++}`, role: 'student', body, timeLabel: '', dayLabel: '',
-			  quickReplies: [], form: null }
+			  quickReplies: [], form: null, rateable: false, feedback: null }
 		];
 		pending = true;
 		scrollToNewest();
@@ -290,7 +428,7 @@
 			sent = [
 				...sent,
 				{ id: `sent-${nextId++}`, role: 'thrive', body: copy.chat.errorReply,
-				  timeLabel: '', dayLabel: '', quickReplies: [], form: null }
+				  timeLabel: '', dayLabel: '', quickReplies: [], form: null, rateable: false, feedback: null }
 			];
 			scrollToNewest();
 		}
@@ -360,6 +498,200 @@
 					{message.timeLabel}
 				</span>
 			{/if}
+
+			{#if isRateable(message)}
+				{@render verdictRow(message)}
+			{/if}
+		</div>
+	</div>
+{/snippet}
+
+<!--
+	Was this answer any good?
+
+	Under the reply rather than beside it, and quiet until it is used: a control
+	that competes with the answer for attention gets pressed by reflex, and a
+	reflex is not a judgement. It only renders when there is a turn log behind the
+	reply to attach the verdict to -- see `isRateable`.
+
+	The note box opens only after a thumbs-down has already been recorded. The
+	click is the datum we are sure of; a textarea in front of it turns a one-tap
+	report into a writing task and most people close the tab instead.
+-->
+{#snippet verdictRow(message: ChatMessageView)}
+	{@const verdict = verdictOf(message)}
+	<div class="mt-1 flex flex-wrap items-center gap-1.5">
+		<span class="text-3xs text-muted-ink">{copy.chat.verdictLabel}</span>
+		{#each [{ rating: 'up' as const, Icon: ThumbsUp, label: copy.chat.thumbUp },
+		        { rating: 'down' as const, Icon: ThumbsDown, label: copy.chat.thumbDown }] as choice (choice.rating)}
+			<button
+				type="button"
+				aria-pressed={verdict?.rating === choice.rating}
+				aria-label={choice.label}
+				title={choice.label}
+				onclick={() => rate(message, choice.rating)}
+				class={cn(
+					'rounded-sm border p-1 transition-colors',
+					verdict?.rating === choice.rating
+						? 'border-line-strong bg-sunken text-ink'
+						: 'border-transparent text-muted-ink hover:border-line hover:text-ink'
+				)}
+			>
+				<choice.Icon aria-hidden="true" class="size-3.5" />
+			</button>
+		{/each}
+
+		{#if rateFailed[message.id]}
+			<span class="text-3xs text-muted-ink">{copy.chat.verdictFailed}</span>
+		{:else if verdict && noteOpenFor !== message.id}
+			<span class="text-3xs text-muted-ink">
+				{verdict.note ? copy.chat.verdictNoted : copy.chat.verdictThanks}
+			</span>
+		{/if}
+	</div>
+
+	{#if noteOpenFor === message.id}
+		<div class="mt-1.5 rounded-md border border-line bg-sunken p-2">
+			<label class="thrive-eyebrow" for={`note-${message.id}`}>
+				{copy.chat.noteLabel}
+			</label>
+			<textarea
+				id={`note-${message.id}`}
+				bind:value={noteDraft}
+				rows="2"
+				placeholder={copy.chat.notePlaceholder}
+				class="mt-1 w-full resize-none rounded-sm border border-line bg-surface px-2 py-1.5 text-xs text-body"
+			></textarea>
+			<div class="mt-1.5 flex items-center gap-1.5">
+				<Button size="sm" onclick={() => submitNote(message)}>{copy.chat.noteSend}</Button>
+				<button
+					type="button"
+					class="text-3xs text-muted-ink underline underline-offset-2"
+					onclick={() => {
+						noteOpenFor = null;
+						noteDraft = '';
+					}}
+				>
+					{copy.chat.noteSkip}
+				</button>
+			</div>
+		</div>
+	{/if}
+{/snippet}
+
+<!--
+	One entry point for both form kinds, so the two call sites do not each have to
+	know which is which. A third kind is one branch here.
+-->
+{#snippet anyForm(form: RatingForm | UnitsForm)}
+	{#if form.kind === 'units'}
+		{@render unitsForm(form)}
+	{:else}
+		{@render ratingForm(form)}
+	{/if}
+{/snippet}
+
+<!--
+	The load form: a real slider per quarter with a live total.
+
+	A slider rather than the rating form's button row, because the range is
+	12-18 units and eleven buttons per quarter would not fit a phone. The total
+	is the important part -- the rows are COUPLED, since the degree is a fixed 50
+	units, so moving Fall up means moving something else down. Showing the sum and
+	holding the submit closed until it is right is what makes that legible instead
+	of a rejection after the fact.
+-->
+{#snippet unitsForm(form: UnitsForm)}
+	<div class="flex justify-start">
+		<!--
+			`w-full` inside the cap, not shrink-to-fit. Measured across every slider
+			value: the panel was 206px wide with the totals correct and 231 or 242
+			once the "move 2 into a quarter" hint appeared, because a shrink-to-fit
+			box rewraps around its longest line. Reserving the hint's HEIGHT stopped
+			the vertical jump and left this one, so the box grew sideways as the
+			numbers changed. A fixed width is the only thing that holds while the
+			content underneath it does not.
+		-->
+		<div class="w-full min-w-0 max-w-[min(85%,var(--thrive-chat-measure))]">
+			<p class="thrive-eyebrow mt-1.5">{form.totalLabel}</p>
+			<div class="mt-1 space-y-2 rounded-md border border-line bg-sunken p-2">
+				{#each form.lockedRows as row (row.key)}
+					<!--
+						Listed, not hidden. Summer is entirely required courses, so there
+						is nothing to drag -- but a form that silently omits it asks the
+						student to reconcile 42 against a 50-unit degree on their own.
+					-->
+					<div class="flex items-baseline justify-between gap-2 text-muted-ink">
+						<span class="text-xs">{row.label} · locked</span>
+						<span class="thrive-numeric w-8 shrink-0 text-right text-sm"
+							>{row.units}</span
+						>
+					</div>
+				{/each}
+
+				{#each form.rows as row (row.key)}
+					<div>
+						<div class="flex items-baseline justify-between gap-2">
+							<label for={`units-${row.key}`} class="text-xs text-body">{row.label}</label>
+							<!--
+								Fixed width, right aligned. The value swings between one and
+								two digits as the slider moves, and an auto-width span made
+								the label jump sideways on every drag.
+							-->
+							<span class="thrive-numeric w-8 shrink-0 text-right text-sm text-ink"
+								>{unitsOf(form, row.key)}</span
+							>
+						</div>
+						<input
+							id={`units-${row.key}`}
+							type="range"
+							min={row.min}
+							max={row.max}
+							step={row.step}
+							disabled={pending}
+							value={unitsOf(form, row.key)}
+							oninput={(event) =>
+								(unitsChosen = {
+									...unitsChosen,
+									[row.key]: Number(event.currentTarget.value)
+								})}
+							class="thrive-range mt-1 h-11 w-full"
+						/>
+					</div>
+				{/each}
+
+				<div class="flex items-center justify-between gap-2 border-t border-line pt-2">
+					<div class="min-w-0">
+						<p class="text-xs text-body">
+							<span class="thrive-numeric"
+								>{unitsTotal(form) + form.lockedTotal}</span
+							>
+							of
+							<span class="thrive-numeric">{form.grandTotal}</span> units
+						</p>
+						<!--
+							Reserved height, always rendered. This line appears only when the
+							total is wrong, and letting it come and go re-flowed the panel on
+							every drag -- the box grew, the buttons moved, and the thumb slid
+							out from under the pointer. `min-h` keeps the row even when empty.
+						-->
+						<p class="min-h-4 text-3xs text-muted-ink">
+							{#if unitsTotal(form) !== form.total}
+								move {Math.abs(form.total - unitsTotal(form))}
+								{unitsTotal(form) > form.total ? 'out of' : 'into'} a quarter
+							{/if}
+						</p>
+					</div>
+					<Button
+						type="button"
+						size="sm"
+						disabled={pending || unitsTotal(form) !== form.total}
+						onclick={() => submitUnits(form)}
+					>
+						{form.submitLabel}
+					</Button>
+				</div>
+			</div>
 		</div>
 	</div>
 {/snippet}
@@ -574,11 +906,12 @@
 			-->
 			{@render bubble(
 				{ id: 'starter', role: 'thrive', body: starter.body, timeLabel: '',
-				  dayLabel: '', quickReplies: starter.quickReplies, form: starter.form ?? null },
+				  dayLabel: '', quickReplies: starter.quickReplies, form: starter.form ?? null,
+				  rateable: false, feedback: null },
 				false
 			)}
 			{#if starter.form}
-				{@render ratingForm(starter.form)}
+				{@render anyForm(starter.form)}
 			{/if}
 			{#if starter.quickReplies.length > 0}
 				{@render quickReplyRow(starter.quickReplies)}
@@ -615,7 +948,7 @@
 
 			{#if showsChoices(index)}
 				{#if message.form}
-					{@render ratingForm(message.form)}
+					{@render anyForm(message.form)}
 				{/if}
 				{#if message.quickReplies.length > 0}
 					{@render quickReplyRow(message.quickReplies)}
@@ -640,7 +973,7 @@
 				-->
 				{@render bubble(
 					{ id: 'pending', role: 'thrive', body: copy.chat.pendingReply,
-					  timeLabel: '', dayLabel: '', quickReplies: [], form: null },
+					  timeLabel: '', dayLabel: '', quickReplies: [], form: null, rateable: false, feedback: null },
 					false
 				)}
 			{/if}

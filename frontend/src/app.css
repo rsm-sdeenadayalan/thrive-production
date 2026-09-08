@@ -1137,6 +1137,144 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* ── The range control ──────────────────────────────────────────────────
+     A slider, in the system's colours rather than the browser's.
+
+     `<input type="range">` renders with the OS accent if nothing claims it,
+     which put a Chrome-blue track in the middle of a cream-and-navy page --
+     the one control in the app not drawn from the tokens. `appearance: none`
+     is what hands it over, and once taken the track and thumb must BOTH be
+     drawn, per engine: WebKit and Firefox expose different pseudo-elements and
+     neither inherits from the other, so the rules are duplicated on purpose
+     rather than by oversight.
+
+     The thumb is 24px against a 4px track. That is deliberately larger than it
+     looks like it needs: a slider is dragged, and a thumb sized to the track is
+     a target you miss on a phone. The 44px row height around it comes from the
+     component, not from here. */
+  .thrive-range {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 100%;
+    background: transparent;
+    /* Grab, not point. The thumb is dragged, and the cursor is the only thing
+       that says so before the student tries. */
+    cursor: grab;
+  }
+
+  .thrive-range:active {
+    cursor: grabbing;
+  }
+
+  .thrive-range::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 999px;
+    /* The hairline, not --thrive-control-line: that token is a TEXT and
+       boundary colour and at 4px solid it reads as a filled bar rather than as
+       the groove the thumb runs in. */
+    background: var(--thrive-hairline);
+  }
+
+  .thrive-range::-moz-range-track {
+    height: 4px;
+    border-radius: 999px;
+    background: var(--thrive-hairline);
+  }
+
+  /* NO `::-moz-range-progress`. Firefox will fill the track behind the thumb
+     for free, and it was taken -- but it means the rail changes as the control
+     moves, so two sliders at different values read as two different controls.
+     The rail is a fixed groove and the THUMB is the only thing that moves;
+     the value is already stated as a number beside the label, so the fill was
+     saying the same thing twice and less precisely. */
+
+  .thrive-range::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: var(--thrive-primary);
+    border: var(--thrive-control-stroke) solid var(--thrive-surface);
+    /* Centre a 24px thumb on a 4px track: (4 - 24) / 2. */
+    margin-top: -10px;
+      /* The value moves in 2-unit steps -- every course is 2 or 4 units, so an
+       odd quarter total is unfillable and a finer step would offer numbers no
+       plan can use. Four stops feel abrupt without help, so the thumb answers
+       the pointer instead: it grows on hover and press, which is what makes a
+       coarse control read as responsive rather than stiff. */
+    transition:
+      transform 120ms ease-out,
+      background-color 120ms ease-out;
+}
+
+  .thrive-range::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: var(--thrive-primary);
+    border: var(--thrive-control-stroke) solid var(--thrive-surface);
+      /* The value moves in 2-unit steps -- every course is 2 or 4 units, so an
+       odd quarter total is unfillable and a finer step would offer numbers no
+       plan can use. Four stops feel abrupt without help, so the thumb answers
+       the pointer instead: it grows on hover and press, which is what makes a
+       coarse control read as responsive rather than stiff. */
+    transition:
+      transform 120ms ease-out,
+      background-color 120ms ease-out;
+}
+
+  .thrive-range:hover::-webkit-slider-thumb {
+    transform: scale(1.12);
+    background: var(--thrive-primary-hover);
+  }
+
+  .thrive-range:hover::-moz-range-thumb {
+    transform: scale(1.12);
+    background: var(--thrive-primary-hover);
+  }
+
+  .thrive-range:active::-webkit-slider-thumb {
+    transform: scale(1.2);
+    background: var(--thrive-primary-active);
+  }
+
+  .thrive-range:active::-moz-range-thumb {
+    transform: scale(1.2);
+    background: var(--thrive-primary-active);
+  }
+
+  /* Anyone who has asked for less motion gets none of the above. */
+  @media (prefers-reduced-motion: reduce) {
+    .thrive-range::-webkit-slider-thumb,
+    .thrive-range::-moz-range-thumb {
+      transition: none;
+    }
+    .thrive-range:hover::-webkit-slider-thumb,
+    .thrive-range:active::-webkit-slider-thumb,
+    .thrive-range:hover::-moz-range-thumb,
+    .thrive-range:active::-moz-range-thumb {
+      transform: none;
+    }
+  }
+
+  .thrive-range:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  /* Keyboard focus has to be visible on the THUMB, which is the thing that
+     moves; an outline on the input would ring the whole 100%-wide row. */
+  .thrive-range:focus-visible::-webkit-slider-thumb {
+    outline: 2px solid var(--thrive-primary);
+    outline-offset: 2px;
+  }
+
+  .thrive-range:focus-visible::-moz-range-thumb {
+    outline: 2px solid var(--thrive-primary);
+    outline-offset: 2px;
+  }
+
   /* The small label above a heading. WORDS, therefore DM Sans.
      The uppercase-and-tracked treatment is what was actually doing the work
      here; mono was along for the ride. Bundling size, tracking, case and weight

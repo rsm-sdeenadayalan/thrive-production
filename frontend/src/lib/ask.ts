@@ -4,6 +4,8 @@ import type {
   Conversation,
   QuickReply,
   RatingForm,
+  TurnFeedback,
+  UnitsForm,
 } from "$lib/data";
 import { formatShortDate, formatTime } from "$lib/format";
 import { messages } from "$lib/messages";
@@ -119,7 +121,16 @@ export interface ChatMessageView {
    *  from an absent field. */
   quickReplies: QuickReply[];
   /** A form offered with this reply, if any. See `RatingForm`. */
-  form: RatingForm | null;
+  form: RatingForm | UnitsForm | null;
+  /**
+   * Whether this row can carry a thumb. False for every student turn and for
+   * replies with no turn log behind them — a verdict is stored against the
+   * trace that produced the answer, so a reply with no trace has nothing to
+   * attach one to and must not show a control that would fail.
+   */
+  rateable: boolean;
+  /** The verdict already recorded, so a reload shows the thumb back. */
+  feedback: TurnFeedback | null;
 }
 
 export interface ConversationView {
@@ -170,6 +181,8 @@ export function toConversationDetailView(
       body: message.body,
       quickReplies: message.quickReplies ?? [],
       form: message.form ?? null,
+      rateable: message.rateable ?? false,
+      feedback: message.feedback ?? null,
       timeLabel: formatTime(message.sentAt),
       dayLabel: relativeDayLabel(message.sentAt, todayKey),
     })),

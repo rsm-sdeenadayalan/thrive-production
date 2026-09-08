@@ -116,6 +116,12 @@ describe("the design system's unenforced rules", () => {
       // The stat pill popover's width clamp. Width only: its surface, hairline
       // and radius are utilities at the call site.
       "thrive-popover",
+      // The slider, in the course planner's per-quarter load form. It has to be
+      // a registered treatment rather than utilities: `<input type="range">`
+      // takes the OS accent colour unless something claims it, and no Tailwind
+      // class reaches the ::-webkit-slider-thumb / ::-moz-range-thumb
+      // pseudo-elements where the colour actually lives.
+      "thrive-range",
       // The arrival ring on a row a stat popover jumped to. Applied from
       // TypeScript, which is why SCRIPTS is scanned as well as MARKUP.
       "thrive-arrived",

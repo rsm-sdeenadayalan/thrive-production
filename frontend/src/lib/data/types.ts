@@ -652,7 +652,7 @@ export interface ConversationStarter {
   body: string;
   quickReplies: QuickReply[];
   /** Same shape as a reply, so the opening is not a special case downstream. */
-  form: RatingForm | null;
+  form: RatingForm | UnitsForm | null;
 }
 
 /**
@@ -672,6 +672,34 @@ export interface RatingForm {
   submitLabel: string;
 }
 
+/**
+ * A slider per quarter, for the load question. Its own kind rather than another
+ * `RatingForm`, because it needs two things a rating cannot express: a range
+ * PER ROW -- the 17-month track's short final quarter runs 2-8 units where the
+ * others run 12-18 -- and a running total, since the rows are coupled. The
+ * degree is a fixed 50 units, so moving one quarter up means moving another
+ * down, and a form that let a student submit a distribution adding to 62 would
+ * be collecting an answer the planner has to reject.
+ */
+export interface UnitsForm {
+  kind: "units";
+  rows: { key: string; label: string; min: number; max: number; step: number;
+          default: number; locked: false }[];
+  /**
+   * Quarters the student cannot move, shown greyed rather than hidden. Summer
+   * is entirely required courses, so leaving it out made the form add up to 42
+   * against a 50-unit degree with no visible reason for the gap.
+   */
+  lockedRows: { key: string; label: string; units: number; locked: true }[];
+  /** What the sliders must sum to. Submit stays disabled until they do. */
+  total: number;
+  lockedTotal: number;
+  /** `total + lockedTotal` — the degree. Shown so the arithmetic is checkable. */
+  grandTotal: number;
+  totalLabel: string;
+  submitLabel: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: ChatRole;
@@ -684,8 +712,28 @@ export interface ChatMessage {
    */
   quickReplies?: QuickReply[];
   /** Optional and additive, like `quickReplies`. Null for almost every reply. */
-  form?: RatingForm | null;
+  form?: RatingForm | UnitsForm | null;
+  /**
+   * The student's own verdict on this reply, echoed back so a reload shows the
+   * thumb they already pressed. Null when nothing has been rated. Optional and
+   * additive like the two above.
+   */
+  feedback?: TurnFeedback | null;
+  /**
+   * Whether this message can be rated at all. False for every student turn and
+   * for replies written before the turn log existed — a verdict is stored
+   * against the trace that produced the answer, and a reply with no trace has
+   * nothing to attach one to.
+   */
+  rateable?: boolean;
   sentAt: ISODateTime;
+}
+
+/** A thumb, and optionally what was wrong. See the backend's `TurnFeedback`. */
+export interface TurnFeedback {
+  rating: "up" | "down";
+  /** Free text the student typed after the thumb landed. Often empty. */
+  note: string;
 }
 
 /**

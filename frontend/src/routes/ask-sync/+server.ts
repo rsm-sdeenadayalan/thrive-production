@@ -10,7 +10,11 @@
 import { json } from "@sveltejs/kit";
 
 import { ApiError, apiEnabled } from "$lib/data/api/client";
-import { createConversation, sendConversationMessage } from "$lib/data/api/providers";
+import {
+	createConversation,
+	rateMessage,
+	sendConversationMessage,
+} from "$lib/data/api/providers";
 import type { AskDestination } from "$lib/data";
 import type { RequestHandler } from "./$types";
 
@@ -37,6 +41,30 @@ export const POST: RequestHandler = async ({ request }) => {
 				String(payload.body ?? ""),
 			);
 			return json({ conversation });
+		}
+		/*
+		 * A thumb, and the optional sentence that follows it.
+		 *
+		 * Deliberately does NOT return the conversation. Rating an answer is not a
+		 * change to the transcript, and re-fetching one so the caller can throw it
+		 * away would make every click cost a conversation load. The verdict alone
+		 * comes back, and `ChatWindow` holds it in component state.
+		 */
+		if (payload.action === "rate") {
+			const feedback = await rateMessage(
+				String(payload.conversationId ?? ""),
+				String(payload.messageId ?? ""),
+				{
+					// `?? undefined` would be wrong here: a null rating is the CLEAR
+					// instruction (pressing the pressed thumb again), and collapsing it
+					// to undefined turns "unrate this" into "leave it as it was".
+					rating: ("rating" in payload
+						? payload.rating
+						: undefined) as "up" | "down" | null | undefined,
+					note: payload.note === undefined ? undefined : String(payload.note),
+				},
+			);
+			return json({ feedback });
 		}
 	} catch (error) {
 		if (error instanceof ApiError) {

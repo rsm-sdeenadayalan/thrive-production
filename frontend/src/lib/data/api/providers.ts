@@ -35,6 +35,7 @@ import type {
 	Student,
 	Syllabus,
 	Task,
+	TurnFeedback,
 } from "../types";
 import { SlotUnavailableError } from "../errors";
 import { ApiError, apiFetch } from "./client";
@@ -163,6 +164,31 @@ export function sendConversationMessage(
 		`/conversations/${encodeURIComponent(conversationId)}/messages`,
 		{ method: "POST", body: { body } },
 	);
+}
+
+/**
+ * Rate one reply, or clear a rating.
+ *
+ * Two calls rather than one on purpose: the thumb is sent the moment it is
+ * pressed, and the "what was wrong?" note follows as a second call against the
+ * same row. Holding the thumb back until someone types a sentence is how
+ * twenty testers become three.
+ *
+ * `rating: null` clears the verdict entirely, which is what pressing the
+ * already-pressed thumb does.
+ */
+export function rateMessage(
+	conversationId: string,
+	messageId: string,
+	verdict: { rating?: "up" | "down" | null; note?: string },
+): Promise<TurnFeedback | { rating: null; note: string }> {
+	const path =
+		`/conversations/${encodeURIComponent(conversationId)}` +
+		`/messages/${encodeURIComponent(messageId)}/feedback`;
+	if (verdict.rating === null) {
+		return apiFetch(path, { method: "DELETE" });
+	}
+	return apiFetch(path, { method: "POST", body: verdict });
 }
 
 /**

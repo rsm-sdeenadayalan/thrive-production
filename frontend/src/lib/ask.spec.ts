@@ -35,7 +35,7 @@ function message(
 ): ChatMessageView {
   return {
     id, role, body: "b", timeLabel: "9:00 AM", dayLabel,
-    quickReplies: [], form: null,
+    quickReplies: [], form: null, rateable: false, feedback: null,
   };
 }
 

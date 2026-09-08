@@ -44,6 +44,36 @@ describe("POST /ask-sync", () => {
       .toBe("http://api.test/api/thrive/conversations/conv-3/messages");
   });
 
+  it("rate posts the verdict and returns it without the conversation", async () => {
+    const impl = stubFetch(200, { rating: "down", note: "wrong term" });
+    const response = await call({ action: "rate", conversationId: "conv-3",
+                                  messageId: "msg-9", rating: "down" });
+    const [url, init] = impl.mock.calls[0];
+    expect(url).toBe(
+      "http://api.test/api/thrive/conversations/conv-3/messages/msg-9/feedback");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body)).toEqual({ rating: "down" });
+    const body = await response.json();
+    expect(body.feedback).toEqual({ rating: "down", note: "wrong term" });
+    // Rating an answer does not change the transcript, so nothing refetches it.
+    expect(body.conversation).toBeUndefined();
+  });
+
+  it("rate with a null rating clears the verdict", async () => {
+    const impl = stubFetch(200, { rating: null, note: "" });
+    await call({ action: "rate", conversationId: "conv-3", messageId: "msg-9",
+                 rating: null });
+    expect(impl.mock.calls[0][1].method).toBe("DELETE");
+  });
+
+  it("a note is sent on its own, after the thumb already landed", async () => {
+    const impl = stubFetch(200, { rating: "down", note: "no prereqs listed" });
+    await call({ action: "rate", conversationId: "conv-3", messageId: "msg-9",
+                 note: "no prereqs listed" });
+    expect(JSON.parse(impl.mock.calls[0][1].body))
+      .toEqual({ note: "no prereqs listed" });
+  });
+
   it("unknown action 400s; ApiError envelopes pass through", async () => {
     stubFetch();
     expect((await call({ action: "nope" })).status).toBe(400);

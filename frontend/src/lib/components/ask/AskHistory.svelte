@@ -251,9 +251,19 @@
 							The confirm step, drawn OVER the row rather than under it: the
 							rail is a fixed-height scroller and a row that grew would push
 							its neighbours around while the student was reading it.
+
+							`inset-x-0 top-0 min-h-full` rather than `inset-0`, because
+							`inset-0` pins the box to the ROW's height and this content is
+							taller than a row: a title that wraps, a sentence of warning,
+							and two 44px touch targets. Pinned, all of that overflowed the
+							box and drew across the rows underneath, so the buttons landed
+							on a neighbour's title. Anchored at the top and free to grow, it
+							covers its own row and floats over the next -- which is what the
+							shadow is for, since it now has an edge that must read as
+							lifted rather than as part of the list.
 						-->
 						<div
-							class="absolute inset-0 z-10 flex flex-col justify-center gap-1 rounded-md border border-line-strong bg-surface p-1.5"
+							class="absolute inset-x-0 top-0 z-20 flex min-h-full flex-col justify-center gap-1 rounded-md border border-line-strong bg-surface p-1.5 shadow-lg"
 						>
 							<p class="text-3xs text-body">{copy.rail.deleteConfirm(conversation.title)}</p>
 							<div class="flex gap-1">
