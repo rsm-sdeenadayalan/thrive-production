@@ -6,6 +6,7 @@
 	import ThumbsUp from '@lucide/svelte/icons/thumbs-up';
 
 	import { goto } from '$app/navigation';
+	import { base } from '$app/paths';
 	import { showsDayLabel, type ChatMessageView, type ConversationDetailView } from '$lib/ask';
 	import type { ConversationStarter, RatingForm, TurnFeedback, UnitsForm } from '$lib/data';
 	import RichMessage from '$lib/components/ask/RichMessage.svelte';
@@ -415,7 +416,7 @@
 
 			const payload = (await response.json()) as { conversation: { id: string } };
 
-			await goto(`/ask/${destination}?c=${payload.conversation.id}`, { invalidateAll: true });
+			await goto(`${base}/ask/${destination}?c=${payload.conversation.id}`, { invalidateAll: true });
 
 			// The `{#key}` above only remounts for a NEW conversation id; the
 			// same-conversation case (a second message in an already-open thread)

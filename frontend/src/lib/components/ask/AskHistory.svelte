@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { base } from '$app/paths';
 	import { invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
 	import MessageSquarePlus from '@lucide/svelte/icons/message-square-plus';
@@ -132,7 +133,7 @@
 			is a thing a student looks for rather than a thing that appears.
 		-->
 		<a
-			href={`/ask/${destination}`}
+			href={`${base}/ask/${destination}`}
 			aria-current={openId ? undefined : 'page'}
 			class={cn(
 				'inline-flex min-h-11 items-center gap-1 rounded-sm px-1 text-3xs',
@@ -177,7 +178,7 @@
 
 				<li class="relative w-56 shrink-0 xl:w-auto xl:shrink">
 					<a
-						href={`/ask/${destination}?c=${conversation.id}`}
+						href={`${base}/ask/${destination}?c=${conversation.id}`}
 						aria-current={open ? 'page' : undefined}
 						aria-label={copy.rail.openConversation(
 							conversation.title,
@@ -269,7 +270,7 @@
 							<div class="flex gap-1">
 								<form
 									method="POST"
-									action={`/ask/${destination}?/deleteConversation`}
+									action={`${base}/ask/${destination}?/deleteConversation`}
 									use:enhance={() => {
 										deletingId = conversation.id;
 										deleteError = null;
