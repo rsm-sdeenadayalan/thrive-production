@@ -9,7 +9,8 @@ from rsm_thrive.http import (BadRequest, api_login_required, json_error,
                              json_ok, parse_body)
 from rsm_thrive.models import ChatMessage, ChatTurnLog, Conversation
 from rsm_thrive.serializers.chat import conversation_payload
-from rsm_thrive.services.bots import BotReply, answer_career, answer_electives, answer_faq
+from rsm_thrive.services.bots import BotReply, answer_career, answer_faq
+from rsm_thrive.services.orchestrator import answer as answer_courses
 from rsm_thrive.services import planner
 from rsm_thrive.services.llm import get_llm
 
@@ -46,7 +47,7 @@ def _run_bot(conversation, destination, question, history):
     try:
         llm = llm_factory()
         if destination == "courses":
-            reply = answer_electives(llm, conversation, question, history)
+            reply = answer_courses(llm, conversation, question, history)
         elif destination == "career":
             reply = answer_career(llm, question, history)
         else:

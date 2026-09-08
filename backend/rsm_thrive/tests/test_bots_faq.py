@@ -17,10 +17,62 @@ def _seed(destinations, text="Students may drop a course before week two."):
 
 
 class TestFaqBot:
-    def test_thin_retrieval_refuses_without_llm(self):
-        fake = FakeLLM(replies=[])  # any call would raise "exhausted"
-        reply = answer_faq(fake, "what is the meaning of life", [])
+    def test_thin_retrieval_falls_back_to_the_web(self, settings):
+        """No corpus hit no longer means no answer.
+
+        The spec's flat refusal was there because "a confident wrong policy
+        answer is worse than none", and that reasoning is kept -- the prompt
+        will not state a deadline or fee as settled. What it also refused was
+        anything the corpus has not got to yet: "What is VMock?" is a real Rady
+        careers tool, band C in the scorecard and so not ingested, and a student
+        asking got sent to advising for a one-sentence answer.
+        """
+        fake = FakeLLM(replies=['{"answerable": true, "reply": "VMock is a resume tool."}'])
+        reply = answer_faq(fake, "what is vmock", [])
+        assert reply.model_note == "web"
+        assert reply.body.startswith("VMock is a resume tool.")
+        assert "verify" in reply.body.lower()
+
+    def test_a_web_answer_is_never_cited_as_rady_material(self):
+        """The defect this pairs with: "2 plus 2 is 4." arrived with
+        "Source: MGTA 495 — Special Topics: AI & Prescriptive Analytics"
+        attached. An answer the corpus did not give carries no citation."""
+        fake = FakeLLM(replies=['{"answerable": true, "reply": "Parking costs vary."}'])
+        reply = answer_faq(fake, "what is vmock", [])
+        assert reply.chunk_ids == []
+        assert "source:" not in reply.body.lower()
+
+    def test_an_off_mission_question_still_refuses(self):
+        """The golden set's weather / sport / write-my-essay cases. This must
+        not turn the FAQ bot into a general chatbot."""
+        fake = FakeLLM(replies=['{"answerable": false, "reply": ""}'])
+        reply = answer_faq(fake, "who won the super bowl", [])
+        assert reply.model_note == "refusal"
         assert "advising" in reply.body.lower()
+
+    def test_it_fails_closed_when_the_model_misbehaves(self):
+        # Unparseable output means the in-scope classification never happened,
+        # so prose must not pass through as though it had been judged.
+        for reply_text in ("not json at all", '{"answerable": true, "reply": ""}'):
+            fake = FakeLLM(replies=[reply_text])
+            assert answer_faq(fake, "what is vmock", []).model_note == "refusal"
+
+    def test_it_fails_closed_when_the_call_raises(self):
+        fake = FakeLLM(replies=[])  # any call raises "exhausted"
+        reply = answer_faq(fake, "what is the meaning of life", [])
+        assert reply.chunk_ids == [] and reply.model_note == "refusal"
+        assert "advising" in reply.body.lower()
+
+    def test_the_old_deterministic_refusal_is_still_available(self, monkeypatch):
+        """`web_fallback: false` restores the spec's original guarantee exactly
+        -- no LLM call at all, so the refusal cannot be argued with."""
+        from rsm_thrive.services import bots
+
+        real = bots.bot_config
+        monkeypatch.setattr(bots, "bot_config",
+                            lambda name: {**real(name), "web_fallback": False})
+        fake = FakeLLM(replies=[])
+        reply = answer_faq(fake, "what is the meaning of life", [])
         assert reply.chunk_ids == [] and reply.model_note == "refusal"
         assert fake.calls == []
 
