@@ -38,22 +38,20 @@ class TestIntakeEndpoint:
     def test_requires_login(self, client):
         assert client.get(INTAKE).status_code == 401
 
-    def test_it_offers_an_opening_prompt_with_buttons(self, student_client):
-        """The chat opens ON the first question, not on an empty box."""
-        body = student_client.get(INTAKE).json()
-        starter = body["starter"]
-        # The choices ride on the buttons; the body asks the question.
-        assert [q["send"] for q in starter["quickReplies"]] == ["11 month", "17 month"]
-        assert [q["description"] for q in starter["quickReplies"]] == [
-            "Summer through Spring", "finishes the following Fall"]
-        assert "MGTA" not in starter["body"]
-
-    def test_the_opening_prompt_is_the_same_text_the_bot_would_send(self, student_client):
-        from rsm_thrive.services import planner
-
+    def test_the_opening_invites_free_text_rather_than_asking_a_question(
+            self, student_client):
+        """The interview opened here with "Which track are you on?" and two
+        buttons. It works, and it makes the bot feel like a form — a student
+        who types a real sentence was pushed back into a script. What opens the
+        surface now says what it can do and gets out of the way."""
         starter = student_client.get(INTAKE).json()["starter"]
-        step = planner.next_intake_step({})
-        assert starter["body"] == planner.render_question(step, {})
+        assert starter["quickReplies"] == []
+        assert starter["form"] is None
+        assert "Step 1 of" not in starter["body"]
+        # It names the shapes of question the router can actually route.
+        for example in ("data scientist", "prerequisites", "industry",
+                        "11-month"):
+            assert example in starter["body"], example
 
     def test_returns_the_script_and_the_profile_track_as_a_default(self, student_client):
         body = student_client.get(INTAKE).json()
@@ -208,3 +206,35 @@ class TestSwapEndpoint:
         _post(student_client, PLAN, {"answers": ANSWERS})
         assert _post(student_client, SWAP,
                      {"quarter": "fall", "slot": 2}).status_code == 400
+
+
+class TestAMalformedBodyIsA400NotA500:
+    """The defect: `validate_intake` tested a client-supplied value against a
+    set, so an UNHASHABLE value raised TypeError from inside `in` instead of
+    failing validation.
+
+    `POST /api/thrive/plan` takes `answers` straight from the caller, so
+    `{"answers": {"track": {"a": 1}}}` crashed the request -- any logged-in
+    student could turn a malformed body into a 500.
+    """
+
+    @pytest.mark.parametrize("answers", [
+        {"track": {"a": {"b": 1}}},
+        {"track": ["11 month"]},
+        {"goals": [{"x": 1}]},
+        {"goals": {"a": 1}},
+        {"skill_python": {"x": 1}},
+        {"workload": ["moderate"]},
+        {"track": {"a": 1}, "goals": [{"b": 2}], "workload": {"c": 3}},
+    ])
+    def test_unhashable_values_are_rejected_not_raised(self, student_client, answers):
+        response = student_client.post(
+            PLAN, data=json.dumps({"answers": answers}),
+            content_type="application/json")
+        assert response.status_code == 400, response.content[:200]
+
+    def test_validate_intake_reports_them_as_problems(self):
+        from rsm_thrive.services import planner
+
+        problems = planner.validate_intake({"track": {"a": 1}, "goals": [{"b": 2}]})
+        assert problems, "an unhashable value must be a problem, not an exception"

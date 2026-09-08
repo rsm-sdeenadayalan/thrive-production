@@ -267,6 +267,21 @@ CHAT_FORM = {
     "properties": {"kind": {"type": "string"}},
 }
 
+# The student's own verdict on a reply, echoed back so a reload shows the thumb
+# they already pressed. Additive and optional like the two above: a client that
+# ignores it renders the conversation exactly as before. Null on student turns,
+# and on a reply with no `ChatTurnLog` to hang a verdict on -- which is what
+# `rateable` distinguishes from "rateable, not yet rated".
+CHAT_FEEDBACK = {
+    "type": ["object", "null"],
+    "additionalProperties": False,
+    "required": ["rating", "note"],
+    "properties": {
+        "rating": {"enum": ["up", "down"]},
+        "note": {"type": "string"},
+    },
+}
+
 CHAT_MESSAGE = {
     "type": "object",
     "additionalProperties": False,
@@ -277,6 +292,8 @@ CHAT_MESSAGE = {
         "body": {"type": "string"},
         "quickReplies": {"type": "array", "items": QUICK_REPLY},
         "form": CHAT_FORM,
+        "feedback": CHAT_FEEDBACK,
+        "rateable": {"type": "boolean"},
         "sentAt": ISO_INSTANT,
     },
 }

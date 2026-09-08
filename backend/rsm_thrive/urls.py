@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import advisors, appointments, assignments, auth, chat, courses, degree, events, health, jobs, overlay, personal, planner, requests, resources, resume, students, tasks
+from .views import advisors, appointments, assignments, auth, chat, courses, degree, events, feedback, health, jobs, overlay, personal, planner, requests, resources, resume, students, tasks, traces
 
 app_name = "rsm_thrive"
 
@@ -16,6 +16,8 @@ urlpatterns = [
     path("conversations", chat.conversations, name="conversations"),
     path("conversations/<str:conversation_id>/messages",
          chat.conversation_messages, name="conversation_messages"),
+    path("conversations/<str:conversation_id>/messages/<str:message_id>/feedback",
+         feedback.message_feedback, name="message-feedback"),
     path("conversations/<str:conversation_id>", chat.conversation, name="conversation"),
     path("courses", courses.courses, name="courses"),
     path("custom-events/<str:key>", personal.custom_event, name="custom-event"),
@@ -54,6 +56,9 @@ urlpatterns = [
     path("tasks/<str:task_id>", tasks.delete_task, name="task-delete"),
     path("tasks/<str:task_id>/note", overlay.task_note, name="task-note"),
     path("tasks/<str:task_id>/override", tasks.override, name="task-override"),
+    path("traces", traces.traces, name="traces"),
+    path("traces/refusals", traces.refusals, name="traces-refusals"),
+    path("traces/<str:trace_id>", traces.trace, name="trace"),
     path("tss", requests.tss, name="tss"),
     path("tss/connect", requests.tss_connect, name="tss-connect"),
 ]

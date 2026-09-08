@@ -2,6 +2,7 @@ import logging
 import time
 
 from django.db import transaction
+from django.db.models import Prefetch
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
@@ -23,6 +24,14 @@ DEGRADED_REPLY = ("I'm having trouble reaching my knowledge sources right "
 
 # Module-level seam: tests monkeypatch this with a FakeLLM factory.
 llm_factory = get_llm
+
+
+# Messages plus the verdict attached to each reply. `conversation_payload`
+# reads `message.turn_log.feedback`, and without this every conversation load
+# issued two extra queries per message.
+_MESSAGES_WITH_VERDICTS = Prefetch(
+    "messages",
+    queryset=ChatMessage.objects.select_related("turn_log", "turn_log__feedback"))
 
 
 def _validated_body(body):
@@ -82,7 +91,11 @@ def _append_turn(conversation, destination, question):
         ChatTurnLog.objects.create(message=assistant, bot=destination,
                                    model_note=reply.model_note,
                                    chunk_ids=reply.chunk_ids,
-                                   duration_ms=duration_ms)
+                                   duration_ms=duration_ms,
+                                   question=question,
+                                   route=reply.route,
+                                   route_confidence=reply.route_confidence,
+                                   refused=reply.refused)
         conversation.updated_at = timezone.now()
         conversation.save(update_fields=["updated_at"])
 
@@ -118,7 +131,7 @@ def _seed_opening_question(conversation, destination):
 def conversations(request):
     if request.method == "GET":
         rows = (Conversation.objects.filter(user=request.user)
-                .prefetch_related("messages").order_by("-updated_at", "-pk"))
+                .prefetch_related(_MESSAGES_WITH_VERDICTS).order_by("-updated_at", "-pk"))
         return json_ok([conversation_payload(c) for c in rows])
     try:
         body = parse_body(request)
@@ -134,7 +147,7 @@ def conversations(request):
     _seed_opening_question(conversation_row, destination)
     _append_turn(conversation_row, destination, question)
     conversation_row = (Conversation.objects.filter(pk=conversation_row.pk)
-                        .prefetch_related("messages").first())
+                        .prefetch_related(_MESSAGES_WITH_VERDICTS).first())
     return json_ok(conversation_payload(conversation_row), status=201)
 
 
@@ -145,7 +158,7 @@ def _own_conversation(user, conversation_id):
     if not (pk.isascii() and pk.isdigit()):
         return None
     return (Conversation.objects.filter(pk=pk, user=user)
-            .prefetch_related("messages").first())
+            .prefetch_related(_MESSAGES_WITH_VERDICTS).first())
 
 
 @api_login_required
@@ -188,5 +201,5 @@ def conversation_messages(request, conversation_id):
         return json_error("bad_request", str(exc), 400)
     _append_turn(row, row.destination, question)
     row = (Conversation.objects.filter(pk=row.pk)
-           .prefetch_related("messages").first())
+           .prefetch_related(_MESSAGES_WITH_VERDICTS).first())
     return json_ok(conversation_payload(row))

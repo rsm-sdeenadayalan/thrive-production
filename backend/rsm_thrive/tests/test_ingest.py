@@ -95,10 +95,17 @@ class TestDestinationScoping:
         assert destinations_for(
             "policy", "https://students.ucsd.edu/academics/enroll/") == ["resources"]
 
-    def test_a_syllabus_still_reaches_the_courses_bot(self):
+    def test_a_syllabus_reaches_the_courses_bot_and_only_that(self):
+        """It used to be ["resources", "courses"]. Full syllabus text is more
+        chunks than the whole FAQ corpus and is dense with the words a student
+        uses to ask about enrolment, so in "resources" it buried the pages that
+        answer them -- see `TestSyllabiStayOutOfTheFaqCorpus` in
+        test_catalog_build.py. The FAQ bot keeps a short `catalog` entry per
+        course instead.
+        """
         from rsm_thrive.management.commands.ingest_corpus import destinations_for
 
-        assert destinations_for("syllabus", "") == ["resources", "courses"]
+        assert destinations_for("syllabus", "") == ["courses"]
 
     def test_a_lookalike_host_is_not_matched(self):
         """Substring matching would catch "careers.example.com"; this is exact."""

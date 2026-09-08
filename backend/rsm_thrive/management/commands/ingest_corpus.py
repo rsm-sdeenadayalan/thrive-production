@@ -30,6 +30,13 @@ ICLOUD_CONFLICT = re.compile(r".+ \d{1,2}$")
 # the bot guessing at a real programme's offering.
 CAREER_HOSTS = frozenset({"career.ucsd.edu", "career.rady.ucsd.edu"})
 
+# What marks a markdown file in `corpus/syllabi/` as a course rather than a
+# policy page. Read from the frontmatter rather than from the directory name,
+# so a syllabus keeps its kind wherever it is ingested from.
+SYLLABUS_FRONTMATTER = re.compile(r"\A---\n(?:.*\n)*?code: \"", re.M)
+COURSE_CODE_FM = re.compile(r'^code: "([^"]+)"', re.M)
+COURSE_TITLE = re.compile(r'^title: "([^"]+)"', re.M)
+
 
 def _host_of(url):
     match = re.match(r"https?://([^/]+)", url or "")
@@ -39,13 +46,26 @@ def _host_of(url):
 def destinations_for(kind, source_url):
     """Which bots can retrieve this document.
 
-    Everything stays in "resources" — the FAQ bot is the general surface and a
+    Most things stay in "resources" — the FAQ bot is the general surface and a
     student asking it about resumes should still be answered. The extra
     destination is additive.
+
+    A SYLLABUS is the exception, and goes to "courses" alone. Full syllabus text
+    is 3,385 chunks against the FAQ corpus's 2,421, and it is dense with exactly
+    the words a student uses to ask about enrolment: every syllabus says "class",
+    most say "book". Measured on 2026-09-05, "how to book a class" returned MGT
+    408 Finance at 0.618 and pushed "Booking Your Classes — students.ucsd.edu"
+    off the results entirely; the bot then said it had no steps for booking a
+    class while holding the page that has them.
+
+    The FAQ bot does not lose course coverage by this. The `catalog` documents
+    are one short entry per course and stay in "resources", which is the right
+    granularity for a general surface: enough to say what MGTA 458 is, and not
+    enough to bury the fee tables.
     """
-    destinations = ["resources"]
     if kind == "syllabus":
-        destinations.append("courses")
+        return ["courses"]
+    destinations = ["resources"]
     if _host_of(source_url) in CAREER_HOSTS:
         destinations.append("career")
     return destinations
@@ -74,7 +94,14 @@ class Command(BaseCommand):
             # fixture corpus or the course catalog has destinations set by that
             # path, not by a host, and must not be quietly narrowed to
             # "resources" here.
-            if not document.source_url:
+            #
+            # A SYLLABUS is exempt: its destination comes from its kind rather
+            # than from a host, so `destinations_for` is authoritative for it
+            # whether or not it carries a source URL. Without this exemption
+            # the markdown syllabi -- which have no URL -- were silently
+            # skipped, and the rescope reported "0 documents" while the corpus
+            # it was meant to fix stayed exactly as it was.
+            if not document.source_url and document.kind != "syllabus":
                 continue
             if sorted(document.destinations or []) == sorted(wanted):
                 continue
@@ -125,11 +152,28 @@ class Command(BaseCommand):
                     kind = "syllabus"
                 elif path.suffix.lower() in (".md", ".txt"):
                     text = path.read_text()
-                    kind = "policy"
+                    # A markdown file IS a syllabus when it says so in its
+                    # frontmatter. `corpus/syllabi/` holds one file per course
+                    # -- the source `build_catalog` compiles courses.json from
+                    # -- and those must reach the COURSES bot, which "policy"
+                    # would not: a course the planner can schedule and the bot
+                    # cannot describe is the split this directory removes.
+                    kind = "syllabus" if SYLLABUS_FRONTMATTER.search(text[:400]) \
+                        else "policy"
                 else:
                     continue
                 url = source_url_of(text)
-                doc = ingest_document(f"file:{path.name}", path.stem, kind,
+                # A syllabus is titled by the course, not by the filename. The
+                # title is what `append_sources` prints under an answer, and
+                # "MGTA-402" tells a student nothing that "MGTA 402 —
+                # Data-Driven Communications" does not tell them better.
+                title = path.stem
+                if kind == "syllabus":
+                    named = COURSE_TITLE.search(text[:1200])
+                    coded = COURSE_CODE_FM.search(text[:1200])
+                    if named and coded:
+                        title = f"{coded.group(1)} — {named.group(1)}"
+                doc = ingest_document(f"file:{path.name}", title, kind,
                                       destinations_for(kind, url), text,
                                       embeddings, source_url=url)
                 self.stdout.write(f"ingested file:{path.name} "

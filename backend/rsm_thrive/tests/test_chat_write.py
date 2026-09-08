@@ -130,44 +130,33 @@ class TestSendMessage:
         assert ChatMessage.objects.filter(
             conversation=conv, role="student", body="q").exists()
 
-    def test_electives_destination_runs_the_planner_interview(self, client, student,
-                                                              fake_llm):
-        """The courses destination asks for the track before naming any course."""
+    def test_the_courses_destination_answers_free_text(self, client, student,
+                                                       fake_llm):
+        """No interview: a sentence naming a track and a goal produces the
+        plan, and the reply carries no buttons and no form."""
         conv = self._conversation(student, destination="courses")
-        fake_llm([json.dumps({"track": None, "goals": [], "skill_python": None,
-                              "skill_sql": None, "skill_stats": None,
-                              "skill_ml": None, "skill_communication": None,
-                              "workload": None, "interests": []})])
+        fake_llm([])       # an exhausted FakeLLM raises if anything calls it
         response = _post(client, f"/api/thrive/conversations/conv-{conv.pk}/messages",
-                         {"body": "recommend me electives"})
+                         {"body": "11 month track, data scientist, python 3 sql 3, moderate load"})
         last = response.json()["messages"][-1]
-        assert "MGTA" not in last["body"]
-        # The track question is a closed set: it comes with buttons, not a form,
-        # and each button carries its own explanation so the body does not
-        # repeat the list above them.
-        assert {"label": "11 month", "send": "11 month",
-                "description": "Summer through Spring"} in last["quickReplies"]
-        assert {"label": "17 month", "send": "17 month",
-                "description": "finishes the following Fall"} in last["quickReplies"]
+        assert "MGTA" in last["body"], "it produced a real plan"
+        assert last["quickReplies"] == []
         assert last["form"] is None
 
-    def test_electives_skills_step_returns_a_rating_form(self, client, student,
-                                                          fake_llm):
-        """The skills step asks about five areas at once, so it comes as a
-        form rather than a row of buttons — see `planner.rating_form_for`."""
+    def test_the_route_is_recorded_on_the_turn_log(self, client, student, fake_llm):
+        """Which path an answer came down is the thing a bad answer is
+        diagnosed by. See `models.chat.ChatTurnLog`."""
+        from rsm_thrive.models import ChatTurnLog
+
         conv = self._conversation(student, destination="courses")
-        fake_llm([json.dumps({"track": "11 month", "goals": ["data-scientist"],
-                              "skill_python": None, "skill_sql": None,
-                              "skill_stats": None, "skill_ml": None,
-                              "skill_communication": None, "workload": None,
-                              "interests": []})])
-        response = _post(client, f"/api/thrive/conversations/conv-{conv.pk}/messages",
-                         {"body": "recommend me electives"})
-        last = response.json()["messages"][-1]
-        assert last["quickReplies"] == []
-        assert last["form"]["kind"] == "rating"
-        assert {"key": "skill_python", "label": "Python programming"} in \
-            last["form"]["rows"]
+        fake_llm([])
+        _post(client, f"/api/thrive/conversations/conv-{conv.pk}/messages",
+              {"body": "I want to be a data scientist"})
+        log = ChatTurnLog.objects.order_by("-pk").first()
+        assert log.route == "role"
+        assert log.question == "I want to be a data scientist"
+        # A rule decided, so there is no probability to record.
+        assert log.route_confidence is None
 
 
 class TestMethodGuards:

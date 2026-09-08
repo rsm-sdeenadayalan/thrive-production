@@ -6,11 +6,11 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from rsm_thrive.models import (
-    Advisor, AppointmentSlot, Assignment, ChatMessage, Conversation, Course,
+    Advisor, AppointmentSlot, Assignment, ChatMessage, ChatTurnLog, Conversation, Course,
     CourseMeeting, CourseRequest, CustomCalendarEvent, DegreeGap, DegreeRequirement, Enrollment,
     Event, ProgramPhaseRow, QuickListItem, ResumeCourseHighlight, ResourceLink, SharedTask,
     Skill, StudentAssignment, StudentProfile, StudentTask, Syllabus,
-    TaskOverride,
+    TaskOverride, TurnFeedback,
 )
 
 
@@ -215,6 +215,22 @@ def make_message(conversation, **overrides) -> ChatMessage:
     fields = {"role": "student", "body": "hello", "sent_at": timezone.now()}
     fields.update(overrides)
     return ChatMessage.objects.create(conversation=conversation, **fields)
+
+
+def make_turn_log(message, **overrides) -> ChatTurnLog:
+    """The provenance row a real assistant turn writes. See `views/chat.py`."""
+    fields = {"bot": message.conversation.destination, "model_note": "llm",
+              "chunk_ids": [], "duration_ms": 120, "question": "",
+              "route": "", "refused": False, "created_at": message.sent_at}
+    fields.update(overrides)
+    return ChatTurnLog.objects.create(message=message, **fields)
+
+
+def make_feedback(turn, user=None, **overrides) -> TurnFeedback:
+    fields = {"rating": "down", "note": ""}
+    fields.update(overrides)
+    return TurnFeedback.objects.create(
+        turn=turn, user=user or turn.message.conversation.user, **fields)
 
 
 def make_quick_item(profile, key, **overrides) -> QuickListItem:

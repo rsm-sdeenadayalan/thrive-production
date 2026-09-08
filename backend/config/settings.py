@@ -152,6 +152,18 @@ _embed_backend = THRIVE_EMBEDDINGS or THRIVE_LLM
 THRIVE_BOT_CONFIG = os.environ.get("THRIVE_BOT_CONFIG", "")
 if not THRIVE_BOT_CONFIG and _embed_backend in ("local", "codex"):
     THRIVE_BOT_CONFIG = str(BASE_DIR / "config" / "bots.local-embed.json")
+# Who performs a web search when a backend cannot do it itself. Only the codex
+# backend searches natively (OpenAI hosts the loop); TritonAI is vLLM behind
+# LiteLLM and has no such loop, so without this `search_chat` silently answered
+# from training data. See services/websearch.py.
+#
+#   "duckduckgo"  no key, and therefore the default. Parses a public HTML
+#                 endpoint, so it is the one that breaks on a markup change.
+#   "brave" | "serper" | "tavily"   keyed, via THRIVE_SEARCH_API_KEY.
+#   "none"        no search. `search_chat` degrades to the model's own memory,
+#                 which is what the whole codebase did before this existed.
+THRIVE_SEARCH = os.environ.get("THRIVE_SEARCH", "duckduckgo")
+THRIVE_SEARCH_API_KEY = os.environ.get("THRIVE_SEARCH_API_KEY", "")
 TRITONAI_API_KEY = os.environ.get("TRITONAI_API_KEY", "")
 TRITONAI_MODEL = os.environ.get("TRITONAI_MODEL", "claude-sonnet-4-6")
 # Placeholder — verify via list_models at the TritonAI portal and correct.

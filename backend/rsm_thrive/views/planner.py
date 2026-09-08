@@ -46,9 +46,9 @@ def _label_choices(plan, baseline):
 
 def _plan_payload(record):
     taken = planner.taken_course_ids(record.user)
-    plan = planner.build_plan(record.intake, taken, record.selections)
+    plan = planner.build_for(record.intake, taken, record.selections)
     if record.selections:
-        plan = _label_choices(plan, planner.build_plan(record.intake, taken, {}))
+        plan = _label_choices(plan, planner.build_for(record.intake, taken, {}))
     plan["intake"] = record.intake
     plan["updatedAt"] = record.updated_at.isoformat()
     # A ready-to-render Markdown view alongside the structured plan. The chat
@@ -137,7 +137,7 @@ def alternatives(request):
         slot = int(request.GET.get("slot", ""))
     except ValueError:
         raise BadRequest("slot must be an integer")
-    built = planner.build_plan(record.intake,
+    built = planner.build_for(record.intake,
                                planner.taken_course_ids(record.user),
                                record.selections)
     try:
