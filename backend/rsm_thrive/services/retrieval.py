@@ -364,14 +364,41 @@ def retrieve(query, destination, top_k, min_similarity, lexical_min=None,
             key=lambda triple: -triple[2])
         return [(chunk, similarity) for chunk, similarity, _ in ranked[:top_k]]
 
+    # A question that survives stopword stripping as ONE term is where the
+    # lexical tier is weakest: "every distinctive term present" is satisfied by
+    # any chunk that happens to use that one word. "What is 2 plus 2?" reduces
+    # to {"plus"}, matched 11 chunks on that basis, and the bot then answered
+    # from its own knowledge with a Source line pointing at a course on
+    # prescriptive analytics -- a fabricated-looking citation, which costs more
+    # trust than the wrong answer does.
+    #
+    # Cosine cannot separate that from a real one-word lookup: the leak scored
+    # 0.256 while "imunizations" scored 0.104, because a misspelling embeds
+    # badly no matter how clearly it is meant. Raising the floor kills typo
+    # repair, lowering it re-opens the leak. So single-term questions are
+    # admitted on a different kind of evidence instead -- the term naming what
+    # the document is ABOUT rather than merely occurring in it. Measured over
+    # the resources corpus: "plus" appears in the heading or title of 0 chunks,
+    # while "immunizations", "orientation", "transcript" and "zoom" appear in
+    # 2, 7, 1 and 6.
+    narrow = len(query_terms) < 2
+
     scored = []
     for chunk, haystack in zip(scoped, haystacks):
         similarity = cosine(query_vector, chunk.embedding)
         keyword = _score(query_terms, haystack)
         # Two tiers, either of which admits. A question with no distinctive
         # terms at all scores 0.0 here, so it can only ever enter on cosine.
-        lexical_hit = (lexical_min is not None and keyword >= lexical_min
-                       and similarity >= lexical_floor)
+        if lexical_min is not None and keyword >= lexical_min:
+            about = _score(query_terms,
+                           _terms(f"{chunk.heading or ''} {chunk.document.title or ''}"))
+            # A title match also STANDS IN for the cosine floor, which is what
+            # lets a misspelling through: the floor is there to catch chunks
+            # matched by accident, and a term in the title is not an accident.
+            lexical_hit = about >= 1.0 if narrow else (
+                similarity >= lexical_floor or about >= 1.0)
+        else:
+            lexical_hit = False
         if similarity < min_similarity and not lexical_hit:
             continue
         rank = similarity + KEYWORD_WEIGHT * keyword

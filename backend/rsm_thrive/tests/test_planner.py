@@ -356,32 +356,42 @@ class TestAlternatives:
 
 @pytest.mark.django_db
 class TestSwap:
+    """`build_for`, not `build_plan`, throughout.
+
+    A swap acts on the plan the student is LOOKING at, and since curated roles
+    default to their bundle that is no longer the same thing as the scorer's
+    output. Driving the swap from one and reading the result off the other is
+    what made a single Fall swap appear to move five rows.
+    """
+
     def _first_option(self):
-        plan = planner.build_plan(ANSWERS)
+        plan = planner.build_for(ANSWERS)
         return planner.alternatives_for(plan, ANSWERS, "fall", 2)["options"][0]
 
     def test_a_swap_sticks_and_keeps_the_plan_valid(self):
         option = self._first_option()
         selections = planner.apply_swap(ANSWERS, {}, "fall", 2, option["courseId"])
-        plan = planner.build_plan(ANSWERS, selections=selections)
+        plan = planner.build_for(ANSWERS, selections=selections)
         assert plan["quarters"][1]["courses"][2]["courseId"] == option["courseId"]
         assert plan["totals"]["total"] == planner.TOTAL_UNITS
         assert plan["unfilled"] == []
 
-    def test_a_swap_only_moves_the_slot_it_targets(self):
-        option = self._first_option()
-        before = planner.build_plan(ANSWERS)
-        after = planner.build_plan(
-            ANSWERS, selections=planner.apply_swap(ANSWERS, {}, "fall", 2,
+    @pytest.mark.parametrize("route", ["fixed", "custom"])
+    def test_a_swap_only_moves_the_slot_it_targets(self, route):
+        answers = {**ANSWERS, "route": route}
+        before = planner.build_for(answers)
+        option = planner.alternatives_for(before, answers, "fall", 2)["options"][0]
+        after = planner.build_for(
+            answers, selections=planner.apply_swap(answers, {}, "fall", 2,
                                                    option["courseId"]))
         changed = [(q["key"], i) for q, qa in zip(before["quarters"], after["quarters"])
                    for i, (a, b) in enumerate(zip(q["courses"], qa["courses"]))
                    if a["courseId"] != b["courseId"]]
-        assert changed == [("fall", 2)]
+        assert changed == [("fall", 2)], route
 
     def test_a_swapped_course_is_marked_as_the_students_choice(self):
         option = self._first_option()
-        plan = planner.build_plan(
+        plan = planner.build_for(
             ANSWERS, selections=planner.apply_swap(ANSWERS, {}, "fall", 2,
                                                    option["courseId"]))
         assert plan["quarters"][1]["courses"][2]["note"] == "your choice"
@@ -417,7 +427,7 @@ class TestSwap:
         for the target slot — otherwise an earlier rule refuses it first and the
         duplicate guard is never reached."""
         by_id = {c["id"]: c for c in load_catalog()}
-        plan = planner.build_plan(ANSWERS)
+        plan = planner.build_for(ANSWERS)
         elsewhere = next(
             (r["courseId"] for q in plan["quarters"] if q["key"] != "fall"
              for r in q["courses"]
@@ -503,10 +513,20 @@ class TestAShortPlanSaysSo:
     them it was complete.
     """
 
-    TAKEN = frozenset({"MGTA 402", "MGTA 457"})
+    # Every 2-unit Fall elective, computed rather than listed: the point of the
+    # fixture is that NOTHING can fill Fall's 2-unit slot, and a hardcoded pair
+    # stopped meaning that the moment the catalog grew past 31 courses.
+    @staticmethod
+    def _all_fall_two_unit():
+        from rsm_thrive.services.electives import load_catalog
+
+        return frozenset(
+            c["id"] for c in load_catalog()
+            if not c["is_core"] and c["units"] == 2
+            and any(o.get("season") == "FA" for o in c.get("offerings") or []))
 
     def test_totals_count_only_what_is_scheduled(self):
-        plan = planner.build_plan(ANSWERS, self.TAKEN)
+        plan = planner.build_plan(ANSWERS, self._all_fall_two_unit())
         scheduled = sum(row["units"] for quarter in plan["quarters"]
                         for row in quarter["courses"] if row["courseId"])
         assert plan["unfilled"], "expected an unfillable slot for this fixture"
@@ -514,13 +534,13 @@ class TestAShortPlanSaysSo:
         assert plan["totals"]["elective"] == 26
 
     def test_a_quarter_reports_the_units_it_holds(self):
-        plan = planner.build_plan(ANSWERS, self.TAKEN)
+        plan = planner.build_plan(ANSWERS, self._all_fall_two_unit())
         for quarter in plan["quarters"]:
             held = sum(row["units"] for row in quarter["courses"] if row["courseId"])
             assert quarter["unitsPlanned"] == held, quarter["key"]
 
     def test_the_markdown_warns_instead_of_claiming_completeness(self):
-        body = planner.render_plan_markdown(planner.build_plan(ANSWERS, self.TAKEN))
+        body = planner.render_plan_markdown(planner.build_plan(ANSWERS, self._all_fall_two_unit()))
         assert "2 units short of the 50" in body
         assert "complete 50-unit plan" not in body
 

@@ -12,9 +12,17 @@ Two stages, which is the same shape the electives bot already uses:
    titles than we will ever curate. It answers with skills, tools and topics --
    NOT with courses, because it does not know our catalog and would invent
    plausible-sounding ones.
-2. **Which of our courses teach that?** Matched here, deterministically, against
-   the catalog's own `skills` / `topics` / `tools` fields. The model never picks
-   a course, so it can never name one that does not exist.
+2. **Which of our courses teach that?** `services/skill_match.py`, the same
+   deterministic matcher the industry route uses. The model never picks a
+   course, so it can never name one that does not exist.
+
+   The matching used to be done here, by `_overlap`, and a second and different
+   implementation lived in `grounded_course_advisor`. They disagreed: on one
+   food-industry requirement set this one returned six courses and that one
+   four, with three courses appearing in only one of them. Worse, `_overlap`
+   accepted a match when every word LONGER THAN THREE CHARACTERS was present,
+   so "cpg analytics" matched on "analytics" alone and picked up four courses
+   on that basis. See `skill_match` for what replaced it and the measurements.
 
 ## It really does search the web
 
@@ -28,9 +36,7 @@ A backend that cannot search still works -- `LLM.search_chat` falls back to
 Degraded, not broken.
 """
 
-import json
-
-from rsm_thrive.services.electives import load_catalog
+from rsm_thrive.services import skill_match
 from rsm_thrive.services.llm import parse_llm_json
 
 ROLE_SYSTEM = (
@@ -47,10 +53,6 @@ ROLE_SYSTEM = (
     "If the input is not a job at all, set known=false and leave the lists "
     "empty.")
 
-# Below this, the match is incidental rather than real -- one shared word
-# between a job and a course means little when both mention "data".
-MIN_MATCH_SCORE = 2
-
 
 def skills_for_role(llm, role_name):
     """What this job needs, as skills/tools/topics. None when it is not a job.
@@ -59,11 +61,19 @@ def skills_for_role(llm, role_name):
     it does not know this catalog and would invent plausible-sounding codes --
     the mapping to real courses happens in `courses_for_role`, where it can only
     return rows that exist.
+
+    The pages behind those skills come back under "sources" whenever the search
+    was ours to run, so the reply can show where it read them. That list is
+    empty, not missing, when the backend searched natively or could not search
+    at all; `cite` renders nothing in either case rather than implying a lookup
+    that did not happen.
     """
+    sources = []
     try:
         raw = llm.search_chat(ROLE_SYSTEM,
                               [{"role": "user", "content": str(role_name)}],
-                              json_mode=True)
+                              json_mode=True, sources_out=sources,
+                              search_query=f"{role_name} job required skills")
     except Exception:
         return None
     parsed = parse_llm_json(raw)
@@ -77,58 +87,40 @@ def skills_for_role(llm, role_name):
     return {
         "role": str(parsed.get("role") or role_name),
         "summary": str(parsed.get("summary") or ""),
+        # What the skills were read off, when we did the reading ourselves.
+        # Empty for a natively-searching backend -- see `LLM.search_chat`.
+        "sources": [{"title": r.title, "url": r.url} for r in sources[:4]],
         **lists,
     }
-
-
-def _course_terms(course):
-    """The catalog's own words for what a course teaches."""
-    parts = []
-    for key in ("skills", "topics", "tools"):
-        parts.extend(str(v).lower() for v in (course.get(key) or []))
-    parts.append(str(course.get("title", "")).lower())
-    parts.append(str(course.get("description", "")).lower())
-    return " ".join(parts)
-
-
-def _overlap(needle, haystack):
-    """Does this requirement appear in what the course teaches?
-
-    Substring in both directions: the catalog says "designing and building
-    interactive dashboards" where a job needs "dashboards", and the job may say
-    "sql" where the catalog says "sql and etl". Neither contains the other
-    exactly, and both are the same skill.
-    """
-    needle = needle.strip()
-    if len(needle) < 3:
-        return False
-    if needle in haystack:
-        return True
-    words = [w for w in needle.split() if len(w) > 3]
-    return bool(words) and all(word in haystack for word in words)
 
 
 def courses_for_role(profile, limit=6):
     """Catalog courses that teach what this job needs, best first.
 
-    Returns [{course, score, matched}] so the reply can say WHY a course is
-    there -- "MGTA 458 for experiment design and A/B testing" is a
-    recommendation; "MGTA 458" is an assertion.
+    Returns [{course, score, matched, reasons}] so the reply can say WHY a
+    course is there -- "MGTA 495 for experiment design and A/B testing" is a
+    recommendation; "MGTA 495" is an assertion.
     """
-    wanted = list(dict.fromkeys(
-        (profile.get("skills") or []) + (profile.get("tools") or [])
-        + (profile.get("topics") or [])))
-    scored = []
-    for course in load_catalog():
-        if course["is_core"]:
-            continue          # nothing to recommend: everyone takes these
-        haystack = _course_terms(course)
-        matched = [need for need in wanted if _overlap(need, haystack)]
-        if len(matched) >= MIN_MATCH_SCORE:
-            scored.append({"course": course, "score": len(matched),
-                           "matched": matched[:4]})
-    scored.sort(key=lambda row: (-row["score"], row["course"]["code"]))
-    return scored[:limit]
+    wanted = ((profile.get("skills") or []) + (profile.get("tools") or [])
+              + (profile.get("topics") or []))
+    fits = skill_match.rank(wanted, limit=limit)
+    return [{"course": fit.course, "score": round(fit.score, 2),
+             "matched": fit.covered[:4],
+             "reasons": skill_match.reasons(fit)}
+            for fit in fits]
+
+
+def coverage_for_role(profile, limit=6):
+    """How much of this job the catalog actually covers. See `skill_match`.
+
+    Re-ranks rather than taking `courses_for_role`'s output, because that
+    flattens each `Fit` into a dict and loses the per-match evidence coverage
+    is computed from. The ranking is deterministic and the catalog is 31 rows,
+    so recomputing it costs nothing and cannot drift from what was recommended.
+    """
+    wanted = ((profile.get("skills") or []) + (profile.get("tools") or [])
+              + (profile.get("topics") or []))
+    return skill_match.coverage(wanted, skill_match.rank(wanted, limit=limit))
 
 
 EXPLAIN_SYSTEM = (
@@ -143,15 +135,26 @@ EXPLAIN_SYSTEM = (
     "closer-fitting role. At most 150 words. Do not use headings.")
 
 
-def explain_fit(llm, profile, matches):
-    """The conversational recommendation, grounded in the matched courses."""
+def explain_fit(llm, profile, matches, cover=None):
+    """The conversational recommendation, grounded in the matched courses.
+
+    The model is handed the matcher's own reasons, phrased in the CATALOG's
+    words, plus what the catalog does not cover. Both halves are given because
+    a recommendation that names only what it found reads as complete, and for a
+    role we have no bundle for it usually is not.
+    """
+    from rsm_thrive.services.planner import display_code
+
     lines = [f"Target role: {profile['role']}",
              f"What it needs: {', '.join(profile.get('skills') or [])}"]
     for row in matches:
         course = row["course"]
         lines.append(
-            f"{course['code']} — {course['title']} ({course['units']} units): "
-            f"covers {', '.join(row['matched'])}")
+            f"{display_code(course)} — {course['title']} ({course['units']} "
+            f"units): {'; '.join(row['reasons'])}")
+    if cover and cover.get("unmet"):
+        lines.append("NOT covered by any of these, say so plainly: "
+                     + ", ".join(cover["unmet"][:5]))
     try:
         return (llm.chat(EXPLAIN_SYSTEM,
                          [{"role": "user", "content": "\n".join(lines)}])
@@ -173,5 +176,15 @@ def recommend_for_unknown_role(llm, role_name):
     matches = courses_for_role(profile)
     if not matches:
         return None, []
-    reply = explain_fit(llm, profile, matches)
-    return (reply or None), matches
+    reply = explain_fit(llm, profile, matches, coverage_for_role(profile))
+    if not reply:
+        return None, matches
+    return f"{reply}{cite(profile)}", matches
+
+
+def cite(profile):
+    """This role's sources line. See `websearch.cite`."""
+    from rsm_thrive.services import websearch
+
+    return websearch.cite(profile.get("sources"),
+                          "What this role needs was read from the web just now")

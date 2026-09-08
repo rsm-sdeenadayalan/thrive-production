@@ -9,6 +9,7 @@ Produces a ranked list with human-readable reasons; the LLM may present or
 lightly adjust this ranking but the base ordering is reproducible.
 """
 import json
+import time
 from functools import lru_cache
 from pathlib import Path
 
@@ -16,21 +17,96 @@ from rsm_thrive.models import Enrollment
 
 _DATA = Path(__file__).resolve().parent.parent / "data" / "catalog"
 
+# The three files that ARE the catalog. Everything derived from them keys its
+# cache on `catalog_version()`.
+_CATALOG_FILES = ("courses.json", "careers.json", "bundles.json")
+
 WORKLOAD_LEVEL = {"light": 1, "moderate": 2, "heavy": 3}
 
+# How long a version check is trusted. See `catalog_version`.
+_VERSION_TTL = 1.0
+_VERSION_MEMO = (0.0, None)
 
-@lru_cache(maxsize=1)
-def load_catalog():
+
+def catalog_version():
+    """A token that changes when any catalog file does.
+
+    Every lookup built on these files is cached -- the catalog is 31 rows read
+    thousands of times a request -- and they were cached FOREVER, keyed on
+    nothing. Editing `careers.json` therefore did nothing at all until someone
+    restarted the process, and Django's autoreloader only watches `.py` files
+    so nothing prompted them to. Found the hard way: two roles were made
+    nameable, the change was verified by unit tests, and the running server
+    went on failing on the live sweep because it still held the old file.
+
+    The catalog is the source of truth that programme staff edit, so "it takes
+    effect when someone remembers to restart" is not a workable contract.
+
+    Modification time in NANOSECONDS, because two edits inside the same second
+    are ordinary during a working session and a whole-second clock would miss
+    the second one. A missing file reads as 0 rather than raising: the caller
+    is about to open it and will produce a better error than this can.
+
+    The stat itself is memoised for `_VERSION_TTL`. Three stats is 10
+    microseconds, which reads as free until you notice where this is called
+    from: `bundles._by_id` sits inside the combinatorial placement search, so
+    "once per catalog lookup" is tens of thousands of times per plan. Measured,
+    the unmemoised version took the test suite from 8.7s to 15.1s. A second of
+    staleness is a fair trade for a file a human edits by hand; `forget_catalog`
+    is there for anything that cannot wait.
+    """
+    now = time.monotonic()
+    checked_at, version = _VERSION_MEMO
+    if version is not None and now - checked_at < _VERSION_TTL:
+        return version
+    version = _stat_version()
+    # A benign race: two threads may both stat and both assign. They compute
+    # the same tuple, and the assignment is atomic, so no lock is needed for
+    # something read on every catalog lookup.
+    _set_version_memo(now, version)
+    return version
+
+
+def _stat_version():
+    return tuple(
+        (_DATA / name).stat().st_mtime_ns if (_DATA / name).exists() else 0
+        for name in _CATALOG_FILES)
+
+
+def _set_version_memo(checked_at, version):
+    global _VERSION_MEMO
+    _VERSION_MEMO = (checked_at, version)
+
+
+def forget_catalog():
+    """Drop every cached read of the catalog files. For tests, and for a
+    process that has just written one and wants the change NOW rather than
+    within `_VERSION_TTL`."""
+    _set_version_memo(0.0, None)
+    for cached in (_load_catalog, _load_careers, _role_aliases_for):
+        cached.cache_clear()
+
+
+@lru_cache(maxsize=4)
+def _load_catalog(_version):
     return json.loads((_DATA / "courses.json").read_text())
 
 
-@lru_cache(maxsize=1)
-def load_careers():
+def load_catalog():
+    return _load_catalog(catalog_version())
+
+
+@lru_cache(maxsize=4)
+def _load_careers(_version):
     return json.loads((_DATA / "careers.json").read_text())
 
 
-@lru_cache(maxsize=1)
-def _role_aliases():
+def load_careers():
+    return _load_careers(catalog_version())
+
+
+@lru_cache(maxsize=4)
+def _role_aliases_for(_version):
     """Old role id -> the profile that absorbed it.
 
     The taxonomy moved from ten roles to the design document's fourteen
@@ -43,6 +119,10 @@ def _role_aliases():
     return {old: new
             for new, role in load_careers().items()
             for old in role.get("legacy_ids") or []}
+
+
+def _role_aliases():
+    return _role_aliases_for(catalog_version())
 
 
 def resolve_role(role_id):
@@ -68,6 +148,19 @@ workload difficulty hard easy technical topic topics skill skills tool tools
 take taking enrol enroll enrolled study learn cover covers
 """.split())
 
+# Function words. Not course vocabulary, and not rare enough to be caught by
+# `COMMON_TERM_SHARE` either -- "what" appears in exactly one description
+# ("what-if analysis"), so a question made only of function words was returning
+# that one course as though it were the answer. A closed set is the right shape
+# here precisely because it IS closed: interrogatives and auxiliaries do not
+# grow the way subject vocabulary does.
+QUESTION_WORDS = frozenset("""
+what which where when whos whose does have has had you your yours they them
+their there here this that these those about with from into onto some many
+much more most tell show list give offer offers access available able need
+want like know anything everything something please thanks help
+""".split())
+
 _COURSE_CODE = __import__("re").compile(r"\b([A-Z]{2,4})\s*(\d{3}[A-Z]?)\b", __import__("re").IGNORECASE)
 
 
@@ -82,15 +175,25 @@ def _searchable(course):
              course.get("description", ""), course.get("department", ""),
              course.get("workload", "")]
     parts.extend(spelled.get(season, "") for season in seasons if season)
+    # The OTHER names Rady's own pages use. A student reading the electives page
+    # sees "CSE 250B" and types that; without this the catalog has no idea what
+    # they mean, even though it carries the course under its new number.
+    parts.extend(course.get("also_known_as") or [])
     for key in ("topics", "skills", "tools", "career_tags"):
         parts.extend(course.get(key) or [])
     return " ".join(parts).lower()
 
 
+# A term appearing in more than this share of the catalog cannot distinguish
+# one course from another, so it is dropped from a search rather than allowed
+# to return six of whatever it matched first.
+COMMON_TERM_SHARE = 0.25
+
+
 def search_catalog(question, limit=6):
     """Courses this question is plausibly about, best first.
 
-    Deterministic term overlap rather than embeddings: the catalog is 31 rows,
+    Deterministic term overlap rather than embeddings: the catalog is ~90 rows,
     the fields are short and specific, and a student asking about "Tableau" or
     "fraud" is naming something that appears literally. A vector search over
     thirty items would add a dependency and a failure mode to a lookup.
@@ -105,7 +208,11 @@ def search_catalog(question, limit=6):
     for department, number in _COURSE_CODE.findall(question or ""):
         named.add(f"{department.upper()} {number.upper()}")
     if named:
-        hits = [c for c in catalog if c["code"].upper() in named]
+        # Match on the course's own code OR any name it also goes by, so an old
+        # or cross-listed number lands on the course that actually exists.
+        hits = [c for c in catalog
+                if c["code"].upper() in named
+                or named & {a.upper() for a in (c.get("also_known_as") or [])}]
         if hits:
             return hits
 
@@ -117,13 +224,35 @@ def search_catalog(question, limit=6):
         return []
 
     terms = {word.strip(".,/-?!") for word in text.split()}
-    terms = {t for t in terms if len(t) > 3 and t not in COURSE_WORDS}
+    terms = {t for t in terms
+             if len(t) > 3 and t not in COURSE_WORDS
+             and t not in QUESTION_WORDS}
     if not terms:
         return []
 
+    haystacks = {course["code"]: _searchable(course) for course in catalog}
+
+    # A term that matches most of the catalog is not a search term. "What
+    # courses do you have" leaves {"what", "have"} after the stoplist, and both
+    # appear in enough descriptions to return six arbitrary rows -- which is how
+    # a question the WHOLE catalog answers started being answered by a handful
+    # of it instead. Harmless while the catalog was 31 short rows; wrong the
+    # moment it grew. A stoplist would be whack-a-mole, so the test is
+    # proportional rather than lexical, and it is the same reasoning
+    # `skill_match.discriminations` applies to skills.
+    ceiling = max(2, int(len(catalog) * COMMON_TERM_SHARE))
+    distinctive = {t for t in terms
+                   if sum(1 for h in haystacks.values() if t in h) <= ceiling}
+    # Only when something SURVIVES. A common term is worth dropping next to a
+    # rarer one; on its own it is the whole question. "Which electives are
+    # offered in winter" leaves {"winter"}, which is common precisely because
+    # the student is asking about something many courses share -- dropping it
+    # would answer a season question with nothing.
+    terms = distinctive or terms
+
     scored = []
     for course in catalog:
-        haystack = _searchable(course)
+        haystack = haystacks[course["code"]]
         hits = sum(1 for term in terms if term in haystack)
         if hits:
             scored.append((hits, course["code"], course))
@@ -158,6 +287,8 @@ DEPARTMENT_LABELS = {
     "MGT": ("Rady MBA",
             "pre-approved MSBA electives; enrolment by consent"),
     "MGTF": ("Rady MS Finance (MFin)",
+             "pre-approved MSBA electives; enrolment by consent"),
+    "MGTP": ("Rady MPAc (Master of Professional Accountancy)",
              "pre-approved MSBA electives; enrolment by consent"),
 }
 

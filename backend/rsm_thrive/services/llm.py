@@ -28,16 +28,46 @@ class LLM(ABC):
     def chat(self, system: str, messages: list, json_mode: bool = False) -> str:
         """messages: [{"role": "user"|"assistant", "content": str}, ...] -> reply text."""
 
-    def search_chat(self, system: str, messages: list, json_mode: bool = False) -> str:
-        """Like `chat`, but the model may look things up on the web.
+    def search_chat(self, system: str, messages: list, json_mode: bool = False,
+                    sources_out: list = None, search_query: str = None) -> str:
+        """Like `chat`, but grounded in pages fetched now rather than in memory.
 
         Separate from `chat` rather than a flag on it, because it is a different
-        promise: slower, and grounded in something outside this codebase. A
-        backend that cannot search answers exactly as `chat` does, so a caller
-        gets the model's own knowledge instead of an error -- degraded, not
-        broken.
+        promise: slower, and grounded in something outside this codebase.
+
+        A backend with no search of its own keeps that promise here, by having
+        `websearch` do the lookup and appending what it found to the system
+        prompt. Only `CodexOAuthLLM` overrides this, because OpenAI hosts a real
+        agent loop and a loop the provider runs beats one bolted on from
+        outside. Everything else -- TritonAI included, which is what deployment
+        runs -- arrives at this method, and before it existed arrived at a
+        fallback that answered from training data while the prompt claimed
+        current sources.
+
+        `search_query` overrides what gets looked up. The default -- the last
+        user turn -- is right when that turn IS the subject, as it is for
+        `role_lookup`. It is wrong when the turn is a request wrapped around
+        the subject: "what should I take if I want to work in esports?"
+        searched verbatim returns Udemy and Coursera listings, because the
+        student's own words are about COURSES, while the prompt those results
+        ground asks what the field HIRES for. A caller that knows the subject
+        says so.
+
+        `sources_out`, when given a list, receives the `websearch.Result`s the
+        answer was grounded in, so a caller can cite them. It stays EMPTY for a
+        backend that searched natively: those pages are the provider's and we
+        never see them, and an empty list is the honest way to say we cannot
+        show our work. Search failing, or being switched off, is not an error --
+        the answer degrades to the model's own knowledge, exactly as before.
         """
-        return self.chat(system, messages, json_mode)
+        from rsm_thrive.services import websearch
+
+        results = websearch.search(search_query or websearch.query_from(messages))
+        if not results:
+            return self.chat(system, messages, json_mode)
+        if sources_out is not None:
+            sources_out.extend(results)
+        return self.chat(websearch.ground(system, results), messages, json_mode)
 
 
 class FakeLLM(LLM):
@@ -294,7 +324,13 @@ class CodexOAuthLLM(LLM):
         self._model = model or getattr(settings, "CODEX_MODEL", "gpt-5.4")
         self._effort = reasoning_effort
 
-    def search_chat(self, system: str, messages: list, json_mode: bool = False) -> str:
+    def search_chat(self, system: str, messages: list, json_mode: bool = False,
+                    sources_out: list = None, search_query: str = None) -> str:
+        """Native search: OpenAI runs the loop, so `websearch` is not used here.
+
+        `sources_out` is accepted and left untouched. The pages behind a hosted
+        search are never handed back, so there is nothing truthful to put in it.
+        """
         return self.chat(system, messages, json_mode, search=True)
 
     def chat(self, system: str, messages: list, json_mode: bool = False,

@@ -34,7 +34,8 @@ import json
 from functools import lru_cache
 from pathlib import Path
 
-from rsm_thrive.services.electives import load_catalog, resolve_role
+from rsm_thrive.services.electives import (catalog_version, load_catalog,
+                                            resolve_role)
 
 _DATA = Path(__file__).resolve().parent.parent / "data" / "catalog"
 
@@ -43,12 +44,18 @@ _DATA = Path(__file__).resolve().parent.parent / "data" / "catalog"
 PRE_PLACED = frozenset({"MGTA 403", "MGTA 464"})
 
 
-@lru_cache(maxsize=1)
-def load_bundles():
-    """Profile id -> {anchor, differentiator, universal}. Keys starting with
-    `_` are documentation, not profiles."""
+@lru_cache(maxsize=4)
+def _load_bundles(_version):
     raw = json.loads((_DATA / "bundles.json").read_text())
     return {key: value for key, value in raw.items() if not key.startswith("_")}
+
+
+def load_bundles():
+    """Profile id -> {anchor, differentiator, universal}. Keys starting with
+    `_` are documentation, not profiles.
+
+    Re-read when the file changes -- see `electives.catalog_version`."""
+    return _load_bundles(catalog_version())
 
 
 def bundle_for(role_id):
@@ -57,9 +64,13 @@ def bundle_for(role_id):
     return load_bundles().get(resolved) if resolved else None
 
 
-@lru_cache(maxsize=1)
-def _by_id():
+@lru_cache(maxsize=4)
+def _by_id_for(_version):
     return {course["id"]: course for course in load_catalog()}
+
+
+def _by_id():
+    return _by_id_for(catalog_version())
 
 
 def _seasons(course_id):
@@ -71,18 +82,38 @@ def _units(course_id):
     return (_by_id().get(course_id) or {}).get("units", 0)
 
 
-def _quarter_budgets(skeleton):
-    """(key, season, elective units) per quarter, from the published totals.
+def _quarter_budgets(skeleton, track):
+    """Per quarter: its elective budget, and how far that may legally move.
 
-    Derived rather than read off the slots, because the slot shape is what this
-    module replaces -- the budget is the part the plan of study actually states.
+    The budget is derived rather than read off the slots, because the slot
+    shape is what this module replaces -- the budget is the part the plan of
+    study actually states.
+
+    `floor` and `ceiling` are the real limits on a quarter's ELECTIVE room,
+    got by taking the quarter's own total bounds (`adjustable_quarters`, which
+    encodes the 12-unit graduate minimum, the 18-unit cap and the short
+    finishing term's own floor) and subtracting what its core courses cost.
+    `QUARTER_FLEX` is then applied INSIDE them.
+
+    Without the clamp the flex was free to run a quarter two units under its
+    budget with nothing to stop it going under the enrolment minimum too:
+    measured by the plan sweep, a light Fall on the 17-month track came back
+    at 10 units, which is below the load a graduate student may enrol in.
     """
+    from rsm_thrive.services.planner import adjustable_quarters
+
+    bounds = {q["key"]: q for q in adjustable_quarters(track)}
     budgets = []
     for quarter in skeleton:
         spent = sum(_units(slot["course_id"]) for slot in quarter["slots"]
                     if slot["kind"] in ("core", "fixed"))
-        budgets.append((quarter["key"], quarter["season"],
-                        quarter["units"] - spent))
+        room = bounds.get(quarter["key"])
+        budgets.append({
+            "key": quarter["key"], "season": quarter["season"],
+            "budget": quarter["units"] - spent,
+            "floor": max(0, room["min"] - spent) if room else quarter["units"] - spent,
+            "ceiling": (room["max"] - spent) if room else quarter["units"] - spent,
+        })
     return budgets
 
 
@@ -103,20 +134,24 @@ def _quarter_budgets(skeleton):
 QUARTER_FLEX = 2
 
 
-def _place(courses, budgets):
+def _place(courses, budgets, flex=None):
     """Assign courses to quarters, or None if this set cannot be scheduled.
 
-    The total must be spent exactly; each quarter may vary by `QUARTER_FLEX`.
-    Most-constrained course first (fewest seasons, then largest), which keeps
-    the search small enough to be exhaustive.
+    The total must be spent exactly; each quarter may vary by `flex`, which
+    defaults to `QUARTER_FLEX`. Most-constrained course first (fewest seasons,
+    then largest), which keeps the search small enough to be exhaustive.
     """
+    if flex is None:
+        flex = QUARTER_FLEX
     order = sorted(courses, key=lambda c: (len(_seasons(c)), -_units(c)))
-    assigned = {key: [] for key, _season, _budget in budgets}
-    load = {key: 0 for key, _season, _budget in budgets}
-    ceiling = {key: budget + QUARTER_FLEX for key, _season, budget in budgets}
-    floor = {key: max(0, budget - QUARTER_FLEX)
-             for key, _season, budget in budgets}
-    season_of = {key: season for key, season, _budget in budgets}
+    assigned = {row["key"]: [] for row in budgets}
+    load = {row["key"]: 0 for row in budgets}
+    # The flex applies INSIDE each quarter's legal range, never outside it.
+    ceiling = {row["key"]: min(row["budget"] + flex, row["ceiling"])
+               for row in budgets}
+    floor = {row["key"]: max(row["budget"] - flex, row["floor"], 0)
+             for row in budgets}
+    season_of = {row["key"]: row["season"] for row in budgets}
 
     def recurse(index):
         if index == len(order):
@@ -138,7 +173,21 @@ def _place(courses, budgets):
     return assigned if recurse(0) else None
 
 
-def choose_courses(role_id, track, taken_ids=frozenset()):
+def _rebudgeted(skeleton, wanted_units):
+    """The published skeleton with each quarter's TOTAL set to the chosen load.
+
+    Only the totals move; the core and fixed slots are copied through
+    untouched. `_quarter_budgets` then derives each quarter's elective room
+    from the total the student actually chose rather than from the published
+    one, which is what makes a bundle and a light or heavy spread coexist.
+    """
+    if not wanted_units:
+        return skeleton
+    return [{**quarter, "units": wanted_units.get(quarter["key"], quarter["units"])}
+            for quarter in skeleton]
+
+
+def choose_courses(role_id, track, taken_ids=frozenset(), wanted_units=None):
     """The bundle's courses for one track, sized to fit and placeable.
 
     Anchor and universal are mandatory -- they are what makes the plan that
@@ -159,8 +208,8 @@ def choose_courses(role_id, track, taken_ids=frozenset()):
     if not bundle or skeleton is None:
         return None, None
 
-    budgets = _quarter_budgets(skeleton)
-    target = sum(units for _key, _season, units in budgets)
+    budgets = _quarter_budgets(_rebudgeted(skeleton, wanted_units), track)
+    target = sum(row["budget"] for row in budgets)
 
     def usable(course_id):
         return (course_id in _by_id() and course_id not in PRE_PLACED
@@ -176,32 +225,56 @@ def choose_courses(role_id, track, taken_ids=frozenset()):
     if needed < 0:
         return None, None
 
+    # Exact per-quarter loads FIRST, then with the flex.
+    #
+    # The flex exists because exact fill places only 5 of 14 bundles on the
+    # 11-month track and 1 of 14 on the 17-month. But it is a concession, not a
+    # preference: once the curated bundle became the default fill, every
+    # student was getting a plan whose quarters could sit 2 units off the load
+    # they had just chosen, including the ones where an exact fit was available
+    # all along. Trying 0 first costs one extra search over a space small
+    # enough to be exhaustive, and `flex_used` lets the plan say when the
+    # concession was actually taken.
+    #
     # Smallest addition first: the anchor is the profile, so a bundle that
     # closes on fewer differentiators is the more faithful one.
-    for count in range(len(optional) + 1):
-        for combination in itertools.combinations(optional, count):
-            if sum(_units(c) for c in combination) != needed:
-                continue
-            courses = required + list(combination)
-            placement = _place(courses, budgets)
-            if placement is not None:
-                return courses, placement
+    for flex in (0, QUARTER_FLEX):
+        for count in range(len(optional) + 1):
+            for combination in itertools.combinations(optional, count):
+                if sum(_units(c) for c in combination) != needed:
+                    continue
+                courses = required + list(combination)
+                placement = _place(courses, budgets, flex)
+                if placement is not None:
+                    return courses, placement
     return None, None
 
 
-def skeleton_for(role_id, track, taken_ids=frozenset()):
+def skeleton_for(role_id, track, taken_ids=frozenset(), wanted_units=None):
     """`TRACK_SKELETONS[track]`, with elective slots shaped to this bundle.
 
     Core and fixed slots are copied through untouched -- the published sequence
     is not this module's to change. Only the elective slots are replaced, by
     one slot per bundle course sized to that course.
+
+    `wanted_units` is the student's chosen per-quarter load, and threading it
+    through is what stops a bundle and a load spread destroying each other.
+    Without it the shape was derived from the PUBLISHED budgets and then
+    `planner._resized` re-cut it to the chosen ones -- which discards the sizes
+    the pinned courses need. Measured by the plan sweep: a curated role with a
+    heavy spread on the 17-month track came back with 26 elective units instead
+    of 28, i.e. a 48-unit degree plan.
+
+    Each shaped quarter also carries the chosen total, so `_resized` sees a
+    skeleton already at the target and leaves it alone.
     """
     from rsm_thrive.services.planner import TRACK_SKELETONS
 
     skeleton = TRACK_SKELETONS.get(track)
     if skeleton is None:
         return None, None, None
-    courses, placement = choose_courses(role_id, track, taken_ids)
+    skeleton = _rebudgeted(skeleton, wanted_units)
+    courses, placement = choose_courses(role_id, track, taken_ids, wanted_units)
     if courses is None:
         return None, None, None
 
@@ -219,6 +292,40 @@ def skeleton_for(role_id, track, taken_ids=frozenset()):
                 str(len(slots) - 1)] = course_id
         shaped.append({**quarter, "slots": slots})
     return shaped, selections, courses
+
+
+def absent(plan, role_id):
+    """Bundle courses this plan does NOT contain, by layer.
+
+    `divergence` answers a narrower question -- which ANCHOR courses a student
+    has swapped away from -- and answering only that hid a second way to lose
+    part of a bundle. A light or heavy load spread re-cuts every quarter's
+    elective slots (`planner._resized`), and a bundle whose universal layer is
+    two 2-unit courses can come out of that with nowhere to put them:
+    measured, a light spread on the 11-month Data Scientist bundle dropped
+    MGTA 402 and MGTA 460 and filled the space with a scored pick, and
+    `divergence` reported nothing because neither is an anchor.
+
+    Returns {} for a bundle that is fully present, so a caller can treat it as
+    "nothing to say".
+    """
+    bundle = bundle_for(role_id)
+    if not bundle:
+        return {}
+    present = {row["courseId"] for quarter in plan["quarters"]
+               for row in quarter["courses"] if row.get("courseId")}
+    catalog = _by_id()
+    out = {}
+    for layer in ("anchor", "differentiator", "universal"):
+        missing = [catalog[c]["code"] for c in (bundle.get(layer) or [])
+                   if c not in present and c not in PRE_PLACED and c in catalog]
+        if missing:
+            out[layer] = missing
+    # The differentiator layer is a MENU, not a checklist -- a bundle lists
+    # more of them than a plan has room for, so some are always absent and
+    # saying so every time would be noise.
+    out.pop("differentiator", None)
+    return out
 
 
 def divergence(plan, role_id):

@@ -165,18 +165,40 @@ class TestRetrieve:
         [group] = expand_terms(["zooom"], frozenset({"zoom", "unrelated"}))
         assert group == frozenset({"zooom", "zoom"})
 
-    def test_lexical_floor_refuses_a_single_word_match_at_absurd_similarity(self):
+    def test_a_one_word_question_needs_the_chunk_to_be_about_that_word(self):
         """The "who is the president" leak: one common word present in a chunk
-        is not evidence the chunk answers the question."""
+        is not evidence the chunk answers the question.
+
+        This used to depend entirely on `lexical_floor`, and the floor could not
+        do the job. Measured on the real corpus, "What is 2 plus 2?" -- which
+        survives stopword stripping as {"plus"} -- scored cosine 0.256 while the
+        misspelling "imunizations" scored 0.104. Any floor that refused the
+        first refused the second, so the bot cited a course on prescriptive
+        analytics as the source for "2 plus 2 is 4" and answered nothing at all
+        for a typo. A one-word question is now admitted on whether the term
+        names what the document is ABOUT, which separates them cleanly.
+        """
         _doc("crawled#fellow", "Fellowships", "scraped", ["resources"], [
             ("Awards", "Nominations are endorsed by the university president."),
         ])
-        # No floor: the word alone opens the gate however unrelated the chunk.
+        # Mentioned in passing, in a document about something else. Refused now
+        # on its own merits, with no floor needed.
         assert retrieve("president", "resources", top_k=5, min_similarity=0.99,
-                        lexical_min=1.0) != []
-        # With a floor, the same match is refused.
+                        lexical_min=1.0) == []
         assert retrieve("president", "resources", top_k=5, min_similarity=0.99,
                         lexical_min=1.0, lexical_floor=0.99) == []
+
+    def test_a_one_word_question_is_answered_when_it_names_the_subject(self):
+        """The other half: closing the leak must not close typo repair.
+
+        A misspelling embeds badly however clearly it is meant, so this match
+        has to survive a cosine floor it cannot possibly clear.
+        """
+        _doc("crawled#immun", "Immunizations", "scraped", ["resources"], [
+            ("Requirements", "Entering students must submit immunization records."),
+        ])
+        assert retrieve("immunizations", "resources", top_k=5, min_similarity=0.99,
+                        lexical_min=1.0, lexical_floor=0.99) != []
 
     def test_lexical_floor_defaults_to_letting_the_tier_through(self):
         _doc("canvas#zoom", "Zoom Setup", "policy", ["resources"], [
