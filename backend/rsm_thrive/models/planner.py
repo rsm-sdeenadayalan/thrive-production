@@ -71,6 +71,28 @@ class PlannerSession(models.Model):
     # on" is state, and reading it back out of prose is exactly the guesswork
     # that made the interview lose its place.
     review = models.JSONField(null=True, blank=True, default=None)
+    # What this conversation has established about where the student IS:
+    # {"track": ..., "start_from": ..., "previous_track": ...}. Null until the
+    # situational route resolves something.
+    #
+    # Its own field rather than a key inside `intake`, because it is not an
+    # interview answer: `intake` is handed straight to `planner.build_for` and
+    # saved onto `CoursePlan`, and smuggling a private key through both means
+    # every consumer of an intake has to know to ignore it. Keeping it separate
+    # is also what stops the follow-up loop it exists to prevent -- asked for a
+    # track and then for a quarter, the second turn states only the quarter,
+    # and without somewhere to keep the first answer the route asks for the
+    # track again forever.
+    situation = models.JSONField(null=True, blank=True, default=None)
+    # Questions this conversation has already put to the student, by key.
+    #
+    # There is only one, and it still needs recording. The load preference is
+    # asked once before the plan is built; without a record of having asked,
+    # a student who replies with something else -- a question, a course code --
+    # gets asked it again on the next turn that would build a plan, forever.
+    # An interview with no exit is the thing being removed, so the exit is
+    # stored rather than inferred.
+    asked = models.JSONField(default=list, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
