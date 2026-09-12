@@ -28,6 +28,30 @@ def is_thrive_faculty(user) -> bool:
     return is_thrive_admin(user) or user.groups.filter(name=FACULTY_GROUP).exists()
 
 
+class FacultyOrAdmin:
+    """Mixin for surfaces faculty and admins share (e.g. answer review).
+
+    Faculty and admins may view and make the narrow change the surface allows
+    (adding a correction); only admins may delete. Adding new parent rows is
+    off (you review turns, you don't create them).
+    """
+
+    def has_module_permission(self, request):
+        return is_thrive_faculty(request.user)
+
+    def has_view_permission(self, request, obj=None):
+        return is_thrive_faculty(request.user)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return is_thrive_faculty(request.user)
+
+    def has_delete_permission(self, request, obj=None):
+        return is_thrive_admin(request.user)
+
+
 class AdminOnly:
     """Mixin for ModelAdmins only THRIVE Admins may use.
 

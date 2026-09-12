@@ -7,7 +7,7 @@ from rsm_thrive.models import (Assignment, Course, CourseMeeting, CoursePlan,
                                PlannerSession, ProgramPhaseRow, StudentAssignment,
                                Syllabus)
 
-from .base import ConsoleModelAdmin
+from .base import ConsoleModelAdmin, FacultyReadableConsoleAdmin
 
 
 class CourseMeetingInline(admin.TabularInline):
@@ -21,7 +21,7 @@ class AssignmentInline(admin.TabularInline):
 
 
 @admin.register(Course)
-class CourseAdmin(ConsoleModelAdmin):
+class CourseAdmin(FacultyReadableConsoleAdmin):
     list_display = ("code", "title", "instructor", "term", "units")
     list_filter = ("term",)
     search_fields = ("code", "title", "instructor")
@@ -29,7 +29,7 @@ class CourseAdmin(ConsoleModelAdmin):
 
 
 @admin.register(Syllabus)
-class SyllabusAdmin(ConsoleModelAdmin):
+class SyllabusAdmin(FacultyReadableConsoleAdmin):
     list_display = ("course", "last_updated", "source_url")
     search_fields = ("course__code", "course__title")
 
