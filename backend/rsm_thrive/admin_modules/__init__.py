@@ -21,5 +21,26 @@ ADMIN_GROUP = "THRIVE Admin"
 FACULTY_GROUP = "THRIVE Faculty"
 
 # Submodules register on import; each registers its own models/views.
-from . import (academic, careers, content, knowledge, oversight,  # noqa: E402,F401
-               people, scheduling)
+from . import (academic, careers, content, knowledge, operations,  # noqa: E402,F401
+               oversight, people, scheduling)
+
+
+def _register_remaining_models():
+    """Completeness guarantee: any rsm_thrive model a submodule didn't register
+    explicitly still gets a console admin, so the backend covers the WHOLE
+    system (and any model added later) with no silent gaps."""
+    from django.apps import apps as _apps
+    from django.contrib.admin.sites import AlreadyRegistered
+
+    from .base import ConsoleModelAdmin
+
+    for model in _apps.get_app_config("rsm_thrive").get_models():
+        if admin.site.is_registered(model):
+            continue
+        try:
+            admin.site.register(model, ConsoleModelAdmin)
+        except AlreadyRegistered:
+            pass
+
+
+_register_remaining_models()
