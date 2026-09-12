@@ -34,3 +34,39 @@ def test_admin_index_denies_anonymous():
 def _client():
     from django.test import Client
     return Client()
+
+
+@pytest.mark.django_db
+def test_console_groups_exist():
+    from django.contrib.auth.models import Group
+    assert Group.objects.filter(name="THRIVE Admin").exists()
+    assert Group.objects.filter(name="THRIVE Faculty").exists()
+
+
+@pytest.mark.django_db
+def test_role_helpers_distinguish_admin_faculty_plain():
+    from django.contrib.auth.models import Group
+    from rsm_thrive.admin_modules.access import is_thrive_admin, is_thrive_faculty
+
+    User = get_user_model()
+    admin_group = Group.objects.get(name="THRIVE Admin")
+    faculty_group = Group.objects.get(name="THRIVE Faculty")
+
+    superuser = User.objects.create_user("su", is_superuser=True, is_staff=True)
+    admin_user = User.objects.create_user("admin1", is_staff=True)
+    admin_user.groups.add(admin_group)
+    faculty_user = User.objects.create_user("faculty1", is_staff=True)
+    faculty_user.groups.add(faculty_group)
+    plain = User.objects.create_user("plain1", is_staff=True)
+
+    # Admin role: superuser and Admin-group members only.
+    assert is_thrive_admin(superuser)
+    assert is_thrive_admin(admin_user)
+    assert not is_thrive_admin(faculty_user)
+    assert not is_thrive_admin(plain)
+
+    # Faculty role is a superset: admins count as faculty for read access.
+    assert is_thrive_faculty(superuser)
+    assert is_thrive_faculty(admin_user)
+    assert is_thrive_faculty(faculty_user)
+    assert not is_thrive_faculty(plain)
