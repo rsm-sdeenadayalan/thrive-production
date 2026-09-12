@@ -1,0 +1,39 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<div id="content-main">
+  <h1>Content management</h1>
+  <p>Edit the catalog the bots plan from, and re-ingest the corpus they answer
+  from. Catalog edits go live immediately; corpus edits take effect after a
+  re-ingest.</p>
+
+  <div class="module">
+    <h2>Catalog</h2>
+    <ul>
+      {% for f in catalog_files %}
+        <li><a href="{% url 'admin:content_catalog_edit' f %}">{{ f }}</a></li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="module">
+    <h2>Corpus re-ingest</h2>
+    <form method="post" action="{% url 'admin:content_corpus_reingest' %}">
+      {% csrf_token %}
+      <p>
+        <label>Directory:
+          <select name="directory">
+            <option value="">— none —</option>
+            {% for d in corpus_dirs %}<option value="{{ d }}">{{ d }}</option>{% endfor %}
+          </select>
+        </label>
+      </p>
+      <p><label><input type="checkbox" name="catalog"> also re-ingest the catalog (<code>--catalog</code>)</label></p>
+      <p><label><input type="checkbox" name="rescope"> visibility only, no re-embed (<code>--rescope</code>)</label></p>
+      <p><button type="submit" class="default">Re-ingest</button></p>
+      <p class="help">Re-ingest runs synchronously and re-embeds on the configured
+      backend. On the deployed service this must be the production embedding
+      provider so vectors match the stored chunks.</p>
+    </form>
+  </div>
+</div>
+{% endblock %}

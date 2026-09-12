@@ -20,5 +20,6 @@ admin.site.index_title = "Program administration"
 ADMIN_GROUP = "THRIVE Admin"
 FACULTY_GROUP = "THRIVE Faculty"
 
-# Submodules register on import. Content/oversight land in later increments.
-from . import academic, careers, knowledge, people, scheduling  # noqa: E402,F401
+# Submodules register on import. Oversight/answer-review land in later increments.
+from . import (academic, careers, content, knowledge, people,  # noqa: E402,F401
+               scheduling)
