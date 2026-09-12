@@ -70,3 +70,35 @@ def test_role_helpers_distinguish_admin_faculty_plain():
     assert is_thrive_faculty(admin_user)
     assert is_thrive_faculty(faculty_user)
     assert not is_thrive_faculty(plain)
+
+
+def test_core_models_are_registered():
+    from django.contrib import admin as dj_admin
+    from rsm_thrive.models import (Advisor, Appointment, Course, CourseRequest,
+                                   Document, DocumentChunk, Enrollment, Event,
+                                   JobPosting, ResourceLink, StudentProfile,
+                                   Syllabus)
+    for model in (Course, Enrollment, Syllabus, Document, DocumentChunk,
+                  ResourceLink, Advisor, Appointment, Event, JobPosting,
+                  StudentProfile, CourseRequest):
+        assert dj_admin.site.is_registered(model), model
+
+
+@pytest.mark.django_db
+def test_admin_opens_changelist_plain_staff_blocked():
+    from django.contrib.auth.models import Group
+    from django.urls import reverse
+
+    User = get_user_model()
+    url = reverse("admin:rsm_thrive_course_changelist")
+
+    admin_user = User.objects.create_user("adm2", is_staff=True)
+    admin_user.groups.add(Group.objects.get(name="THRIVE Admin"))
+    admin_client = _client()
+    admin_client.force_login(admin_user)
+    assert admin_client.get(url).status_code == 200
+
+    plain = User.objects.create_user("plainstaff2", is_staff=True)
+    plain_client = _client()
+    plain_client.force_login(plain)
+    assert plain_client.get(url).status_code == 403
