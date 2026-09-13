@@ -224,3 +224,46 @@ class TestRetrieve:
                         top_k=2, min_similarity=0.0)
         assert len(hits) == 2
         assert hits[0][1] >= hits[1][1]
+
+
+class TestTheCorpusCache:
+    """`retrieve` scores from a process-level snapshot of the corpus rather
+    than reloading 5,889 chunks and 67 MB of vectors per query -- measured,
+    582 ms down to 9 ms. The snapshot must never be the wrong corpus."""
+
+    def test_a_changed_corpus_is_seen_on_the_next_query(self):
+        from rsm_thrive.services import retrieval
+        _doc("a#1", "Pantry", "policy", ["resources"], [
+            ("Pantry", "The Hub pantry shares a recipe box with students."),
+        ])
+        assert retrieve("recipe box", "resources", top_k=5,
+                        min_similarity=0.99, lexical_min=1.0) != []
+        # A second document lands. No forget_corpus() call: the fingerprint
+        # alone has to notice.
+        _doc("a#2", "Zoom", "policy", ["resources"], [
+            ("Zoom", "Activate your UCSD Zoom Pro account before class."),
+        ])
+        hits = retrieve("zoom pro account", "resources", top_k=5,
+                        min_similarity=0.99, lexical_min=1.0)
+        assert hits and hits[0][0].document.title == "Zoom"
+
+    def test_the_cache_returns_real_chunk_rows(self):
+        """Callers read `chunk.document.title` and `source_url` to cite. The
+        cache changes how the ranking is computed, not what comes back."""
+        from rsm_thrive.models import DocumentChunk
+        _doc("a#3", "Laptops", "policy", ["resources"], [
+            ("Laptops", "Laptop loans are handled by the tech desk."),
+        ])
+        (chunk, similarity), = retrieve("laptop loans tech desk", "resources",
+                                        top_k=1, min_similarity=0.99,
+                                        lexical_min=1.0)
+        assert isinstance(chunk, DocumentChunk)
+        assert chunk.document.title == "Laptops"
+        assert isinstance(similarity, float)
+
+    def test_a_destination_with_no_documents_returns_nothing(self):
+        _doc("a#4", "Only careers", "policy", ["career"], [
+            ("X", "Interview preparation for consulting cases."),
+        ])
+        assert retrieve("interview preparation", "resources", top_k=5,
+                        min_similarity=0.0, lexical_min=1.0) == []

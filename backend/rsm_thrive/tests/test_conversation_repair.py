@@ -69,7 +69,9 @@ class TestAMistypedRoleIsStillRead:
         make quietly."""
         reply = orchestrator.answer(FakeLLM([]), conversation,
                                     "17 month data nalyst", [])
-        assert "Reading **17 month data nalyst** as **Business / Data Analyst**" \
+        # The TRACK is not quoted back as part of the career. What needs
+        # confirming is the half that was guessed at.
+        assert "Reading **data nalyst** as **Business / Data Analyst**" \
             in reply.body
         assert "say the word if you meant something else" in reply.body
 
@@ -88,90 +90,38 @@ class TestAMistypedRoleIsStillRead:
 # 2. It asks about Python
 # ---------------------------------------------------------------------------
 
-class TestItAsksWhereYouAreStartingFrom:
-    def test_the_question_names_all_five_areas(self, conversation):
+class TestItDoesNotAskYouToRateYourself:
+    """The five self-rating questions are gone.
+
+    They gated the plan behind sliders a student could not honestly fill in --
+    nobody can rate their own machine learning before they have taken any --
+    and a low rating steered them AWAY from the courses that would fix the
+    gap, which is the opposite of advising. The scoring still runs, at the
+    neutral rating, and says so in the plan.
+    """
+
+    def test_the_load_spread_is_the_only_question_left(self, conversation):
         reply = orchestrator.answer(FakeLLM([]), conversation,
-                                    "11 month, data scientist", [])
-        for area in planner.SKILL_AREAS:
-            assert area["label"].split()[0] in reply.body, area["label"]
-
-    def test_it_comes_before_the_load_spread(self, conversation):
-        """Skills change WHICH courses are picked; the spread changes where
-        they sit. The one that changes the courses is asked first."""
-        first = orchestrator.answer(FakeLLM([]), conversation,
-                                    "11 month, data scientist", [])
-        assert "starting from technically" in first.body
-        assert "spread" not in first.body.lower()
-
-    @pytest.mark.parametrize("said,expected", [
-        ("python 4, sql 2", {"skill_python": 4, "skill_sql": 2}),
-        ("strong in python, no ML", {"skill_python": 4, "skill_ml": 1}),
-        ("3 for stats", {"skill_stats": 3}),
-        ("good at presenting", {"skill_communication": 4}),
-        ("never written python", {"skill_python": 1}),
-    ])
-    def test_it_reads_the_shapes_people_write(self, said, expected):
-        assert planner.read_skills(said) == expected
-
-    def test_a_rating_does_not_leak_across_a_comma(self):
-        """Without clause splitting, "sql" takes the 4 from the phrase before
-        it and the student is handed a plan built on a level they never
-        claimed."""
-        assert planner.read_skills("python 4, sql 2")["skill_sql"] == 2
-
-    @pytest.mark.parametrize("said", ["skip", "no idea", "dunno", "not sure"])
-    def test_declining_is_an_answer(self, said, conversation):
-        assert planner.declines_skills(said)
-        orchestrator.answer(FakeLLM([]), conversation, "11 month, data scientist", [])
-        reply = orchestrator.answer(FakeLLM([]), conversation, said, [])
-        assert "starting from technically" not in reply.body, "not asked again"
+                                    "17 month, data scientist", [])
         assert "spread across the quarters" in reply.body.lower()
+        assert "starting from technically" not in reply.body
+        assert "rate yourself" not in reply.body.lower()
 
-    def _weak_and_strong(self, route):
-        base = {"track": "11 month", "goals": ["data-scientist"],
-                "workload": "moderate", "route": route}
-        return ({**base, **{f"skill_{a['key']}": 1 for a in planner.SKILL_AREAS}},
-                {**base, **{f"skill_{a['key']}": 5 for a in planner.SKILL_AREAS}})
+    def test_a_rating_volunteered_anyway_is_still_read(self, conversation):
+        """Being asked and being told are different things."""
+        orchestrator.answer(FakeLLM([]), conversation,
+                            "11 month, data scientist, python 4, sql 2", [])
+        stored = planner.load_session_intake(conversation)
+        assert stored["skill_python"] == 4 and stored["skill_sql"] == 2
 
-    def test_on_the_scored_route_the_answer_changes_the_courses(self):
-        weak, strong = self._weak_and_strong("custom")
-        picked = lambda answers: planner.elective_codes(
-            planner.build_for(answers, frozenset()))
-        assert picked(weak) != picked(strong)
-
-    def test_on_a_curated_bundle_it_changes_the_warnings_instead(self):
-        """A curated role defaults to its bundle, and a bundle is the same set
-        whoever takes it — that is what makes it the programme's
-        recommendation rather than a ranking. What the answer buys there is
-        knowing WHERE it will stretch you, which is the more useful thing to
-        be told about a set you cannot reorder."""
-        weak, strong = self._weak_and_strong("fixed")
-        picked = lambda answers: planner.elective_codes(
-            planner.build_for(answers, frozenset()))
-        assert picked(weak) == picked(strong), "the bundle is the bundle"
-
-        # The SKILL-driven notes specifically. A bundle also carries workload
-        # notes, which have nothing to do with what the student can do.
-        technical = lambda answers: [
-            note for quarter in planner.build_for(answers, frozenset())["quarters"]
-            for row in quarter["courses"]
-            for note in (row.get("stretch") or []) + (row.get("cautions") or [])
-            if "technical" in note or "you reported" in note]
-        assert technical(weak), "a beginner is told which courses will stretch"
-        assert not technical(strong), "an advanced student is told none of it"
-
-    def test_it_says_which_areas_it_had_to_assume(self, conversation):
-        orchestrator.answer(FakeLLM([]), conversation, "11 month, data scientist", [])
-        orchestrator.answer(FakeLLM([]), conversation, "python 5", [])
+    def test_the_plan_does_not_recite_the_assumption(self, conversation):
+        """Nothing asks for a rating, so announcing that none was given is a
+        preamble about a question that was never put."""
+        orchestrator.answer(FakeLLM([]), conversation,
+                            "11 month, data scientist", [])
         reply = orchestrator.answer(FakeLLM([]), conversation, "moderate", [])
-        preamble = reply.body.split("plan of study")[0]
-        assert "SQL and databases" in preamble
-        assert "Python programming" not in preamble, "that one was stated"
+        assert "i've assumed" not in reply.body.lower()
 
-
-# ---------------------------------------------------------------------------
-# 3. Changing your mind says so
-# ---------------------------------------------------------------------------
 
 class TestChangingYourMindIsAcknowledged:
     def _planned(self, conversation, role="data analyst"):
@@ -316,6 +266,8 @@ class TestTheBundleAndTheLoadSpreadCoexist:
             for quarter in planner.adjustable_quarters(track):
                 for load in ("light", "moderate", "heavy"):
                     units = planner.units_for_load(track, quarter["key"], load)
+                    if units is None:
+                        continue   # not a choice on this track
                     wanted, _ = planner.rebalanced_units(
                         track, {}, quarter["key"], units)
                     if wanted is None:
@@ -520,7 +472,8 @@ class TestEditingTheCatalogTakesEffect:
         # Every wrapper takes the version, so a new version misses the cache.
         assert planner._catalog_by_id_for.cache_info().maxsize >= 4
         assert skill_match._indexed_catalog_for.cache_info().maxsize >= 4
-        assert isinstance(version, tuple) and len(version) == 3
+        assert isinstance(version, tuple)
+        assert len(version) == len(electives._CATALOG_FILES)
 
     def test_the_check_is_memoised_so_it_is_not_a_stat_per_lookup(self):
         """`bundles._by_id` sits inside the placement search, so "once per

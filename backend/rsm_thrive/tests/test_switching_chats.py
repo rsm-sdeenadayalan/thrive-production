@@ -88,9 +88,10 @@ class TestTwoChatsAtOnce:
 
     def test_a_quarter_load_chosen_in_one_stays_there(self, user):
         first, second = chat(user, "one"), chat(user, "two")
-        plan_through(first)
-        plan_through(second)
+        plan_through(first, track="17 month")
+        plan_through(second, track="17 month")
         orchestrator.answer(llm(), first, "walk me through it", [])
+        orchestrator.answer(llm(), first, "next quarter", [])
         orchestrator.answer(llm(), first, "next quarter", [])
         orchestrator.answer(llm(), first, "light", [])
 
@@ -101,12 +102,12 @@ class TestTwoChatsAtOnce:
         """`asked` is what stops a question repeating. Shared, it would stop it
         being asked in a chat where it never was."""
         first, second = chat(user, "one"), chat(user, "two")
-        orchestrator.answer(llm(), first, "11 month, data scientist", [])
-        assert planner.session_has_asked(first, "skills")
-        assert not planner.session_has_asked(second, "skills")
+        orchestrator.answer(llm(), first, "17 month, data scientist", [])
+        assert planner.session_has_asked(first, "workload")
+        assert not planner.session_has_asked(second, "workload")
 
-        reply = orchestrator.answer(llm(), second, "11 month, data scientist", [])
-        assert "starting from technically" in reply.body
+        reply = orchestrator.answer(llm(), second, "17 month, data scientist", [])
+        assert "spread across the quarters" in reply.body.lower()
 
     def test_the_situational_position_is_per_chat(self, user):
         first, second = chat(user, "one"), chat(user, "two")
@@ -118,16 +119,16 @@ class TestTwoChatsAtOnce:
         assert planner.load_session_situation(first).get("start_from") == "winter"
         assert planner.load_session_situation(second) == {}
 
-    def test_an_uncurated_goal_does_not_leak(self, user):
+    def test_a_goal_does_not_leak_between_chats(self, user):
+        """A career named in one chat must not become the other chat's goal.
+
+        This used to assert on `unmatched_goal`, which the removed web lookup
+        stored for a role it had no profile for. Nothing stores that now -- an
+        uncovered role is refused outright -- so the leak this guards against
+        is tested with a goal that really is remembered."""
         first, second = chat(user, "one"), chat(user, "two")
-        profile = json.dumps({"known": True, "role": "esports analyst",
-                              "summary": "…", "skills": ["sql", "dashboards"],
-                              "tools": [], "topics": []})
-        orchestrator.answer(
-            FakeLLM(['{"route": "role", "confidence": 0.9, "role": "esports analyst"}',
-                     profile, "Here is what the catalog offers…"]),
-            first, "esports analyst", [])
-        assert planner.load_session_intake(first)["unmatched_goal"] == "esports analyst"
+        orchestrator.answer(llm(), first, "data scientist", [])
+        assert planner.load_session_intake(first)["goals"] == ["data-scientist"]
         assert not planner.load_session_intake(second).get("unmatched_goal")
 
     def test_three_chats_interleaved_keep_three_plans(self, user):

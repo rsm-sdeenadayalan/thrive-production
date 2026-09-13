@@ -100,9 +100,10 @@ def _quarter_budgets(skeleton, track):
     measured by the plan sweep, a light Fall on the 17-month track came back
     at 10 units, which is below the load a graduate student may enrol in.
     """
-    from rsm_thrive.services.planner import adjustable_quarters
+    from rsm_thrive.services.planner import adjustable_quarters, tail_quarter_key
 
     bounds = {q["key"]: q for q in adjustable_quarters(track)}
+    tail = tail_quarter_key(track)
     budgets = []
     for quarter in skeleton:
         spent = sum(_units(slot["course_id"]) for slot in quarter["slots"]
@@ -110,6 +111,9 @@ def _quarter_budgets(skeleton, track):
         room = bounds.get(quarter["key"])
         budgets.append({
             "key": quarter["key"], "season": quarter["season"],
+            # The finishing quarter -- the one the load rule holds short.
+            # Second-year Fall on the 17-month track, Spring on the 11-month.
+            "tail": quarter["key"] == tail,
             "budget": quarter["units"] - spent,
             "floor": max(0, room["min"] - spent) if room else quarter["units"] - spent,
             "ceiling": (room["max"] - spent) if room else quarter["units"] - spent,
@@ -134,22 +138,34 @@ def _quarter_budgets(skeleton, track):
 QUARTER_FLEX = 2
 
 
-def _place(courses, budgets, flex=None):
+def _place(courses, budgets, flex=None, rigid=()):
     """Assign courses to quarters, or None if this set cannot be scheduled.
 
     The total must be spent exactly; each quarter may vary by `flex`, which
-    defaults to `QUARTER_FLEX`. Most-constrained course first (fewest seasons,
-    then largest), which keeps the search small enough to be exhaustive.
+    defaults to `QUARTER_FLEX`, except the quarters named in `rigid`, which
+    must hit their budget exactly. Most-constrained course first (fewest
+    seasons, then largest), which keeps the search small enough to be
+    exhaustive.
+
+    `rigid` exists for the finishing quarter. This is a first-fit search, and
+    with two units of give there are many valid assignments; the first one
+    found fills the early quarters toward their ceilings and leaves the tail
+    at its floor. Measured on the 17-month track: 11 of 14 bundles landed 2
+    units in the final Fall on the PUBLISHED spread, whose budget there is 4
+    -- not because 4 was impossible (Business Analyst has 457+402, or 459, or
+    461 all offered then) but because the search never preferred it.
     """
     if flex is None:
         flex = QUARTER_FLEX
+    rigid = set(rigid)
     order = sorted(courses, key=lambda c: (len(_seasons(c)), -_units(c)))
     assigned = {row["key"]: [] for row in budgets}
     load = {row["key"]: 0 for row in budgets}
     # The flex applies INSIDE each quarter's legal range, never outside it.
-    ceiling = {row["key"]: min(row["budget"] + flex, row["ceiling"])
+    give = {row["key"]: (0 if row["key"] in rigid else flex) for row in budgets}
+    ceiling = {row["key"]: min(row["budget"] + give[row["key"]], row["ceiling"])
                for row in budgets}
-    floor = {row["key"]: max(row["budget"] - flex, row["floor"], 0)
+    floor = {row["key"]: max(row["budget"] - give[row["key"]], row["floor"], 0)
              for row in budgets}
     season_of = {row["key"]: row["season"] for row in budgets}
 
@@ -187,6 +203,82 @@ def _rebudgeted(skeleton, wanted_units):
             for quarter in skeleton]
 
 
+#: Prefixes whose anchors are swapped for an MSBA course when one exists.
+#: CSE is NOT here, and that is the whole distinction: the design document
+#: gates `data-scientist` and `ml-engineer` on real computer-science
+#: coursework, and an all-MGTA "AI/ML Engineer" plan would be a plan that
+#: does not reach the job. MGT and MGTF anchors are electives the MSBA can
+#: cover from its own catalog.
+SUBSTITUTABLE_PREFIXES = ("MGT ", "MGTF")
+
+
+def _substitute_for(role_id, course_id, used):
+    """The MSBA course that best serves THIS ROLE in that slot, or None.
+
+    Chosen by the role's own ranking rather than by resemblance to the course
+    being replaced. Measured, the resemblance route is weak -- the closest
+    MGTA course to MGT 477 Consumer Behavior scores 0.27 on skill overlap, so
+    "most similar" would be picking a barely-related course and implying it
+    teaches the same thing. What the student actually wants in that slot is
+    the best remaining course FOR THEIR GOAL, which the elective scorer
+    already knows how to name.
+
+    Same unit count, always: the bundle's arithmetic and the quarter budgets
+    are built on it, and a 2-unit swap for a 4-unit anchor unbalances a plan
+    that has to close at exactly 50.
+    """
+    from rsm_thrive.services.electives import (load_careers, load_catalog,
+                                               rank_electives)
+
+    catalog = _by_id()
+    original = catalog.get(course_id)
+    if not original:
+        return None
+    ranked = rank_electives(
+        load_catalog(),
+        {"career_roles": [role_id], "career_tags": [], "technical_comfort": 3,
+         "workload_preference": "moderate", "interests": []},
+        load_careers())
+    for row in ranked:
+        candidate = row["course"]
+        if not candidate["code"].startswith("MGTA"):
+            continue
+        if candidate["id"] in used or candidate["id"] in PRE_PLACED:
+            continue
+        if candidate.get("units") != original.get("units"):
+            continue
+        # And OFFERED when the original was. Matching units alone is not
+        # enough: the placement engine has to put the course in a quarter, and
+        # a substitute taught only in Spring cannot stand in for an anchor the
+        # plan needs in Fall. Ignoring this returned course sets that no
+        # arrangement could schedule, `choose_courses` gave up, and the plan
+        # fell through to the generic scorer fill -- which is the same for
+        # neighbouring roles, so Marketing and Pricing came out identical.
+        if not (_seasons(original["id"]) <= _seasons(candidate["id"])):
+            continue
+        return candidate["id"]
+    return None
+
+
+def _prefer_msba(role_id, required, taken_ids):
+    """Swap MGT/MGTF anchors for MSBA courses. Returns (courses, swaps)."""
+    out, swaps = [], []
+    used = set(required) | set(taken_ids)
+    for course_id in required:
+        if not course_id.startswith(SUBSTITUTABLE_PREFIXES):
+            out.append(course_id)
+            continue
+        replacement = _substitute_for(role_id, course_id, used)
+        if not replacement:
+            out.append(course_id)
+            continue
+        used.discard(course_id)
+        used.add(replacement)
+        out.append(replacement)
+        swaps.append((course_id, replacement))
+    return out, swaps
+
+
 def choose_courses(role_id, track, taken_ids=frozenset(), wanted_units=None):
     """The bundle's courses for one track, sized to fit and placeable.
 
@@ -217,10 +309,14 @@ def choose_courses(role_id, track, taken_ids=frozenset(), wanted_units=None):
 
     required = [c for c in bundle["anchor"] + bundle["universal"] if usable(c)]
     required = list(dict.fromkeys(required))
+    return _search(role_id, required, bundle, budgets, target, taken_ids, usable)
+
+
+def _search(role_id, required, bundle, budgets, target, taken_ids, usable):
+    """The combination search, for one `required` spine."""
     optional = [c for c in bundle["differentiator"]
                 if usable(c) and c not in required]
     optional = list(dict.fromkeys(optional))
-
     needed = target - sum(_units(c) for c in required)
     if needed < 0:
         return None, None
@@ -238,13 +334,39 @@ def choose_courses(role_id, track, taken_ids=frozenset(), wanted_units=None):
     #
     # Smallest addition first: the anchor is the profile, so a bundle that
     # closes on fewer differentiators is the more faithful one.
-    for flex in (0, QUARTER_FLEX):
+    # Fewest courses from OUTSIDE the MSBA first, within each size.
+    #
+    # A differentiator is chosen to make the units add up, and where several
+    # combinations do that equally well the programme's own courses are the
+    # ones a student can rely on registering for. So "MGTF 405 or MGTA 461,
+    # both 4 units, both close the budget" resolves to the MGTA one rather
+    # than to whichever `itertools` happened to emit first.
+    #
+    # This does NOT touch the anchor. An anchor is what makes the plan that
+    # profile rather than a neighbouring one -- `ml-engineer` is three CSE
+    # courses and dropping them would leave a bundle that is no longer AI/ML
+    # Engineering. Those survive here and are flagged where they are shown.
+    def outside_first(combination):
+        return (sum(1 for c in combination if not c.startswith("MGTA")),
+                combination)
+
+    # THE LADDER. Exact everywhere first; then the FINISHING QUARTER exact
+    # while the full quarters take the flex; then everything flexes. The
+    # middle rung is what holds the tail at its budget -- 4 units on a light
+    # or moderate spread, 2 on a heavy one -- and the last rung is what keeps
+    # every bundle that placed before still placing.
+    tail_keys = {row["key"] for row in budgets if row.get("tail")}
+    rungs = [(0, ()), (QUARTER_FLEX, tail_keys), (QUARTER_FLEX, ())]
+    if not tail_keys:
+        rungs = [(0, ()), (QUARTER_FLEX, ())]
+    for flex, rigid in rungs:
         for count in range(len(optional) + 1):
-            for combination in itertools.combinations(optional, count):
+            for combination in sorted(
+                    itertools.combinations(optional, count), key=outside_first):
                 if sum(_units(c) for c in combination) != needed:
                     continue
                 courses = required + list(combination)
-                placement = _place(courses, budgets, flex)
+                placement = _place(courses, budgets, flex, rigid)
                 if placement is not None:
                     return courses, placement
     return None, None

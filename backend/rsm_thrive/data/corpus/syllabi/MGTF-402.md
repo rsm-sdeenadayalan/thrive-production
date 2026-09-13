@@ -3,7 +3,7 @@ id: "MGTF 402"
 code: "MGTF 402"
 title: "Investment Analysis"
 department: "MGTF"
-programme: "Rady MS Finance (MFin)"
+programme: "Rady MQF (Master of Quantitative Finance)"
 units: 4
 schedulable: true
 is_core: false
@@ -21,7 +21,7 @@ syllabi: ["MGTF 402 Investment Analysis (Timmermann) FA26.txt"]
 ---
 # MGTF 402 — Investment Analysis
 
-**4 units** · Rady MS Finance (MFin) · offered FA26
+**4 units** · Rady MQF (Master of Quantitative Finance) · offered FA26
 
 ## What this course covers
 

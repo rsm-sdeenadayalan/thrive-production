@@ -44,6 +44,11 @@ class BotReply:
     # a content backlog and a backlog assembled by parsing prose loses rows
     # silently the first time the prose changes.
     refused: bool = False
+    # What this reply SAYS, when the rest of its body is a re-render a caller
+    # may replace with its own. Set by a swap: the body is "Swapped X for Y"
+    # plus a note on where X can still go plus the whole plan, and the
+    # walk-through wants the first two over its own quarter, not the third.
+    lead: str = ""
     # The plan this reply renders, for a caller that needs to inspect what was
     # actually scheduled rather than re-derive it. Set only by `_plan_reply`;
     # None everywhere else. See `orchestrator._uncurated_coverage_note`, which
@@ -366,24 +371,74 @@ def _handle_change_request(user, answers, question):
     if replacement:
         target = next((course["id"] for course in load_catalog()
                        if course["code"].upper() == replacement.upper()), None)
+        taken = planner.taken_course_ids(user)
+        by_id = {course["id"]: course for course in load_catalog()}
         try:
             record.selections = planner.apply_swap(
-                answers, record.selections, quarter_key, slot, target,
-                planner.taken_course_ids(user))
+                answers, record.selections, quarter_key, slot, target, taken)
+        except planner.NotOfferedError as exc:
+            # Not offered THERE is not the end of the answer: say where it is,
+            # and which quarter of this plan that is.
+            here = next(q for q in plan["quarters"] if q["key"] == quarter_key)
+            return BotReply(
+                f"I can't put **{replacement}** in that slot: {exc}."
+                + planner.placement_note(plan, by_id[target], taken,
+                                         missing_from=here),
+                [], "plan")
         except ValueError as exc:
             return BotReply(
                 f"I can't put **{replacement}** in that slot: {exc}.", [], "plan")
         record.save(update_fields=["selections", "updated_at"])
-        updated = planner.build_for(answers, planner.taken_course_ids(user),
-                                     record.selections)
-        return BotReply(
-            f"Swapped **{row['code']}** for **{replacement}**.\n\n"
-            + planner.render_plan_markdown(updated), [], "plan")
+        updated = planner.build_for(answers, taken, record.selections)
+        # The course going OUT: is this goodbye, or can it be picked up later?
+        # Said with the swap, because after it the student has no reason to ask.
+        lead = f"Swapped **{row['code']}** for **{replacement}**."
+        dropped = by_id.get(row["courseId"])
+        if dropped is not None:
+            lead += planner.displaced_note(updated, dropped, quarter_key)
+        return BotReply(lead + "\n\n" + planner.render_plan_markdown(updated),
+                        [], "plan", lead=lead)
 
     return BotReply(planner.render_alternatives_markdown(
         planner.alternatives_for(plan, answers, quarter_key, slot,
                                  planner.taken_course_ids(user))), [], "plan")
 
+
+
+def _course_availability(user, answers, question):
+    """A course the student wants that is NOT in the plan: say where it fits.
+
+    "I want MGTA 456", "can I take CSE 251A", "when is 463 offered" -- each
+    names a course, none of them is in the plan, so `_handle_change_request`
+    and `_explain_course` both pass. Left alone the turn reached the catalog
+    route, which answered "offered in Winter" from the catalog row: true, and
+    not what a student with a plan on screen needs. The plan knows which
+    quarter Winter IS and which course would have to make room.
+
+    Only for a turn that reads as wanting the course or asking when it runs.
+    "Does MGTA 456 have prerequisites?" names a course not in the plan too,
+    and the catalog route answers that better than this can.
+    """
+    codes = planner.mentioned_codes(question)
+    if not codes or not planner.wants_course(question):
+        return None
+    taken = planner.taken_course_ids(user)
+    record = planner.save_intake(user, answers)
+    plan = planner.build_for(answers, taken, record.selections)
+    by_code = {course["code"].upper(): course for course in load_catalog()}
+    wanted = [by_code[code.upper()] for code in codes
+              if planner.locate_code(plan, code)[2] is None
+              and code.upper() in by_code]
+    if not wanted:
+        return None
+    notes = [planner.placement_note(plan, course, taken).strip()
+             for course in wanted]
+    body = "\n\n".join(notes)
+    if len(wanted) == 1:
+        course = wanted[0]
+        body = (f"**{planner.display_code(course)} — {course['title']}** "
+                f"({course['units']} units) isn't in your plan yet.\n\n{body}")
+    return BotReply(body, [], "availability")
 
 
 # Deterministic, like `review_intent`: a short closed list beats a model call.

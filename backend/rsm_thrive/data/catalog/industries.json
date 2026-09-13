@@ -1,0 +1,209 @@
+{
+  "_source": "MSBA-Elective-Recommender-Design.md Part III section 3.3, 'Rankings by industry'. Role ids map onto careers.json; the ORDER of each list is the professor's ranking for that industry and is meaningful -- do not sort it.",
+  "industries": [
+    {
+      "id": "technology-software",
+      "label": "Technology / Software",
+      "blurb": "The largest single destination for MSBA graduates — roughly a third of recent peer-program classes, and typically the highest-paying.",
+      "roles": [
+        {
+          "id": "product-analyst",
+          "why": "The defining analytics role in tech; every product team needs one"
+        },
+        {
+          "id": "data-scientist",
+          "why": "Recommendation, forecasting, personalization, ranking"
+        },
+        {
+          "id": "analytics-engineer",
+          "why": "Warehouse and semantic-layer buildout is a standing need"
+        },
+        {
+          "id": "ml-engineer",
+          "why": "Extreme demand, steepest gate"
+        },
+        {
+          "id": "marketing-analyst",
+          "why": "Acquisition and monetization analytics at consumer scale"
+        },
+        {
+          "id": "decision-scientist",
+          "why": "Concentrated at the largest and most experiment-mature firms"
+        },
+        {
+          "id": "bi-analyst",
+          "why": "Internal analytics platform work"
+        },
+        {
+          "id": "business-data-analyst",
+          "why": "Present, but the least differentiated way in"
+        }
+      ],
+      "short_label": "Technology / Software"
+    },
+    {
+      "id": "financial-services",
+      "label": "Financial Services & Fintech",
+      "blurb": "Consistently the #1 or #2 destination in peer-program reporting.",
+      "roles": [
+        {
+          "id": "fraud-risk-analyst",
+          "why": "The industry's structural, non-discretionary analytics need"
+        },
+        {
+          "id": "data-scientist",
+          "why": "Credit scoring, propensity, pricing, collections"
+        },
+        {
+          "id": "business-data-analyst",
+          "why": "Very high volume across every line of business"
+        },
+        {
+          "id": "finance-quant",
+          "why": "FP&A, treasury, portfolio and investment analytics"
+        },
+        {
+          "id": "bi-analyst",
+          "why": "Heavy regulatory and management reporting load"
+        },
+        {
+          "id": "analytics-engineer",
+          "why": "Data platform modernization is a live, funded program"
+        },
+        {
+          "id": "marketing-analyst",
+          "why": "Card and lending acquisition, CRM, lifecycle"
+        }
+      ],
+      "short_label": "Finance & Fintech"
+    },
+    {
+      "id": "consulting",
+      "label": "Consulting",
+      "blurb": "Roughly a tenth to a fifth of recent peer-program classes; lower starting comp, faster exposure breadth.",
+      "roles": [
+        {
+          "id": "consultant",
+          "why": "The core hire"
+        },
+        {
+          "id": "business-data-analyst",
+          "why": "Client-embedded analyst staffing"
+        },
+        {
+          "id": "data-scientist",
+          "why": "Firm-side data science practices and AI units"
+        },
+        {
+          "id": "bi-analyst",
+          "why": "Dashboard and reporting implementation engagements"
+        },
+        {
+          "id": "operations-supply-chain",
+          "why": "Operations practice work"
+        },
+        {
+          "id": "pricing-analyst",
+          "why": "Pricing practices are a distinct, well-paid specialty"
+        }
+      ],
+      "short_label": "Consulting"
+    },
+    {
+      "id": "healthcare",
+      "label": "Healthcare / Biotech / Pharma",
+      "blurb": "Especially relevant to San Diego-anchored students.",
+      "roles": [
+        {
+          "id": "healthcare-analyst",
+          "why": ""
+        },
+        {
+          "id": "business-data-analyst",
+          "why": ""
+        },
+        {
+          "id": "bi-analyst",
+          "why": ""
+        },
+        {
+          "id": "data-scientist",
+          "why": ""
+        },
+        {
+          "id": "operations-supply-chain",
+          "why": ""
+        },
+        {
+          "id": "fraud-risk-analyst",
+          "why": "Claims integrity"
+        }
+      ],
+      "short_label": "Healthcare & Biotech"
+    },
+    {
+      "id": "retail-cpg",
+      "label": "Retail / CPG / E-commerce",
+      "blurb": "",
+      "roles": [
+        {
+          "id": "marketing-analyst",
+          "why": ""
+        },
+        {
+          "id": "operations-supply-chain",
+          "why": ""
+        },
+        {
+          "id": "pricing-analyst",
+          "why": ""
+        },
+        {
+          "id": "business-data-analyst",
+          "why": ""
+        },
+        {
+          "id": "data-scientist",
+          "why": "Demand forecasting, recommendation"
+        },
+        {
+          "id": "bi-analyst",
+          "why": ""
+        }
+      ],
+      "short_label": "Retail / CPG"
+    },
+    {
+      "id": "other",
+      "label": "Other (media, gaming, energy, government, defense, sports, telecom)",
+      "blurb": "",
+      "roles": [
+        {
+          "id": "business-data-analyst",
+          "why": ""
+        },
+        {
+          "id": "bi-analyst",
+          "why": ""
+        },
+        {
+          "id": "marketing-analyst",
+          "why": "Media, streaming, gaming"
+        },
+        {
+          "id": "data-scientist",
+          "why": ""
+        },
+        {
+          "id": "operations-supply-chain",
+          "why": "Defense, energy, telecom"
+        },
+        {
+          "id": "consultant",
+          "why": ""
+        }
+      ],
+      "short_label": "Other sectors"
+    }
+  ]
+}

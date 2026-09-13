@@ -3,7 +3,7 @@ id: "MGTF 418"
 code: "MGTF 418"
 title: "Topics in Finance: Preparing for the CFA Exam"
 department: "MGTF"
-programme: "Rady MS Finance (MFin)"
+programme: "Rady MQF (Master of Quantitative Finance)"
 units: 2
 schedulable: true
 is_core: false
@@ -21,7 +21,7 @@ syllabi: ["MGTF 418 Preparing for the CFA Exam (Girand) FA26.txt"]
 ---
 # MGTF 418 — Topics in Finance: Preparing for the CFA Exam
 
-**2 units** · Rady MS Finance (MFin) · offered FA26
+**2 units** · Rady MQF (Master of Quantitative Finance) · offered FA26
 
 ## What this course covers
 

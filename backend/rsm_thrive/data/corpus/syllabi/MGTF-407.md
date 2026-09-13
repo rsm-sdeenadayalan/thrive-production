@@ -3,7 +3,7 @@ id: "MGTF 407"
 code: "MGTF 407"
 title: "Valuation in Corporate Finance"
 department: "MGTF"
-programme: "Rady MS Finance (MFin)"
+programme: "Rady MQF (Master of Quantitative Finance)"
 schedulable: false
 is_core: false
 technical_level: 4
@@ -20,7 +20,7 @@ syllabi: ["MGTF 407 Valuation in Corporate Finance (Mullins) WI26.txt"]
 ---
 # MGTF 407 — Valuation in Corporate Finance
 
-Rady MS Finance (MFin) · offered WI26 · _unit count not stated in the material supplied_
+Rady MQF (Master of Quantitative Finance) · offered WI26 · _unit count not stated in the material supplied_
 
 ## What this course covers
 

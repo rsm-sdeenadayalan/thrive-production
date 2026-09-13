@@ -2,7 +2,7 @@
 
 `TritonAiLLM` is the working default — UCSD's TritonAI proxy
 (https://tritonai-api.ucsd.edu/v1), OpenAI-compatible, model
-`claude-sonnet-4-6` (live-verified 2026-08-23; ids drift — the portal's models page is the source of truth). Retries are same-model only (429/5xx), no
+`claude-sonnet-5` (live-verified 2026-09-11; ids drift — the portal's models page is the source of truth). Retries are same-model only (429/5xx), no
 model fallback: TritonAI is the single sanctioned backend, so a
 failure here is meant to surface honestly and feed the existing
 degraded/503 paths rather than silently swap models. `FakeLLM` is
@@ -21,6 +21,84 @@ from django.conf import settings
 logger = logging.getLogger("rsm_thrive.llm")
 
 BASE_URL = "https://tritonai-api.ucsd.edu/v1"
+
+# Models that refuse `temperature`. claude-sonnet-5 is the first: Vertex
+# answers `temperature is deprecated for this model` with a 400, but ONLY
+# when `response_format` is also present -- either parameter alone is fine,
+# which is why this surfaced on the eight `json_mode=True` call sites (router,
+# situation, the course advisor, jobs) and nowhere else.
+#
+# LEARNED AT RUNTIME, not hardcoded, for the reason the module docstring
+# already gives: ids drift. A hardcoded list goes stale silently at the next
+# rename and takes the main path down with it; this costs ONE wasted request
+# per model per process and is then free, and a model that later starts
+# accepting temperature again just never lands here.
+_NO_TEMPERATURE = set()
+_NO_TEMPERATURE_LOCK = threading.Lock()
+
+
+def _rejects_temperature(model: str) -> bool:
+    with _NO_TEMPERATURE_LOCK:
+        return model in _NO_TEMPERATURE
+
+
+def _remember_rejects_temperature(model: str) -> None:
+    with _NO_TEMPERATURE_LOCK:
+        if model not in _NO_TEMPERATURE:
+            _NO_TEMPERATURE.add(model)
+            logger.info("%s rejects temperature; dropping it for this process.",
+                        model)
+
+
+def _is_temperature_rejection(exc, status) -> bool:
+    """A 400 naming `temperature` as the offending parameter.
+
+    Deliberately narrow. The gateway is litellm in front of several providers,
+    so the wording is the upstream provider's and not ours to predict -- but a
+    400 that does not mention temperature is a real bad request and must keep
+    raising, because retrying it without temperature would only bury it.
+
+    `status` comes from the caller's `_status_of` rather than being read off
+    the exception here, so the backend keeps ONE way of deciding what a status
+    is and this cannot drift from the ladder it sits in.
+    """
+    if status != 400:
+        return False
+    return "temperature" in str(exc).lower()
+
+
+def _log_before_raising(exc, status, kwargs) -> None:
+    """Say what failed before it disappears into a caller's `except`.
+
+    Every caller of `chat` swallows exceptions -- deliberately, because a
+    classifier or a job score is not worth taking a student's turn down for.
+    The cost is that a request WE built wrong looks exactly like a provider
+    outage: `_model_route` answers "the language model could not be reached"
+    either way, and nothing reaches a log. That is how a 400 on every
+    `json_mode` call sat behind a plausible content refusal.
+
+    So the distinction is drawn HERE, at the one place that still holds the
+    status code, rather than at the six call sites that would each have to
+    repeat it:
+
+    * **4xx that is not 429** -- we sent something the provider will not
+      accept. It is a defect in this code or in a model id, it is identical
+      on every retry, and it will still be there tomorrow. ERROR, with the
+      parameters we sent, because that is the bug report.
+    * **anything else** -- a timeout, a 5xx, an exhausted retry ladder. The
+      provider is having a bad day and the degraded path is the right answer.
+      WARNING, because there is nothing to fix in here.
+    """
+    sent = sorted(k for k in kwargs if k != "messages")
+    if status is not None and 400 <= status < 500 and status != 429:
+        logger.error(
+            "%s rejected our request (HTTP %s): %s -- parameters sent: %s. "
+            "This is a malformed request, not an outage; retrying will not "
+            "help and callers are about to degrade silently.",
+            kwargs.get("model", "?"), status, exc, sent)
+    else:
+        logger.warning("%s call failed (HTTP %s): %s", kwargs.get("model", "?"),
+                       status, exc)
 
 
 class LLM(ABC):
@@ -140,8 +218,13 @@ class TritonAiLLM(LLM):
         key = api_key or getattr(settings, "TRITONAI_API_KEY", "")
         if not key:
             raise RuntimeError("TRITONAI_API_KEY is not set.")
-        self._model = model or getattr(settings, "TRITONAI_MODEL", "claude-sonnet-4-6")
-        self._client = OpenAI(api_key=key, base_url=BASE_URL)
+        self._model = model or getattr(settings, "TRITONAI_MODEL", "claude-sonnet-5")
+        # A per-call ceiling, so one unresponsive socket cannot own the turn.
+        # The SDK's own default is ten minutes, which is not a timeout for a
+        # student waiting on a chat reply.
+        self._client = OpenAI(
+            api_key=key, base_url=BASE_URL,
+            timeout=float(getattr(settings, "TRITONAI_TIMEOUT_SECONDS", 45)))
         self._sleep = sleep
 
     def _create(self, **kwargs):
@@ -155,29 +238,57 @@ class TritonAiLLM(LLM):
         kwargs = {
             "model": self._model,
             "messages": full_messages,
-            "temperature": 0.4,
             "max_tokens": 4000,
         }
+        if not _rejects_temperature(self._model):
+            kwargs["temperature"] = 0.4
         if json_mode:
             kwargs["response_format"] = {"type": "json_object"}
         return self._chat_with_retries(kwargs)
 
     def _chat_with_retries(self, kwargs) -> str:
+        # A DEADLINE for the whole ladder, not just for each call.
+        #
+        # The per-attempt timeout bounds one request; it does not bound three
+        # of them plus the 15s and 30s waits between. Measured during a real
+        # connection blip on the sweep, one turn took 149 SECONDS -- long
+        # after the student has decided the thing is broken, and long after
+        # the point where saying "I can't reach the model" would have been the
+        # better answer. The retries exist for a provider having a bad
+        # second, not a bad minute.
+        deadline = time.monotonic() + float(
+            getattr(settings, "TRITONAI_TURN_BUDGET_SECONDS", 75))
         last_err = None
-        for attempt in range(3):
+        attempt = 0
+        while attempt < 3:
             try:
                 resp = self._create(**kwargs)
                 return resp.choices[0].message.content or ""
             except Exception as e:
                 last_err = e
                 status = self._status_of(e)
-                if status == 429 and attempt < 2:
-                    self._sleep(15 * (attempt + 1))
+                # Dropping temperature does NOT spend an attempt. It is a
+                # correction to a malformed request, not a retry of a failed
+                # one, and it can only happen once per process per model --
+                # letting it burn the last attempt would fail a request whose
+                # fix we already hold.
+                if _is_temperature_rejection(e, status) and "temperature" in kwargs:
+                    _remember_rejects_temperature(kwargs["model"])
+                    kwargs.pop("temperature")
                     continue
-                if status in (500, 502, 503) and attempt < 2:
-                    self._sleep(3 * (attempt + 1))
+                attempt += 1
+                # Only wait if there is room to wait AND to retry afterwards.
+                remaining = deadline - time.monotonic()
+                if status == 429 and attempt < 3 and remaining > 15 * attempt:
+                    self._sleep(15 * attempt)
                     continue
+                if (status in (500, 502, 503) and attempt < 3
+                        and remaining > 3 * attempt):
+                    self._sleep(3 * attempt)
+                    continue
+                _log_before_raising(e, status, kwargs)
                 raise
+        _log_before_raising(last_err, self._status_of(last_err), kwargs)
         raise last_err
 
 

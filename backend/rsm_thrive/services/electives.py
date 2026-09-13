@@ -19,7 +19,8 @@ _DATA = Path(__file__).resolve().parent.parent / "data" / "catalog"
 
 # The three files that ARE the catalog. Everything derived from them keys its
 # cache on `catalog_version()`.
-_CATALOG_FILES = ("courses.json", "careers.json", "bundles.json")
+_CATALOG_FILES = ("courses.json", "careers.json", "bundles.json",
+                  "industries.json")
 
 WORKLOAD_LEVEL = {"light": 1, "moderate": 2, "heavy": 3}
 
@@ -83,7 +84,8 @@ def forget_catalog():
     process that has just written one and wants the change NOW rather than
     within `_VERSION_TTL`."""
     _set_version_memo(0.0, None)
-    for cached in (_load_catalog, _load_careers, _role_aliases_for):
+    for cached in (_load_catalog, _load_careers, _role_aliases_for,
+                   _load_industries):
         cached.cache_clear()
 
 
@@ -103,6 +105,67 @@ def _load_careers(_version):
 
 def load_careers():
     return _load_careers(catalog_version())
+
+
+@lru_cache(maxsize=4)
+def _load_industries(_version):
+    return json.loads((_DATA / "industries.json").read_text())
+
+
+def load_industries():
+    """The six industries, each with its roles in the design document's order.
+
+    `industries.json` carries Part III section 3.3 of the MSBA Elective
+    Recommender design document. The ORDER of each industry's role list is the
+    ranking for that industry and is load-bearing -- it is what "top roles in
+    <industry>" means -- so nothing here sorts it.
+    """
+    return _load_industries(catalog_version())["industries"]
+
+
+def industry_by_id(industry_id):
+    for industry in load_industries():
+        if industry["id"] == industry_id:
+            return industry
+    return None
+
+
+def top_titles_for(industry_id, limit=10):
+    """The industry's best-known job titles, as (title, role_id) pairs.
+
+    BREADTH FIRST across the profiles, not depth first. Taking titles in flat
+    order would fill the list from the top one or two profiles -- Technology's
+    first five would be "product analyst, product data scientist, growth
+    analyst, product manager, data scientist - product", which is one job
+    written five ways and tells a student nothing about the industry's spread.
+    Round-robin takes each profile's primary title first, so the list spans
+    every profile in the industry's ranking before it names a second title for
+    anyone, and only then cycles for the remainder.
+
+    Deduplicated across profiles, because a title like "growth analyst" is
+    listed under both Product and Marketing, and the same word twice in a
+    numbered list reads as a bug.
+    """
+    industry = industry_by_id(industry_id)
+    if not industry:
+        return []
+    careers = load_careers()
+    titles = [list(careers.get(role["id"], {}).get("titles") or [])
+              for role in industry["roles"]]
+    out, seen, depth = [], set(), 0
+    while len(out) < limit and any(len(t) > depth for t in titles):
+        for index, role_titles in enumerate(titles):
+            if depth >= len(role_titles):
+                continue
+            title = role_titles[depth]
+            if title in seen:
+                continue
+            seen.add(title)
+            out.append((title, industry["roles"][index]["id"]))
+            if len(out) >= limit:
+                break
+        depth += 1
+    return out
 
 
 @lru_cache(maxsize=4)
@@ -286,7 +349,15 @@ DEPARTMENT_LABELS = {
             "so seats go as space permits"),
     "MGT": ("Rady MBA",
             "pre-approved MSBA electives; enrolment by consent"),
-    "MGTF": ("Rady MS Finance (MFin)",
+    # MQF, not MFin. Rady runs both -- its own page lists "EMBA, Full-Time
+    # MBA, FlexEvening/FlexWeekend MBA, MPAc, MQF and MFin" as separate
+    # programmes -- and the MGTF courses are the MQF's: MGTF 416 is titled
+    # "MQF Professional Seminar" in Rady's own catalog, and the current
+    # registration-fee pages for this prefix's programme are headed "Master
+    # of Quantitative Finance". The old label named the wrong degree, and
+    # because `import_syllabi` stamps it into every MGTF syllabus, it had
+    # already been ingested into the corpus as though it were sourced.
+    "MGTF": ("Rady MQF (Master of Quantitative Finance)",
              "pre-approved MSBA electives; enrolment by consent"),
     "MGTP": ("Rady MPAc (Master of Professional Accountancy)",
              "pre-approved MSBA electives; enrolment by consent"),
@@ -327,6 +398,17 @@ def catalog_overview():
         "nonMsbaCap": NON_MSBA_UNIT_CAP,
         "codes": sorted(c["code"] for c in electives),
     }
+
+
+#: What a course outside the MSBA carries in its `reasons`, so a plan, a
+#: swap list and a walk-through can all say the same thing about it without
+#: three of them re-deriving it from the course code.
+OUTSIDE_THE_MSBA = "sits outside the MSBA — needs the programme's permission"
+
+
+def is_msba(course):
+    """The programme's own courses: the MGTA prefix, core and elective alike."""
+    return str(course.get("code") or "").startswith("MGTA")
 
 
 def rank_electives(catalog, profile, careers=None):
@@ -417,13 +499,36 @@ def rank_electives(catalog, profile, careers=None):
             score += 2.0 * len(hits)
             reasons.append("covers your interest in " + ", ".join(hits))
 
+        if not is_msba(course):
+            reasons.append(OUTSIDE_THE_MSBA)
+
         results.append({
             "course": course,
             "score": round(score, 2),
             "reasons": reasons,
         })
 
-    results.sort(key=lambda r: (-r["score"], r["course"]["code"]))
+    # MSBA COURSES FIRST, and not as a tie-break -- as the first sort key, so
+    # an MGTA course outranks every course outside the programme whatever the
+    # scores say.
+    #
+    # This is a preference about ENROLMENT, not about quality, which is why a
+    # score boost was the wrong instrument: a boost large enough to win
+    # reliably distorts every comparison it touches, and one small enough not
+    # to lets a marginally better-scoring outside course take a slot the
+    # student may not be able to register for. MGTA courses are the
+    # programme's own, they are what the design document's bundles are built
+    # from, and they are the ones an MSBA student can rely on getting into.
+    # Everything else needs permission and competes with the students that
+    # programme belongs to.
+    #
+    # Nothing is EXCLUDED. An outside course still sorts, still scores, still
+    # appears among the alternatives for a slot, and still lands in the plan
+    # when no MSBA course can fill that slot -- it just never displaces one
+    # that can. It also carries `OUTSIDE_THE_MSBA` in its reasons from here
+    # on, so every surface that shows it can say so.
+    results.sort(key=lambda r: (not is_msba(r["course"]),
+                                -r["score"], r["course"]["code"]))
     return results
 
 

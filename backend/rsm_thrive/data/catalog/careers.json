@@ -73,6 +73,9 @@
       "bi engineer",
       "business intelligence analyst",
       "analytics reporting lead"
+    ],
+    "aliases": [
+      "business intelligence"
     ]
   },
   "product-analyst": {
@@ -114,6 +117,9 @@
       "growth analyst",
       "product manager",
       "data scientist - product"
+    ],
+    "aliases": [
+      "product analytics"
     ]
   },
   "data-scientist": {
@@ -151,6 +157,10 @@
       "applied scientist",
       "ml analyst",
       "senior data scientist"
+    ],
+    "aliases": [
+      "data science",
+      "applied machine learning"
     ]
   },
   "analytics-engineer": {
@@ -189,6 +199,10 @@
       "data engineer",
       "data engineer - analytics",
       "data platform analyst"
+    ],
+    "aliases": [
+      "analytics engineering",
+      "data engineering"
     ]
   },
   "marketing-analyst": {
@@ -227,6 +241,11 @@
       "marketing data scientist",
       "crm analyst",
       "media analytics manager"
+    ],
+    "aliases": [
+      "marketing analytics",
+      "growth analytics",
+      "marketing"
     ]
   },
   "consultant": {
@@ -265,6 +284,10 @@
       "technology consultant",
       "management consultant",
       "strategy consultant"
+    ],
+    "aliases": [
+      "analytics consulting",
+      "data consulting"
     ]
   },
   "fraud-risk-analyst": {
@@ -303,6 +326,10 @@
       "credit risk modeler",
       "financial crimes analytics",
       "aml analyst"
+    ],
+    "aliases": [
+      "fraud analytics",
+      "risk analytics"
     ]
   },
   "operations-supply-chain": {
@@ -340,6 +367,9 @@
       "demand planner",
       "s&op analyst",
       "logistics analytics manager"
+    ],
+    "aliases": [
+      "operations analytics"
     ]
   },
   "pricing-analyst": {
@@ -377,6 +407,10 @@
       "revenue management analyst",
       "monetization analyst",
       "commercial analytics"
+    ],
+    "aliases": [
+      "pricing analytics",
+      "revenue management"
     ]
   },
   "decision-scientist": {
@@ -414,6 +448,10 @@
       "experimentation analyst",
       "causal inference analyst",
       "data scientist - experimentation"
+    ],
+    "aliases": [
+      "decision science",
+      "experimentation analytics"
     ]
   },
   "ml-engineer": {
@@ -454,6 +492,10 @@
       "ai solutions engineer",
       "applied ai analyst",
       "forward-deployed engineer"
+    ],
+    "aliases": [
+      "machine learning engineering",
+      "genai engineering"
     ]
   },
   "healthcare-analyst": {
@@ -496,6 +538,9 @@
       "healthcare analyst",
       "health analyst",
       "healthcare analytics"
+    ],
+    "aliases": [
+      "life sciences analytics"
     ]
   },
   "finance-quant": {
@@ -535,7 +580,10 @@
       "investment analytics",
       "quantitative analyst",
       "quant analyst",
-      "quant",
+      "quant"
+    ],
+    "aliases": [
+      "financial analytics",
       "fintech",
       "financial technology"
     ]

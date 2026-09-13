@@ -3,7 +3,7 @@ id: "MGTF 419"
 code: "MGTF 419"
 title: "Special Topics in Finance: CFA Level II"
 department: "MGTF"
-programme: "Rady MS Finance (MFin)"
+programme: "Rady MQF (Master of Quantitative Finance)"
 schedulable: false
 is_core: false
 technical_level: 4
@@ -20,7 +20,7 @@ syllabi: ["MGTF 419 CFA Level II Exam Preparation (Girand) SP26.txt"]
 ---
 # MGTF 419 — Special Topics in Finance: CFA Level II
 
-Rady MS Finance (MFin) · offered SP26 · _unit count not stated in the material supplied_
+Rady MQF (Master of Quantitative Finance) · offered SP26 · _unit count not stated in the material supplied_
 
 ## What this course covers
 

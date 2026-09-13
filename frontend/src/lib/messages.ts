@@ -1210,13 +1210,13 @@ export const messages = {
 			courses: {
 				label: 'Course Recommender',
 				blurb: 'Classes and electives',
-				emptyHeading: 'Ask which classes fit where you are going',
+				emptyHeading: 'Plan your electives, decided or not',
 				emptyBody:
-					'Electives, sequencing, and what a quarter will actually cost you in hours. Say what you are aiming at and it can be specific.',
+					'Name the job you are aiming at and it builds the plan around it. Not decided yet? Say so, and it walks you through the industries and the roles each one hires for.',
 				examples: [
 					'Which electives suit product analytics?',
-					'Can I take experimentation and data engineering together?',
-					'Does auditing a course count toward the degree?'
+					'What roles does biotech hire for?',
+					'I have no idea what I want to do'
 				]
 			},
 			career: {

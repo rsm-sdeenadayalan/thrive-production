@@ -3,7 +3,7 @@ id: "MGTF 404"
 code: "MGTF 404"
 title: "Financial Econometrics and Empirical Methods"
 department: "MGTF"
-programme: "Rady MS Finance (MFin)"
+programme: "Rady MQF (Master of Quantitative Finance)"
 units: 4
 schedulable: true
 is_core: false
@@ -21,7 +21,7 @@ syllabi: ["MGTF 404 Fin Econometric-Empirical Mthd (Valkanov) FA25 - AM.txt"]
 ---
 # MGTF 404 — Financial Econometrics and Empirical Methods
 
-**4 units** · Rady MS Finance (MFin) · offered FA25, FA26
+**4 units** · Rady MQF (Master of Quantitative Finance) · offered FA25, FA26
 
 ## What this course covers
 

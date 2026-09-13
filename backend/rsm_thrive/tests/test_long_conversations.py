@@ -71,7 +71,13 @@ def check_invariants(conversation, reply, history):
     where = " -> ".join(f"{kind}:{text[:24]!r}" for kind, text in history)
     assert reply.body.strip(), f"empty reply after {where}"
     assert DEGRADED not in reply.body, f"degraded after {where}"
-    assert reply.quick_replies == [], f"buttons after {where}"
+    # The industry routes answer WITH buttons -- six industries, then ten job
+    # titles -- and nothing else on this surface does. A stray button anywhere
+    # else is still the bug this was written to catch.
+    if reply.model_note in ("industry-menu", "industry-roles"):
+        assert reply.quick_replies, f"empty menu after {where}"
+    else:
+        assert reply.quick_replies == [], f"buttons after {where}"
     assert reply.form is None, f"a form after {where}"
     assert reply.route in router.ROUTES | {"plan"}, f"{reply.route} after {where}"
 

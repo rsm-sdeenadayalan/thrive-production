@@ -3,7 +3,7 @@ id: "MGTF 413"
 code: "MGTF 413"
 title: "Computational Finance Methods"
 department: "MGTF"
-programme: "Rady MS Finance (MFin)"
+programme: "Rady MQF (Master of Quantitative Finance)"
 schedulable: false
 is_core: false
 technical_level: 5
@@ -20,7 +20,7 @@ syllabi: ["MGTF 413 Computational Finance Methods (Cheng & Williams) WI26.txt"]
 ---
 # MGTF 413 — Computational Finance Methods
 
-Rady MS Finance (MFin) · offered WI26 · _unit count not stated in the material supplied_
+Rady MQF (Master of Quantitative Finance) · offered WI26 · _unit count not stated in the material supplied_
 
 ## What this course covers
 

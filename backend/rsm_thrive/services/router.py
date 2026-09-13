@@ -131,11 +131,20 @@ def names_a_course(question):
 
 # Words that make a question about a course a FACTUAL one: it asks what the
 # catalog or the syllabus says, not what to take.
+# The words that turn a named course into a QUESTION ABOUT that course.
+#
+# The second block is the one that was missing, and the gap was not small: a
+# student typed "whats MGTA 458 about" and, because "whats" is not "what" and
+# "about" was not on the list, the turn was not ruled factual at all. It fell
+# through to the intake, which had a track and a goal by then and answered a
+# question about one course by printing the entire plan of study.
 _FACTUAL_WORDS = frozenset("""
 prerequisite prerequisites prereq prereqs corequisite units unit credits
 credit offered offering offer run runs quarter quarters term terms season
 syllabus grading graded assessment assessed workload textbook instructor
 professor taught teaches meets schedule when what who how many
+whats what's whos who's hows how's tell about cover covers covering
+explain describe is are does do worth like good hard easy difficult
 """.split())
 
 # A student describing WHERE THEY ARE. Both halves are required: "I switched"
@@ -163,6 +172,15 @@ def _role_titles_for(_version):
     for role_id, role in load_careers().items():
         for title in (role.get("titles") or []):
             titles.append((str(title).lower(), role_id))
+        # `aliases` are RECOGNISED but never shown. They carry the design
+        # document's own name for the profile -- "marketing analytics",
+        # "fraud analytics", "product analytics" -- which is what a student
+        # who has read the programme material types, and which was matching
+        # nothing. They are kept out of `titles` because that list is also
+        # what the industry menu offers, and "Product Analytics" is a field
+        # rather than a job somebody is hired as.
+        for alias in (role.get("aliases") or []):
+            titles.append((str(alias).lower(), role_id))
         label = str(role.get("short_label") or "").lower()
         if label:
             titles.append((label, role_id))
@@ -231,16 +249,33 @@ def role_match(question):
     if not text:
         return "", False
     titles = _role_titles()
+    said = re.findall(r"[a-z&]+", text)
+
+    def fuzzy(title):
+        wanted = title.split()
+        return (len(wanted) >= 2
+                and all(any(_within_one_edit(word, target) for word in said)
+                        for target in wanted))
+
     for title, role_id in titles:
         if re.search(rf"\b{re.escape(title)}\b", text):
+            # THE MORE SPECIFIC READING WINS, even over an exact match.
+            # "i wanna be a helthcare data analyst" contains "data analyst"
+            # exactly, and that returned Business Analyst before the fuzzy
+            # pass could see that "healthcare data analyst" matches with one
+            # letter of slop. A longer title that fuzzy-matches AND contains
+            # every word of the exact hit is what the student typed; the
+            # exact hit is a substring of it. Reported as fuzzy so the
+            # confirmation note shows them the reading.
+            exact_words = set(title.split())
+            for longer, longer_id in titles:
+                if len(longer) <= len(title):
+                    break
+                if exact_words <= set(longer.split()) and fuzzy(longer):
+                    return longer_id, False
             return role_id, True
-    said = re.findall(r"[a-z]+", text)
     for title, role_id in titles:
-        wanted = title.split()
-        if len(wanted) < 2:
-            continue
-        if all(any(_within_one_edit(word, target) for word in said)
-               for target in wanted):
+        if fuzzy(title):
             return role_id, False
     return "", False
 
@@ -377,15 +412,42 @@ _INVENTORY_VERBS = re.compile(
     r"suggest|recommend|help with|do you do)\b", re.IGNORECASE)
 # Words that turn "what jobs..." into a question about a PARTICULAR job, which
 # is the role route's, not this one's.
+# "become" earns its place here the same way "as" and "into" did: it opens a
+# PURPOSE clause, and a question with one is about that purpose rather than
+# about the shelf. Without it "what electives should I take to become an
+# esports analyst" satisfied both halves of the inventory test -- "electives"
+# and "take" -- and answered a question about one job with all 86 courses.
+# The role guard above did not save it, because that only recognises the
+# fourteen roles we curate, and the phrasing is commonest for the ones we do
+# not. The docstring already promised this: false for "what should I take".
+# "to be a <job>" is matched as a PHRASE, not on the word "be". Bare "be"
+# would fire on "what courses can be taken", which is an inventory question
+# and must keep its catalog answer; "to be a" only ever opens a purpose
+# clause.
 _NOT_INVENTORY = re.compile(
-    r"\b(for|in|as|about|towards?|into|require|need|pay|salary|skills?)\b",
+    r"(\bto\s+be\s+an?\b)|"
+    r"\b(for|in|as|about|towards?|into|become|becoming|require|need|pay|"
+    r"salary|skills?)\b",
     re.IGNORECASE)
+
+
+_OWN_JOB = re.compile(
+    r"\b(?:i|i've|ive|i'd|we)\s+(?:have|had|got|hold)\b|"
+    r"\b(?:my|a|an)\s+(?:part[- ]time|full[- ]time|current|day|new)\s+job\b|"
+    r"\bmy job\b", re.IGNORECASE)
 
 
 def asks_which_careers(question):
     """True for "which careers do you know", false for "what does X need"."""
     text = question or ""
     if not (_CAREER_NOUNS.search(text) and _INVENTORY_VERBS.search(text)):
+        return False
+    # A job the STUDENT has is not a question about the jobs we cover. "light,
+    # i have a part time job" -- an answer to the load question, with a reason
+    # -- carries "have" and "job" and was answered with the list of fourteen
+    # careers. First-person possession of a job is a fact about them, and the
+    # inventory question is always about us ("do you have", "are there").
+    if _OWN_JOB.search(text):
         return False
     if _NOT_INVENTORY.search(text) or names_a_course(text):
         return False
@@ -433,6 +495,14 @@ def asks_which_courses(question):
     return True
 
 
+# What may sit around a bare course code and still leave it a bare course
+# code: a department prefix, digits, and the words people put either side of
+# one when they are pointing at it.
+_COURSE_ONLY_FILLER = frozenset("""
+mgta mgtf mgt mgtp cse the a an this that course class about
+""".split())
+
+
 def rule_route(question):
     """A confident route, decided here, or None to ask the model.
 
@@ -466,6 +536,14 @@ def rule_route(question):
         return Route(SITUATIONAL, why="named a position in the programme")
     if names_a_course(text) and (_words(text) & _FACTUAL_WORDS):
         return Route(FACTUAL, why="named a course and asked a catalog question")
+    # A turn that is ONLY a course code is about that course. "MGTA 458" on
+    # its own carries no question word at all, and the rule above therefore
+    # declined it -- leaving a bare code to be classified, or worse, to reach
+    # an intake that would answer it with a plan.
+    if names_a_course(text) and not (_words(text) - _COURSE_ONLY_FILLER
+                                     - set(COURSE_CODE.findall(text.lower())[0]
+                                           if COURSE_CODE.search(text) else [])):
+        return Route(FACTUAL, why="named a course and nothing else")
     # A single quarter, asked about in the first person. After the factual rule
     # on purpose: "does MGTA 464 run in winter" names a course and asks what
     # the catalog says, which is a different question from "what should I take
@@ -482,6 +560,17 @@ def rule_route(question):
         # being filed as a plain role question, which is the exact case the
         # combination route exists for.
         field = _target_field(text)
+        # The ROLE is not also the FIELD. "aiming for business analyst"
+        # satisfies the field pattern on the word "for", so the job title
+        # itself came back as the industry and the turn was ruled a
+        # combination of Business Analyst with the field "business analyst".
+        # That misrouted it past the intake -- which only runs for ROLE -- and
+        # a sentence carrying a role, a track AND a load kept only the role.
+        titles = {str(t).lower() for t in
+                  (load_careers().get(role_id) or {}).get("titles") or []}
+        titles.add(str((load_careers().get(role_id) or {}).get("label", "")).lower())
+        if field and field.lower() in titles:
+            field = None
         if field or is_industry_course_question(text):
             return Route(COMBINATION, role_id=role_id, industry=field or "",
                          why="named a curated role and a field")

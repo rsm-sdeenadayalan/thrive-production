@@ -3,7 +3,7 @@ id: "MGTF 495"
 code: "MGTF 495"
 title: "Special Topics: Fixed Income"
 department: "MGTF"
-programme: "Rady MS Finance (MFin)"
+programme: "Rady MQF (Master of Quantitative Finance)"
 schedulable: false
 is_core: false
 technical_level: 4
@@ -20,7 +20,7 @@ syllabi: ["MGTF 495 Special Topics - AI in Finance (Ghezzi) SP26.txt", "MGTF 495
 ---
 # MGTF 495 — Special Topics: Fixed Income
 
-Rady MS Finance (MFin) · offered SP26 · _unit count not stated in the material supplied_
+Rady MQF (Master of Quantitative Finance) · offered SP26 · _unit count not stated in the material supplied_
 
 ## What this course covers
 

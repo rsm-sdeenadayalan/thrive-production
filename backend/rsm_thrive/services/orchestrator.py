@@ -40,14 +40,14 @@ from rsm_thrive.services import (bundles, electives, planner, router,
                                  situation, skill_match)
 from rsm_thrive.services.bot_config import bot_config
 from rsm_thrive.services.bots import (BotReply, _catalog_context,
-                                      _explain_course, _finalise_reply,
+                                      _course_availability, _explain_course,
+                                      _finalise_reply,
                                       _handle_change_request, _plan_reply,
                                       _review_reply, _small_talk_reply,
                                       _wants_the_plan, append_sources,
                                       build_context)
 from rsm_thrive.services.electives import (NON_MSBA_UNIT_CAP,
                                             load_careers, load_catalog)
-from rsm_thrive.services.grounded_course_advisor import recommend_for_question
 from rsm_thrive.services.retrieval import retrieve
 
 
@@ -57,10 +57,30 @@ from rsm_thrive.services.retrieval import retrieve
 
 # "11 month" / "17-month" / "the eleven month one". A closed set of two, so a
 # pattern is the whole implementation and no model call is needed to read it.
+# "11 mo" counts. Students abbreviate, and "yo i wanna do data science stuff,
+# 11 mo" named a track that was not read -- so the next turn's "moderate" had
+# no track to attach to and was met with a request to clarify.
 _TRACK_WORDS = {
-    "11 month": re.compile(r"\b(?:11|eleven)[\s-]?month\b", re.IGNORECASE),
-    "17 month": re.compile(r"\b(?:17|seventeen)[\s-]?month\b", re.IGNORECASE),
+    "11 month": re.compile(r"\b(?:11|eleven)[\s-]?(?:months?|mos?)\b", re.IGNORECASE),
+    "17 month": re.compile(r"\b(?:17|seventeen)[\s-]?(?:months?|mos?)\b", re.IGNORECASE),
 }
+
+
+# A BARE "11" or "17", as the whole message. Every curated recommendation
+# closes by asking "which track you're on -- 11-month or 17-month", and the
+# shortest honest answer to that is the number. It was not understood:
+# measured live, a student was asked that question, replied "17", and got
+# "I want to make sure I answer the right question".
+#
+# Safe as a whole-message test on this surface. Course codes are three digits,
+# quarters are named words, and a menu pick is handled before this is reached
+# and only ever offers 1-10 -- so a lone 11 or 17 has nothing else it could
+# mean. Anything longer still needs the word, so "I did 11 courses" is not a
+# track.
+_BARE_TRACK = re.compile(
+    r"^(?:the\s+)?(11|17|eleven|seventeen)(?:[\s-]?mo)?\.?$", re.IGNORECASE)
+_BARE_TRACK_OF = {"11": "11 month", "eleven": "11 month",
+                  "17": "17 month", "seventeen": "17 month"}
 
 
 def stated_track(question):
@@ -68,7 +88,17 @@ def stated_track(question):
     for track, pattern in _TRACK_WORDS.items():
         if pattern.search(question or ""):
             return track
+    bare = _BARE_TRACK.match(" ".join((question or "").strip().split()))
+    if bare:
+        return _BARE_TRACK_OF[bare.group(1).lower()]
     return ""
+
+
+_COMPLETION_VERB = re.compile(
+    r"\b(already|ive|i've|have|had)\s+(done|taken|took|completed|finished|"
+    r"passed)\b|\b(done|taken|took|completed|finished|passed)\s+(?:it|that|"
+    r"those|them|these)?\s*(?:already|before|last)\b",
+    re.IGNORECASE)
 
 
 def learned_from(question):
@@ -90,6 +120,13 @@ def learned_from(question):
     track = stated_track(question)
     if track:
         learned["track"] = track
+    # "I've already done MGTA 464 and 402." A completion verb beside course
+    # codes is a fact about the transcript, and the plan has to honour it:
+    # `planner.build_for` treats these exactly like enrolment rows.
+    if _COMPLETION_VERB.search(question or ""):
+        codes = planner.mentioned_codes(question)
+        if codes:
+            learned["completed_codes"] = codes
     role_id, _exact = router.role_match(question)
     if role_id:
         learned["goals"] = [role_id]
@@ -147,6 +184,42 @@ LOAD_APPLIED_NOTE = (
     "Spread **{load}**: {spread}. The degree is still {total} units — a "
     "lighter quarter is a heavier one somewhere else.\n\n")
 
+COMPLETED_NOTE = (
+    "Leaving out {codes} \u2014 you said you've done them. That's **{units} "
+    "units** already banked, so this plan schedules the remaining "
+    "**{scheduled}**.\n\n")
+
+TAIL_SHORT_NOTE = (
+    "**{label}** carries **{actual} units** rather than the {wanted} a spread "
+    "like this one usually ends on. Some of this path's courses are taught in "
+    "one term only, and laying them out that way would push an earlier "
+    "quarter past 18 units or under 12. The degree still closes at 50.\n\n")
+
+SPREAD_DROPPED_NOTE = (
+    "One thing about the spread: a **{load}** distribution cannot be laid "
+    "around the courses this path needs — several of them are taught in one "
+    "term only. I've kept the courses and used the published spread, because "
+    "the courses are what make this plan about your career and the spread is "
+    "something you can still change one quarter at a time below.\n\n")
+
+# The 11-month track. See `planner.load_is_a_choice`.
+LOAD_FIXED_TRACK_NOTE = (
+    "On the **{track}** track I haven't asked about light or heavy: the "
+    "programme is compressed into four quarters and each carries what the "
+    "plan of study publishes. You can still swap any elective.\n\n")
+
+LOAD_FIXED_TRACK_SAID_NOTE = (
+    "You said **{load}** — on the {track} track there is no light or heavy "
+    "version: the programme is compressed into four quarters and each carries "
+    "what the plan of study publishes. Here it is as published; you can still "
+    "swap any elective.\n\n")
+
+LOAD_FIXED_ON_TRACK = (
+    "**{label}** carries {units} units, and on the {track} track that isn't a "
+    "choice — the programme is compressed into four quarters and each carries "
+    "what the plan of study publishes. You can still swap electives in the "
+    "quarters that have them.\n\n---\n\n")
+
 LOAD_UNAVAILABLE_NOTE = (
     "You asked for a **{load}** spread, and on the {track} track the quarters "
     "are already close enough to their limits that there is nothing to move — "
@@ -160,17 +233,6 @@ LOAD_UNAVAILABLE_NOTE = (
 # It used to be five sliders on a form. Asked in prose it is one line back, and
 # partial answers are fine: rating two areas and ignoring three is a real
 # answer, and the rest are assumed and said to be assumed.
-ASK_FOR_SKILLS = (
-    "Two quick things and I'll build it.\n\n"
-    "**First — where are you starting from technically?** Rate yourself 1–5 on "
-    "any of these that you have a view on:\n\n"
-    "- **Python**\n- **SQL and databases**\n- **Statistics and regression**\n"
-    "- **Machine learning**\n- **Presenting and storytelling**\n\n"
-    "However you'd say it: _\"python 4, sql 2\"_, _\"strong in python, never "
-    "done ML\"_, or just _\"skip\"_ and I'll assume the middle of the scale. "
-    "This decides how far I stretch you, not whether you get the courses you "
-    "need.")
-
 # Said when a title was matched with a character of slop. Confirmed rather
 # than assumed: guessing which of fourteen careers someone meant is not a
 # guess to make quietly.
@@ -182,7 +244,8 @@ ASK_FOR_A_GOAL = (
     "Good \u2014 **{track}** it is. What are you aiming for after the "
     "programme?\n\nAny job title works \u2014 \"data scientist\", "
     "\"pricing analyst\", \"product manager\" \u2014 or name an industry "
-    "and I'll work from what that field is currently asking for.")
+    "and I'll show you the roles it hires MSBA graduates into. Not sure yet? "
+    "Say so and I'll walk you through the options.")
 
 
 GOAL_SWITCHED = "Switched to **{label}**.\n\n"
@@ -301,19 +364,41 @@ def _uncurated_coverage_note(answers, plan):
 
 
 def _plan_now(conversation, answers, previous=None):
-    """Build and show the plan, saying what was assumed rather than asking.
+    """Build and show the plan.
 
     `fill_assumed_skills` supplies a low-middle level for every skill area the
     student has not mentioned. Deliberately low: under-claiming keeps courses
-    in reach and the plan says what it assumed, where over-claiming puts
-    someone in a course they cannot pass.
+    in reach, where over-claiming puts someone in a course they cannot pass.
+    Any course that lands above the assumed level is marked on its own row by
+    `_stretch_notes`, which is where a student can do something about it.
     """
-    filled, assumed = planner.fill_assumed_skills(
+    # The assumed level is still FILLED -- the scorer needs a number for every
+    # area -- but it is no longer announced. It used to be, and that made
+    # sense while the interview asked: a student who had answered four of five
+    # questions deserved to know the fifth had been guessed.
+    #
+    # Nothing asks now, so the note fired on every single plan and listed all
+    # five areas every time: "I've assumed working knowledge for Python
+    # programming, SQL and databases, Statistics and regression, Machine
+    # learning, Presenting and storytelling since you haven't said". Forty
+    # words of preamble, above the plan, saying only that a question the
+    # student was never asked went unanswered.
+    #
+    # What the assumption actually affects is still disclosed where it can be
+    # acted on: `_stretch_notes` marks every course above the assumed level on
+    # the course's own row, in the walk-through, next to the course it is
+    # about.
+    filled, _assumed = planner.fill_assumed_skills(
         answers, [f"skill_{area['key']}" for area in planner.SKILL_AREAS])
     track = filled.get("track") or "11 month"
     load = filled.get("workload")
     lead = ""
-    if not load:
+    applied = False
+    if not planner.load_is_a_choice(track):
+        lead += (LOAD_FIXED_TRACK_SAID_NOTE.format(load=load, track=track)
+                 if load and load != "moderate"
+                 else LOAD_FIXED_TRACK_NOTE.format(track=track))
+    elif not load:
         lead += ASSUMED_LOAD_NOTE
     elif not filled.get("quarter_units"):
         # Turn the one-word answer into a real distribution, once. A later
@@ -321,11 +406,7 @@ def _plan_now(conversation, answers, previous=None):
         seeded = planner.seeded_units(track, load)
         if seeded:
             filled = {**filled, "quarter_units": seeded}
-            lead += LOAD_APPLIED_NOTE.format(
-                load=load, total=planner.TOTAL_UNITS,
-                spread=", ".join(
-                    f"{planner.quarter_label(track, key)} {units} units"
-                    for key, units in seeded.items()))
+            applied = True
         elif load != "moderate":
             lead += LOAD_UNAVAILABLE_NOTE.format(load=load, track=track)
     planner.save_session_intake(conversation, filled)
@@ -337,18 +418,53 @@ def _plan_now(conversation, answers, previous=None):
         planner.taken_course_ids(conversation.user))
     reply = _plan_reply(conversation.user, filled, pinned)
     tail = _uncurated_coverage_note(filled, reply.plan)
+    if applied and reply.plan:
+        # The spread the plan ACTUALLY has, read off the built plan rather
+        # than the seed. The bundle placer may sit a quarter two units off
+        # the seed to fit a course taught in one term only, and a lead that
+        # said "Winter 18 units" over a table showing 16 was wrong in the
+        # one place a student checks first.
+        fixed = {q["key"] for q in planner.TRACK_SKELETONS.get(track) or []} - {
+            q["key"] for q in planner.adjustable_quarters(track)}
+        lead = LOAD_APPLIED_NOTE.format(
+            load=load, total=planner.TOTAL_UNITS,
+            spread=", ".join(
+                f"{q['label']} {q['unitsPlanned']} units"
+                for q in reply.plan["quarters"] if q["key"] not in fixed)) + lead
     lead = _goal_change_note(previous, filled, conversation.user) + lead
-    if assumed:
-        # The level is read off `ASSUMED_SKILL` rather than written out here.
-        # It used to say "some exposure" as a literal, and when the assumed
-        # level moved off "basic" the sentence would have been describing a
-        # value the plan was no longer built on.
-        level = planner.skill_label(planner.ASSUMED_SKILL)
-        lead += (f"I've assumed **{level}** for " + ", ".join(assumed)
-                 + " since you haven't said \u2014 tell me where that's wrong "
-                   "and I'll redo it.\n\n")
+    if (reply.plan or {}).get("spreadDropped"):
+        lead += SPREAD_DROPPED_NOTE.format(load=filled.get("workload") or "custom")
+    short = (reply.plan or {}).get("tailShort")
+    if short:
+        lead += TAIL_SHORT_NOTE.format(**short)
+    done = [c for c in (filled.get("completed_codes") or [])
+            if planner.stated_completed_ids({"completed_codes": [c]})]
+    if done:
+        lead += COMPLETED_NOTE.format(
+            codes=" and ".join(f"**{c}**" for c in done),
+            units=(reply.plan or {}).get("totals", {}).get("completed", 0),
+            scheduled=(reply.plan or {}).get("totals", {}).get("scheduled", 0))
     return spoken(BotReply(lead + reply.body + tail, [], "plan",
                            reply.quick_replies, route="plan"))
+
+
+SHARED_TITLE_NOTE = (
+    "**{title}** is listed under both **{chosen}** and {other} \u2014 I've gone "
+    "with {chosen}. Say **{say}** if you meant the other.\n\n")
+
+
+def shared_title_in(question):
+    """(title, [role ids]) for a curated title this turn names that belongs
+    to more than one profile, or None."""
+    owners = {}
+    for role_id, role in electives.load_careers().items():
+        for title in (role.get("titles") or []):
+            owners.setdefault(str(title).lower(), []).append(role_id)
+    said = " ".join((question or "").lower().split())
+    for title, role_ids in sorted(owners.items(), key=lambda kv: -len(kv[0])):
+        if len(role_ids) > 1 and re.search(rf"\b{re.escape(title)}\b", said):
+            return title, role_ids
+    return None
 
 
 def _confirmation(question):
@@ -365,10 +481,41 @@ def _confirmation(question):
     # that matched a career off its short label. "Something in supply chain"
     # came back as the full Supply Chain / Operations Analytics set with
     # nothing saying that was a reading.
+    shared = shared_title_in(question)
+    if shared and role_id in shared[1]:
+        # The design document lists this title under MORE THAN ONE profile --
+        # "growth analyst" sits under Product and under Marketing -- so an
+        # exact match still decided between two readings, and did so silently.
+        # A student who meant the other one was handed the wrong bundle with
+        # nothing marking it as a choice. Named here, with the way to switch.
+        others = [electives.load_careers()[r] for r in shared[1] if r != role_id]
+        chosen = electives.load_careers()[role_id]
+        return SHARED_TITLE_NOTE.format(
+            title=shared[0], chosen=chosen.get("short_label") or chosen["label"],
+            other=" or ".join(f"**{o.get('short_label') or o['label']}**"
+                              for o in others),
+            say=(others[0].get("titles") or [others[0]["label"]])[0])
     if exact and router.names_a_job_function(question):
         return ""
     label = (load_careers().get(role_id) or {}).get("label", role_id)
-    said = " ".join((question or "").split())[:40]
+    # QUOTE WHAT THEY NAMED, not the first forty characters of their sentence.
+    # Truncating the raw turn produced "Reading **im switching from consulting
+    # into analyt** as **Analytics / Data Consultant**" -- a note whose whole
+    # job is to show the student their own words back, showing them a
+    # sentence cut off mid-syllable instead.
+    # The TRACK comes out before the job is quoted. "17 month data nalyst"
+    # names both, and quoting it whole reads as though the track were part of
+    # the career -- "Reading **17 month data nalyst** as **Business / Data
+    # Analyst**". What the student needs confirmed is the half we guessed at.
+    without_track = question or ""
+    for pattern in _TRACK_WORDS.values():
+        without_track = pattern.sub(" ", without_track)
+    without_track = _BARE_TRACK.sub(" ", " ".join(without_track.split()))
+    said = _student_words(without_track) or _student_words(question)
+    if not _looks_like_a_job_title(said):
+        # Nothing quotable came out of it, and a confirmation that cannot
+        # quote is just noise above an answer.
+        return ""
     return FUZZY_ROLE_NOTE.format(said=said, label=label)
 
 
@@ -402,6 +549,23 @@ def _intake_progress(conversation, question, answers):
     the only thing asked.
     """
     learned = learned_from(question)
+    # A QUESTION WE JUST ASKED OWNS THE NEXT TURN'S LOAD WORD.
+    #
+    # `learned_from` reads a load with the strict whole-message test unless
+    # the turn also named a track or a goal, which is right in general: a
+    # passing remark that a course is heavy states no preference. It is wrong
+    # directly after we have asked. Measured live: the bot asked how to spread
+    # the load, the student answered "ok moderate load please", and got "I
+    # want to make sure I answer the right question" -- for an answer to the
+    # question it had just put.
+    #
+    # So the looser reading applies exactly when we are waiting on it: the
+    # workload question has been asked, and no workload is on file yet.
+    if (not learned.get("workload") and not answers.get("workload")
+            and planner.session_has_asked(conversation, "workload")):
+        said = planner.load_mentioned(question)
+        if said:
+            learned = {**learned, "workload": said}
     merged = {**answers, **learned}
     changed = any(merged.get(key) != answers.get(key) for key in learned)
     if learned.get("track") and answers.get("track") \
@@ -437,16 +601,17 @@ def _intake_progress(conversation, question, answers):
         # with something else gets their plan on the NEXT turn with what was
         # assumed said out loud: an interview with no exit is the thing being
         # removed, so the exit is recorded rather than rediscovered.
-        if (not any(key.startswith("skill_") for key in merged)
-                and not planner.session_has_asked(conversation, "skills")):
-            planner.note_session_asked(conversation, "skills")
-            return BotReply(_confirmation(question) + ASK_FOR_SKILLS, [],
-                            "intake", route="plan")
         if (not merged.get("workload")
                 and not planner.session_has_asked(conversation, "workload")):
             planner.note_session_asked(conversation, "workload")
-            return BotReply(_confirmation(question) + ASK_FOR_A_LOAD, [],
-                            "intake", route="plan")
+            # On a track where the load is not a choice the question is
+            # still RECORDED as asked -- and skipped. Recording it is what
+            # lets a later "light, please" be read as a load and answered
+            # ("there is no light version here") rather than sent to the
+            # classifier as an unrelated remark.
+            if planner.load_is_a_choice(merged["track"]):
+                return BotReply(_confirmation(question) + ASK_FOR_A_LOAD, [],
+                                "intake", route="plan")
         # Delivered automatically exactly once -- that is the answer to what
         # they asked for. After that it is reprinted only when this turn
         # changed something the plan is built from, so "thanks" and "how do I
@@ -593,6 +758,12 @@ def _answer_role(llm, route, conversation, question, history):
 
 # Words that are ALWAYS in a question and never distinguish one job from
 # another. What is left after these is what the student actually named.
+# The words left after these are what the student actually named. The COURSE
+# vocabulary in the second block matters as much as the filler in the first:
+# without it "which electives suit product analytics" survived whole, and the
+# reply read "I don't have a course recommendation for **which electives suit
+# product analytics**" -- naming the question back to the student as though it
+# were a job title.
 _ROLE_FILLER = frozenset("""
 a an the i im i'm want wants wanted like would love to be become work working
 in into on at for with about something anything some kind sort area field
@@ -600,6 +771,18 @@ industry sector space world side of my me you what how do does can could
 job role career position work maybe perhaps think thinking interested
 it its them they there here part bit stuff thing things doing get getting
 that this those these actually just really please yeah yes ok
+which who whom whose where when why whether if
+course courses class classes elective electives module modules unit units
+take taking takes study studying learn learning enrol enroll
+suit suits suited fit fits fitting good best right useful worth
+recommend recommends recommended recommendation suggestion suggest
+should shall need needs help helps helping tell show give
+is are am was were been will did done any
+switching switch moving transition transitioning from currently previously
+background experience years year worked coming looking aiming
+hmm hm um uh actually honestly think thinking guess maybe probably kinda kind
+sorta sort prefer rather lean leaning side more thing things my me i
+wanna gonna gotta tryna lemme dunno ya yeah yep nah
 """.split())
 
 
@@ -722,201 +905,643 @@ def _accepts_the_guess(question):
     return lowered in _ACCEPTANCES
 
 
-UNCURATED_NEXT = (
-    "\n\n" + planner.RECOMMENDATION_ONLY
-    + "\n\n---\n\nTell me which track you're on — **11-month** or "
-      "**17-month** — and I'll build the whole plan of study around these.")
+# ---------------------------------------------------------------------------
+# Route: a role the catalog has no profile for
+# ---------------------------------------------------------------------------
+
+NO_PROFILE_FOR_ROLE = (
+    "I don't have a course recommendation for **{role}**.\n\n"
+    "The MSBA elective mapping covers fourteen analytics job profiles, and that "
+    "one isn't among them. I'm not going to assemble a plan around it by "
+    "guessing which electives might transfer \u2014 a confident-sounding list of "
+    "courses for a job nobody mapped them to is worse than no answer.\n\n"
+    "**MSBA advising** can tell you whether the programme supports that "
+    "direction; you can book time from the **Appointments** tab. If you'd like "
+    "to look at what the mapping does cover, say **show me the industries**.")
+
+
+# A job title is SHORT and has no digits in it. What is left of a sentence
+# after the filler is stripped is not always a job: "i worked in marketing for
+# 3 years and want to move more into data" reduces to "worked marketing 3
+# years and move more data", which is a fragment of a life story, and naming
+# it back to the student as the career we cannot cover is worse than useless.
+_MAX_TITLE_WORDS = 4
+
+
+def _looks_like_a_job_title(said):
+    words = (said or "").split()
+    if not words or len(words) > _MAX_TITLE_WORDS:
+        return False
+    return not any(any(ch.isdigit() for ch in word) for word in words)
 
 
 def _uncurated_role(llm, route, conversation, question):
-    """A real job with no bundle: look up what it needs, match our catalog.
+    """A job we have no profile for. Say so, and stop.
 
-    Same two-stage shape the rest of this module uses. The model says what the
-    JOB requires; `role_lookup.courses_for_role` decides which of OUR courses
-    teach that. The model never picks a course, so it can never name one that
-    does not exist.
+    This used to search the web for the role's skills and match them against
+    the catalog with `role_lookup`. That is gone. The reason is not that it
+    worked badly -- it worked -- but that it answered a DIFFERENT question from
+    the one the rest of this route answers. Every curated profile's electives
+    trace to the design document's bundle mapping, reviewed against the
+    programme. A web-matched set traced to whatever a model read that morning,
+    and arrived wearing the same formatting, so a student could not tell the
+    two apart. Two sources of truth with one voice is the problem.
 
-    The GOAL and the matched courses are then remembered, and that is the part
-    that was missing. A student who said "esports analyst" got a good grounded
-    list and then, on their very next turn, was asked what they were aiming for
-    -- the career they had just named -- and never reached a plan at all. An
-    uncurated career is still a career: `selections_for_courses` pins what was
-    matched into the slots it fits and the scorer fills the rest, so the answer
-    ends in a plan of study like every other route.
+    `llm` and `route` are unused now and kept so the call sites do not have to
+    care which kind of answer this is.
     """
-    from rsm_thrive.services import role_lookup
+    named = _student_words(question) or (route.unmatched_role or "")
+    if not _looks_like_a_job_title(named):
+        # NOT A JOB, so not a refusal. A student who writes "i worked in
+        # marketing for 3 years and want to move more into data" has told us
+        # something useful and named no job at all -- and the reply was
+        # "I don't have a course recommendation for **worked marketing 3
+        # years and move more data**", which quotes a mangled fragment of
+        # their own sentence back at them as though it were a career.
+        #
+        # Refusing is only honest when they actually named something we do
+        # not cover. Otherwise the right answer is to ask.
+        return industry_menu_reply(conversation, router.ROLE, route.confidence)
+    return BotReply(NO_PROFILE_FOR_ROLE.format(role=named), [], "no-profile",
+                    route=router.ROLE, route_confidence=route.confidence,
+                    refused=True)
 
+
+# ---------------------------------------------------------------------------
+# Route: an industry
+# ---------------------------------------------------------------------------
+
+INDUSTRY_MENU_INTRO = (
+    "No problem \u2014 that's what this is for. Analytics hiring splits along "
+    "industry lines more than most people expect: the same degree points at "
+    "quite different jobs depending on where you take it.\n\n"
+    "**Which of these interests you most?**\n\n")
+
+INDUSTRY_MENU_OUTRO = (
+    "\n\nPick one and I'll show you the roles it hires for, ranked. You can "
+    "change your mind at any point.")
+
+INDUSTRY_ROLES_INTRO = (
+    "**{label}.** {blurb}\n\nThe roles this industry hires MSBA graduates "
+    "into, most in demand first:\n\n")
+
+INDUSTRY_ROLES_OUTRO = (
+    "\n\nSay which one you want to aim at and I'll build the elective plan "
+    "around it \u2014 or say **show me the industries** to go back.")
+
+# Asking outright, and admitting to having no target. Matched as PHRASES
+# anywhere in the turn rather than as whole messages: "i have no idea what i
+# want to do" is the commonest way a student says this and an exact-match list
+# missed it, handing back the generic opening -- which is the least useful
+# possible reply to somebody who has just said they are stuck.
+_ASKS_FOR_INDUSTRIES = (
+    "show me the industries", "show the industries", "list the industries",
+    "show me industries", "list industries", "what industries",
+)
+_HAS_NO_TARGET = (
+    "no idea", "not sure", "dont know", "don't know", "no clue", "unsure",
+    "havent decided", "haven't decided", "not decided", "undecided",
+    "no clue", "dunno",
+)
+
+
+_THANKS = re.compile(
+    r"^(?:ok(?:ay)?[,!. ]*)?(?:thanks?|thank you|thx|ty|cheers|great|perfect|"
+    r"awesome|cool|nice|got it|sounds good)(?:[,!. ]*(?:so much|a lot|this is "
+    r"great|that helps))?[!. ]*$", re.IGNORECASE)
+_DEGREE_UNITS = re.compile(
+    r"\bhow many (?:units|credits)\b.*\b(?:graduate|degree|total|need|"
+    r"program|programme|msba)\b|\bhow many (?:units|credits) (?:do i|is the)\b",
+    re.IGNORECASE)
+_DEGREE_ELECTIVES = re.compile(
+    r"\bhow many electives?\b|\bhow many (?:of (?:those|them|these) are )?"
+    r"electives?\b", re.IGNORECASE)
+# "why", and the ways students question a pick without saying why: "is MGTA
+# 458 really necessary", "do i actually need 466". Each, with a course code on
+# the turn, is asking for the reason it is there.
+_WHY = re.compile(
+    r"\bwhy\b|\b(?:necessary|required|needed|essential|mandatory)\b|"
+    r"\bdo i (?:really |actually )?(?:need|have to take)\b", re.IGNORECASE)
+
+THANKS_THEN_LOAD = ("You're welcome. Whenever you're ready \u2014 **light**, "
+                    "**moderate** or **heavy**?")
+THANKS_THEN_TRACK = ("You're welcome. Which track are you on \u2014 the "
+                     "**11-month** or the **17-month**?")
+THANKS_THEN_GOAL = ("You're welcome. What are you aiming for after the "
+                    "programme \u2014 a job, an industry, or not sure yet?")
+THANKS_REPLY = (
+    "You're welcome. Whenever you're ready, name a job or an industry -- or "
+    "say you're not sure yet and I'll walk you through the options.")
+DEGREE_UNITS_REPLY = (
+    "The MSBA is **{total} units**: **{core}** of core that everyone takes, and "
+    "**{elective}** of electives you choose. Full-time standing needs 12 a "
+    "quarter. Name a job or an industry and I'll show you how the {elective} "
+    "elective units fill in.")
+DEGREE_ELECTIVES_REPLY = (
+    "**{elective} of the {total} units are electives** -- the {core} core units "
+    "are fixed. That is usually ten to twelve courses, depending on unit "
+    "sizes. Name what you're aiming for and I'll pick them.")
+# A colon, not "because it": the reasons mix verb phrases ("builds your
+# data-engineering focus") with noun phrases ("directly relevant for Data
+# Scientist"), and only the first kind agrees with "because it".
+WHY_REPLY = "**{code} — {title}** is in your plan: {reasons}."
+WHY_NOT_IN_PLAN = (
+    "**{code}** isn't in your plan, so there's no pick to explain -- say "
+    "**swap X for {code}** if you'd like it in.")
+
+
+_QUARTER_LOAD_WORD = re.compile(
+    r"\b(lighter|light|easier|heavier|heavy|harder|moderate|normal)\b",
+    re.IGNORECASE)
+_QUARTER_LOAD_OF = {"lighter": "light", "light": "light", "easier": "light",
+                    "heavier": "heavy", "heavy": "heavy", "harder": "heavy",
+                    "moderate": "moderate", "normal": "moderate"}
+
+
+def _quarter_load_request(conversation, answers, said):
+    """"Can I make Fall lighter?" with a plan on file -> that quarter, moved.
+
+    The machinery existed (`_apply_quarter_load`) but was reachable only from
+    inside the walk-through, keyed on the quarter on screen. Asked about a
+    NAMED quarter with a plan already built, the turn went to the classifier,
+    came back situational, and asked the student which track they were on.
+    """
+    if not (answers.get("track") and answers.get("goals")):
+        return None
+    word = _QUARTER_LOAD_WORD.search(said)
+    if not word:
+        return None
+    track = answers.get("track") or "11 month"
+    quarter_key = planner.resolve_quarter(track, said)
+    if not quarter_key:
+        return None
+    keys = planner.quarter_keys(track)
+    if quarter_key not in keys:
+        return None
+    return _apply_quarter_load(conversation, answers, keys.index(quarter_key),
+                               _QUARTER_LOAD_OF[word.group(1).lower()])
+
+
+def _direct_answer(conversation, answers, question):
+    """Three answers that need no route, or None.
+
+    * Thanks, before a plan exists. Afterwards `_small_talk_reply` handles it;
+      before, it fell through to the generic opening, so "thanks!" was
+      answered with "tell me what you're aiming for".
+    * How many units, or how many electives, the degree is. Those are three
+      constants, and "how many units do i need to graduate" was reaching the
+      situational route and asking for the student's track in return.
+    * Why a course is in the plan. The plan already holds the reason on the
+      row; "why did you pick MGTA 463" was being read as a request for
+      alternatives to it.
+    """
+    said = " ".join((question or "").strip().split())
+    if _THANKS.match(said) and not planner.session_has_asked(conversation, "plan"):
+        # Before the plan has been shown. After it, `_small_talk_reply` answers
+        # in the model's own words; before it, this used to fire only with
+        # nothing on file, so "thanks" between the load question and its
+        # answer fell through to the classifier and came back as "I want to
+        # make sure I answer the right question". The reply re-offers whatever
+        # is pending, so the thank-you does not cost the student their place.
+        if answers.get("goals") and answers.get("track"):
+            body = THANKS_THEN_LOAD
+        elif answers.get("goals"):
+            body = THANKS_THEN_TRACK
+        elif answers.get("track"):
+            body = THANKS_THEN_GOAL
+        else:
+            body = THANKS_REPLY
+        return BotReply(body, [], "small-talk", route=router.UNCLEAR)
+    if not planner.mentioned_codes(said):
+        if _DEGREE_UNITS.search(said):
+            return BotReply(DEGREE_UNITS_REPLY.format(
+                total=planner.TOTAL_UNITS, core=planner.CORE_UNITS,
+                elective=planner.ELECTIVE_UNITS), [], "degree-fact",
+                route=router.FACTUAL)
+        if _DEGREE_ELECTIVES.search(said):
+            return BotReply(DEGREE_ELECTIVES_REPLY.format(
+                total=planner.TOTAL_UNITS, core=planner.CORE_UNITS,
+                elective=planner.ELECTIVE_UNITS), [], "degree-fact",
+                route=router.FACTUAL)
+    quarter_load = _quarter_load_request(conversation, answers, said)
+    if quarter_load is not None:
+        return quarter_load
+    if _WHY.search(said) and answers.get("track") and answers.get("goals"):
+        codes = planner.mentioned_codes(said)
+        if codes:
+            plan = planner.build_for(
+                answers, planner.taken_course_ids(conversation.user))
+            _q, _slot, row = planner.locate_code(plan, codes[0])
+            if row is None:
+                # And WHERE it could go, since "swap X for it" is only useful
+                # advice when there is an X in a quarter it runs in.
+                course = next((c for c in load_catalog()
+                               if c["code"].upper() == codes[0].upper()), None)
+                note = (planner.placement_note(
+                            plan, course, planner.taken_course_ids(conversation.user))
+                        if course is not None else "")
+                return BotReply(WHY_NOT_IN_PLAN.format(code=codes[0]) + note, [],
+                                "why", route=router.FACTUAL)
+            reasons = row.get("reasons") or ["fits the path you named"]
+            joined = (reasons[0] if len(reasons) == 1
+                      else ", ".join(reasons[:-1]) + " and " + reasons[-1])
+            return BotReply(WHY_REPLY.format(code=row["code"], title=row["title"],
+                                             reasons=joined), [], "why",
+                            route=router.FACTUAL)
+    return None
+
+
+def wants_the_industry_menu(question):
+    """Did this turn ask to see the industries, or admit to having no target?
+
+    Deterministic rather than a model call: these are a small closed set of
+    phrases, and paying a classifier round trip to be told that "no idea"
+    means no idea is a second spent on something already known.
+
+    A turn that NAMES something is never read as having no target, so "not
+    sure whether to go into consulting or tech" keeps its industries rather
+    than being treated as a blank.
+    """
+    lowered = " ".join(re.sub(r"[^a-z' ]+", " ", (question or "").lower()).split())
+    if any(phrase in lowered for phrase in _ASKS_FOR_INDUSTRIES):
+        return True
+    if not any(phrase in lowered for phrase in _HAS_NO_TARGET):
+        return False
+    # The guards read the ORIGINAL text. The sanitiser above strips "&" for
+    # phrase matching, and "probably fp&a analyst? not 100% sure" then failed
+    # the role guard -- "fp a analyst" is not a title -- so a student who had
+    # named a job was shown the industry menu, and the two turns after that
+    # had no goal to attach to.
+    return (not resolve_industry(question or "")
+            and not router.matched_role(question or ""))
+
+
+def industry_menu_body():
+    lines = []
+    for index, industry in enumerate(electives.load_industries(), 1):
+        blurb = industry.get("blurb") or ""
+        lines.append(f"{index}. **{industry['label']}**"
+                     + (f" \u2014 {blurb}" if blurb else ""))
+    return INDUSTRY_MENU_INTRO + "\n".join(lines) + INDUSTRY_MENU_OUTRO
+
+
+def _button(text, label=None, description=""):
+    """One quick reply, in the shape the client actually renders.
+
+    `{label, send}`, NOT a bare string. The chat window keys its button row on
+    `reply.send`; a list of strings gave every button the key `undefined`, and
+    Svelte aborts a keyed block on a duplicate key -- so the whole message list
+    threw and the conversation rendered as an empty pane. The reply itself was
+    correct the entire time, which is exactly why this now has a test.
+
+    `label` is the button face and `send` is what the student is taken to have
+    said, so a long name can be shortened on screen without the router losing
+    the words it matches on.
+    """
+    button = {"label": label or text, "send": text}
+    if description:
+        button["description"] = description
+    return button
+
+
+def industry_buttons():
+    return [_button(industry["label"],
+                    label=industry.get("short_label") or industry["label"])
+            for industry in electives.load_industries()]
+
+
+def industry_menu_reply(conversation, route=None, confidence=None):
+    _remember_menu(conversation, "industries")
+    return BotReply(industry_menu_body(), [], "industry-menu",
+                    industry_buttons(),
+                    route=route or router.INDUSTRY, route_confidence=confidence)
+
+
+# Job titles are stored lowercase, and `str.title()` mangles every acronym in
+# them -- "bi analyst" became "Bi Analyst", "heor analyst" "Heor Analyst". The
+# catalog's own spelling of these is the one students see on postings.
+_ACRONYMS = {
+    "bi": "BI", "ml": "ML", "ai": "AI", "crm": "CRM", "heor": "HEOR",
+    "aml": "AML", "sql": "SQL", "s&op": "S&OP", "fp&a": "FP&A",
+    "cpg": "CPG", "genai": "GenAI",
+}
+
+
+def title_case(title):
+    return " ".join(_ACRONYMS.get(word, word.title()) for word in title.split())
+
+
+def _industry_roles_body(industry):
+    """The industry's ten job titles, numbered, most in demand first.
+
+    NO PROFILE NOTE beside the title. Each row used to carry the profile it
+    maps to in brackets, and it read as "also known as" rather than "belongs
+    to": the Healthcare list showed `BI Analyst (BI Developer)` at 3 and
+    `BI Developer` at 9, so the note on one row named another row; and
+    `Supply Chain Analyst (Supply Chain)` said nothing at all.
+
+    Nothing is lost by dropping it. The mapping is self-evident one turn
+    later, because a curated recommendation opens with the profile's own name
+    -- pick "Applied Scientist" and the reply is headed "Data Scientist". What
+    a student is scanning here is job titles, so this is job titles.
+    """
+    lines = []
+    for index, (title, role_id) in enumerate(
+            electives.top_titles_for(industry["id"], 10), 1):
+        why = next((r.get("why") for r in industry["roles"]
+                    if r["id"] == role_id), "") or ""
+        tail = f" \u2014 {why}" if why else ""
+        lines.append(f"{index}. **{title_case(title)}**{tail}")
+    return (INDUSTRY_ROLES_INTRO.format(label=industry["label"],
+                                        blurb=industry.get("blurb") or "")
+            + "\n".join(lines) + INDUSTRY_ROLES_OUTRO)
+
+
+def industry_roles_reply(conversation, industry, confidence=None):
+    """The industry's top ten titles, and a note of which industry we are in.
+
+    The industry is remembered because the titles are ambiguous on their own.
+    "Growth analyst" is listed under BOTH Product and Marketing in the design
+    document, so re-matching the student's pick as free text resolves it to
+    whichever profile the matcher happens to reach first -- Product, even when
+    the student picked it from the Retail list where it means Marketing. The
+    menu knows which profile it offered; storing the industry lets the next
+    turn ask the menu rather than guess.
+    """
+    _remember_menu(conversation, "roles", industry["id"])
+    replies = [_button(title_case(title))
+               for title, _ in electives.top_titles_for(industry["id"], 10)]
+    return BotReply(_industry_roles_body(industry), [], "industry-roles", replies,
+                    route=router.INDUSTRY, route_confidence=confidence)
+
+
+# "6", "#6", "6.", "number 6", "option 3". A numbered list that will not take
+# a number is a list that lied about being numbered -- measured live: the menu
+# printed 1-6, said "Pick one", and a student who typed "6" was handed the
+# generic "tell me what you're aiming for" fallback.
+_JUST_A_NUMBER = re.compile(
+    r"^(?:option|number|no\.?|#)?\s*#?\s*(\d{1,2})\s*[.)]?$", re.IGNORECASE)
+
+
+def _said_a_number(question):
+    match = _JUST_A_NUMBER.match(" ".join((question or "").strip().split()))
+    return int(match.group(1)) if match else None
+
+
+def pick_by_number(conversation, question):
+    """What the student chose by typing a number, or None.
+
+    Scoped to the menu THIS conversation was last shown, so "2" is the second
+    industry after the industry menu and the second job title after the role
+    list. A number typed with no menu on screen means nothing and falls
+    through to ordinary routing rather than guessing at a list.
+    """
+    said = _said_a_number(question)
+    if said is None or said < 1:
+        return None
+    stored = planner.load_session_intake(conversation) or {}
+    menu = stored.get("menu")
+    if menu == "industries":
+        industries = electives.load_industries()
+        if said <= len(industries):
+            return ("industry", industries[said - 1])
+    if menu == "roles" and stored.get("industry"):
+        titles = electives.top_titles_for(stored["industry"], 10)
+        if said <= len(titles):
+            return ("role", titles[said - 1][1])
+    return None
+
+
+def _remember_menu(conversation, kind, industry_id=None):
     stored = planner.load_session_intake(conversation)
-    # A guess the student was offered last turn and has just accepted. Their
-    # "yes" is not a job title, so the suggestion becomes the name.
-    accepted = bool(stored.get("suggested_goal")) and _accepts_the_guess(question)
-    # What to look up, best source first. `ROLE_SYSTEM` asks the model to
-    # describe a JOB, so it has to be handed something job-shaped: given the
-    # raw sentence "I want to do somthign in esports" it answered known=false
-    # -- correctly, that is not a job -- and the whole route collapsed into a
-    # refusal that had searched for nothing.
-    #
-    # `route.industry` matters most here. `unmatched_role` is only ever set on
-    # a ROLE or COMBINATION route, so an INDUSTRY route arrived with nothing
-    # but the sentence -- and which of the two the classifier picks for "I want
-    # to do something in esports" is not stable between runs.
-    named = stored["suggested_goal"] if accepted else (
-        route.unmatched_role or route.industry
-        or _student_words(question) or question)
-    profile = role_lookup.skills_for_role(llm, named)
-    if profile and accepted:
-        profile = {**profile, "role": stored["suggested_goal"]}
-
-    # Did the model name a job the student did not?
-    # Ask whenever the student named no JOB at all, whatever the model came
-    # back with. The invention check alone was not enough: on one run the model
-    # echoed the student's own words closely enough to pass it, and the plan
-    # came out headed "somthign esports" -- a typo promoted to a career.
-    if (profile and not accepted
-            and not router.names_a_job_function(_student_words(question))
-            and not planner.session_has_asked(conversation, "what-work")):
-        planner.note_session_asked(conversation, "what-work")
-        planner.save_session_intake(
-            conversation, {**stored, "suggested_goal": profile["role"][:60]})
-        area = " ".join(word for word in (route.industry or named).split()
-                        if word.lower() not in _ROLE_FILLER) or named
-        close = curated_near(area)
-        if close:
-            planner.save_session_intake(
-                conversation, {**stored, "suggested_goal": close[0]})
-            return BotReply(ASK_WHAT_KIND_OF_WORK_CURATED.format(
-                area=area,
-                closest=", ".join(f"**{label}**" for label in close[:2])),
-                [], "intake", route=router.ROLE,
-                route_confidence=route.confidence)
-        return BotReply(
-            ASK_WHAT_KIND_OF_WORK.format(area=area, guess=profile["role"]),
-            [], "intake", route=router.ROLE, route_confidence=route.confidence)
-
-    if profile and not accepted:
-        # Compared against what the STUDENT wrote, not against
-        # `route.unmatched_role` -- that is the model's own extraction, so
-        # comparing the two asks whether the model agrees with itself. Measured:
-        # a classifier that read "I want to work in esports" as the role
-        # "esports analyst" made "analyst" look spoken, and the check passed on
-        # a word the student had never typed.
-        invented = invented_job_function(_student_words(question), profile["role"])
-        if invented and not planner.session_has_asked(conversation, "what-work"):
-            # Offer it, do not assert it.
-            planner.note_session_asked(conversation, "what-work")
-            planner.save_session_intake(
-                conversation, {**stored, "suggested_goal": profile["role"][:60]})
-            area = " ".join(
-                word for word in (route.industry or named).split()
-                if word.lower() not in _ROLE_FILLER) or named
-            close = curated_near(area)
-            if close:
-                # Suggest OUR set rather than the model's improvisation, and
-                # remember it as the guess so "yes" accepts something real.
-                planner.save_session_intake(
-                    conversation, {**stored, "suggested_goal": close[0]})
-                named_close = (f"**{close[0]}**" if len(close) == 1 else
-                               ", ".join(f"**{label}**" for label in close[:2]))
-                body = ASK_WHAT_KIND_OF_WORK_CURATED.format(
-                    area=area, closest=named_close)
-            else:
-                body = ASK_WHAT_KIND_OF_WORK.format(
-                    area=area, guess=profile["role"])
-            return BotReply(body, [], "intake", route=router.ROLE,
-                            route_confidence=route.confidence)
-        # The NAME is the student's, always. The lookup is worth having --
-        # what the model knows about the WORK is why we asked it -- but it
-        # gets the job title wrong in both directions: it RENAMED "esports
-        # analyst" to "data analyst", and it THINNED it to plain "analyst",
-        # losing the very word the student had added. Either way the heading
-        # ends up describing somebody else's career.
-        profile = {**profile, "role": _student_words(question) or profile["role"]}
-
-    matches = role_lookup.courses_for_role(profile) if profile else []
-    found = role_lookup.explain_fit(
-        llm, profile, matches, role_lookup.coverage_for_role(profile)) \
-        if matches else ""
-    if found:
-        stored = planner.load_session_intake(conversation)
-        settled = {**stored,
-                   "unmatched_goal": profile["role"][:60],
-                   "goal_courses": [row["course"]["id"] for row in matches],
-                   # The requirements themselves, not just what matched them.
-                   # Without these the plan cannot check its OWN coverage: the
-                   # figure quoted with the recommendation is about the six
-                   # courses that were recommended, and scheduling does not
-                   # promise to keep all six.
-                   "goal_skills": ((profile.get("skills") or [])
-                                   + (profile.get("tools") or [])
-                                   + (profile.get("topics") or []))[:40]}
-        # The question has been answered; the suggestion must not go on
-        # capturing later turns.
-        settled.pop("suggested_goal", None)
-        planner.save_session_intake(conversation, settled)
-        return BotReply(
-            UNCOVERED_ROLE_PREFIX.format(role=profile["role"]) + found
-            # Before the what-next prompt, so the sources sit against the
-            # claims they support rather than after a change of subject.
-            + role_lookup.cite(profile)
-            + UNCURATED_NEXT, [], "role-web", route=router.ROLE,
-            route_confidence=route.confidence)
-    # Cleared here too. Left set, a lookup that came back empty repeated its
-    # refusal for ever: "yup", "11 month", "skip" and "moderate" each came back
-    # with the same paragraph, because the question was still capturing turns
-    # long after it had been answered.
-    if stored.get("suggested_goal"):
-        planner.save_session_intake(
-            conversation, {key: value for key, value in stored.items()
-                           if key != "suggested_goal"})
-    return BotReply(planner.uncovered_career_reply(named), [],
-                    "no-track", route=router.ROLE,
-                    route_confidence=route.confidence, refused=True)
+    updated = {**stored, "menu": kind}
+    if industry_id:
+        updated["industry"] = industry_id
+    planner.save_session_intake(conversation, updated)
 
 
-# ---------------------------------------------------------------------------
-# Route: an industry we have no bundle for
-# ---------------------------------------------------------------------------
+def role_from_industry_menu(conversation, question):
+    """The role id behind a title the student just picked off the menu.
 
-NO_INDUSTRY_MATCH = (
-    # No claim about what was searched. This is reached from two paths -- a
-    # lookup that ran and found nothing, and one that could not run at all --
-    # and the old wording asserted a search either way.
-    "I couldn't find enough of what that field asks for in the MSBA elective "
-    "catalog to recommend anything honestly.\n\n"
-    "I won't name a course without a catalog match — a plausible-sounding "
-    "recommendation is worse than none. **MSBA advising** can tell you whether "
-    "the programme supports that direction; you can book time from the "
-    "**Appointments** tab.")
+    None when this conversation has not been shown a menu, or when the turn is
+    not one of the titles on it -- in which case the ordinary role matching
+    runs and this never gets in the way.
+    """
+    industry_id = (planner.load_session_intake(conversation) or {}).get("industry")
+    if not industry_id:
+        return None
+    said = " ".join((question or "").strip().lower().split())
+    for title, role_id in electives.top_titles_for(industry_id, 10):
+        if said == title.lower():
+            return role_id
+    return None
+
+
+# "what's the difference between the first two", "1 vs 2", "compare analytics
+# consultant and business analyst". A student looking at a numbered list of
+# ten job titles asks this before picking one, and it used to reach the
+# generic opening -- which answers a question about two named things by
+# asking what they are aiming for.
+_ASKS_TO_COMPARE = re.compile(
+    r"\b(differ|differs|different|difference|differences|compare|comparison|"
+    r"versus|vs)\b", re.IGNORECASE)
+
+_ORDINALS = {"first": 1, "1st": 1, "second": 2, "2nd": 2, "third": 3,
+             "3rd": 3, "fourth": 4, "4th": 4, "fifth": 5, "5th": 5,
+             "sixth": 6, "6th": 6, "seventh": 7, "7th": 7, "eighth": 8,
+             "8th": 8, "ninth": 9, "9th": 9, "tenth": 10, "10th": 10}
+_PAIR_WORDS = {"two": 2, "three": 3, "2": 2, "3": 3}
+
+
+def _compared_positions(question, count):
+    """The 1-based positions this turn is asking about, or []. Deterministic.
+
+    Reads the three shapes people use: an ordinal run ("the first two"),
+    explicit ordinals ("the first and the third"), and bare numbers ("1 vs 2").
+    """
+    said = " ".join((question or "").lower().split())
+    run = re.search(r"\b(?:first|top|last)\s+(two|three|2|3)\b", said)
+    if run:
+        size = _PAIR_WORDS[run.group(1)]
+        if "last" in run.group(0):
+            return [n for n in range(count - size + 1, count + 1) if n >= 1]
+        return list(range(1, min(size, count) + 1))
+    picked = [_ORDINALS[w] for w in re.findall(r"[a-z0-9]+", said)
+              if w in _ORDINALS]
+    picked += [int(n) for n in re.findall(r"\b(\d{1,2})\b", said)
+               if 1 <= int(n) <= count]
+    ordered = list(dict.fromkeys(picked))
+    return ordered[:3] if len(ordered) >= 2 else []
+
+
+def wants_a_comparison(conversation, question):
+    """(kind, [items]) for a comparison this conversation can answer, or None.
+
+    Scoped to the menu that is on screen, exactly like `pick_by_number`: "the
+    first two" means nothing without a list in front of it, and reading it as
+    a comparison of something else would be a guess.
+    """
+    if not _ASKS_TO_COMPARE.search(question or ""):
+        return None
+    stored = planner.load_session_intake(conversation) or {}
+    menu = stored.get("menu")
+    if menu == "industries":
+        industries = electives.load_industries()
+        positions = _compared_positions(question, len(industries))
+        named = [i for i in industries
+                 if i["label"].lower() in (question or "").lower()]
+        chosen = [industries[n - 1] for n in positions] or named
+        return ("industries", chosen[:3]) if len(chosen) >= 2 else None
+    if menu == "roles" and stored.get("industry"):
+        titles = electives.top_titles_for(stored["industry"], 10)
+        positions = _compared_positions(question, len(titles))
+        chosen = [titles[n - 1][1] for n in positions]
+        if len(chosen) < 2:
+            said = (question or "").lower()
+            chosen = [rid for title, rid in titles if title in said]
+        chosen = list(dict.fromkeys(chosen))
+        return ("roles", chosen[:3]) if len(chosen) >= 2 else None
+    return None
+
+
+COMPARE_ROLES_INTRO = "**{names}** — where they part company:\n\n"
+COMPARE_ROLES_OUTRO = (
+    "\n\nSay which one you want and I'll build the plan around it.")
+
+
+def _role_comparison(conversation, role_ids):
+    careers = electives.load_careers()
+    stored = planner.load_session_intake(conversation) or {}
+    industry = electives.industry_by_id(stored.get("industry") or "")
+    ranked = [r["id"] for r in (industry or {}).get("roles", [])]
+    rows = [careers[r] for r in role_ids]
+
+    lines = [COMPARE_ROLES_INTRO.format(
+        names=" vs ".join(r.get("short_label") or r["label"] for r in rows))]
+    head = " | ".join([""] + [r.get("short_label") or r["label"] for r in rows])
+    lines.append(f"|{head} |")
+    lines.append("|" + "---|" * (len(rows) + 1))
+    lines.append("| **The work** | "
+                 + " | ".join(r.get("work") or r.get("description") or ""
+                              for r in rows) + " |")
+    lines.append("| **What it asks of you** | "
+                 + " | ".join(r.get("gate") or "" for r in rows) + " |")
+    if industry and all(r in ranked for r in role_ids):
+        lines.append(f"| **Rank in {industry['label'].split(' (')[0]}** | "
+                     + " | ".join(f"#{ranked.index(r) + 1} of {len(ranked)}"
+                                  for r in role_ids) + " |")
+
+    # WHERE THE ELECTIVES PART. Two careers that read differently can still
+    # take nine of the same courses, and a student choosing between them
+    # deserves to know that before they agonise over it.
+    sets = {}
+    for role_id in role_ids:
+        bundle = bundles.bundle_for(role_id) or {}
+        sets[role_id] = {c for key in ("anchor", "differentiator", "universal")
+                         for c in (bundle.get(key) or [])}
+    shared = set.intersection(*sets.values()) if sets else set()
+    lines.append("\n**The electives, side by side.**\n")
+    for role_id in role_ids:
+        only = sorted(sets[role_id] - shared)
+        label = careers[role_id].get("short_label") or careers[role_id]["label"]
+        lines.append(f"- **Only {label}:** "
+                     + (", ".join(only) if only else "nothing of its own"))
+    lines.append(f"- **Both:** {len(shared)} courses in common"
+                 + (f" — {', '.join(sorted(shared)[:4])}…" if shared else ""))
+    return "".join(lines[:1]) + "\n".join(lines[1:]) + COMPARE_ROLES_OUTRO
+
+
+def _industry_comparison(industries):
+    lines = ["**" + " vs ".join(i["label"].split(" (")[0] for i in industries)
+             + "** — where they part company:\n"]
+    for industry in industries:
+        top = [title_case(t) for t, _ in electives.top_titles_for(industry["id"], 3)]
+        lines.append(f"\n**{industry['label'].split(' (')[0]}**"
+                     + (f" — {industry['blurb']}" if industry.get("blurb") else ""))
+        lines.append(f"  Hires most into: {', '.join(top)}.")
+    lines.append("\n\nSay which one and I'll show you its roles, ranked.")
+    return "\n".join(lines)
+
+
+def comparison_reply(conversation, kind, items, confidence=None):
+    body = (_role_comparison(conversation, items) if kind == "roles"
+            else _industry_comparison(items))
+    return BotReply(body, [], f"compare-{kind}", [],
+                    route=router.INDUSTRY, route_confidence=confidence)
+
+
+def resolve_industry(question):
+    """Which of the six industries this turn names, or None.
+
+    Matched on the industry's own label and on the words the label is made of,
+    so "fintech", "biotech", "e-commerce" and "consulting" all land. Anything
+    unrecognised returns None and gets the menu -- which is the honest answer,
+    because these six are the whole of what the mapping covers.
+    """
+    said = (question or "").lower()
+    best = None
+    for industry in electives.load_industries():
+        for word in _industry_words(industry):
+            # WHOLE WORDS, and a HYPHEN DOES NOT END A WORD. A substring test
+            # read "esports analyst" as the catch-all industry, because
+            # "sports" is one of its sectors and sits inside "esports"; the
+            # obvious repair, `\b...\b`, still matched "e-sports", because a
+            # hyphen is a word boundary to `\b`. So a job we have no profile
+            # for came back as a menu of six industries the student never
+            # asked about, and the spelling with the hyphen is the commoner
+            # one. The same trap waits in "e-commerce" and "bio-tech".
+            if not re.search(rf"(?<![\w-]){re.escape(word)}(?![\w-])", said):
+                continue
+            if best is None or len(word) > best[0]:
+                best = (len(word), industry)
+    return best[1] if best else None
+
+
+def _industry_words(industry):
+    label = industry["label"].lower()
+    words = {label}
+    # "Technology / Software" -> {"technology", "software"}; the parenthesised
+    # tail of the catch-all industry is a list of its own sectors.
+    for chunk in re.split(r"[/(),]| and | & ", label):
+        chunk = chunk.strip()
+        if len(chunk) > 3 and chunk != "other":
+            words.add(chunk)
+    words.update(_INDUSTRY_ALIASES.get(industry["id"], ()))
+    return words
+
+
+_INDUSTRY_ALIASES = {
+    "technology-software": ("tech", "saas", "software", "startup", "startups"),
+    "financial-services": ("finance", "fintech", "banking", "bank",
+                           "insurance", "financial"),
+    "consulting": ("consultancy", "advisory"),
+    "healthcare": ("health", "biotech", "pharma", "life sciences", "medical",
+                   "medtech", "device"),
+    "retail-cpg": ("retail", "cpg", "ecommerce", "e-commerce", "consumer",
+                   "grocery"),
+    "other": ("media", "gaming", "games", "energy", "government", "defense",
+              "defence", "sports", "telecom", "public sector"),
+}
 
 
 def _answer_industry(llm, route, conversation, question):
-    """Web for the field's requirements, catalog for the courses. Never both.
+    """An industry question, answered from the curated taxonomy only.
 
-    This is `grounded_course_advisor` unchanged, and it is where the aerospace
-    case stops being plausible-and-unhelpful: when nothing in the catalog
-    matches, the reply says so and names no course, rather than returning six
-    courses that share the word "analytics" with the question.
+    This used to run a web search for what the field asks for and match the
+    result against the catalog. That is gone for the same reason the web role
+    lookup is: it produced a second, differently-sourced answer wearing the
+    same clothes as the curated one.
 
-    `recommend_for_question` returns None for TWO different reasons and they
-    need different answers. Either the lookup ran and found nothing usable, or
-    it never ran at all because the question is not shaped like an industry
-    question. "Aerospace engineer" is the second: it names a JOB, the classifier
-    called it an industry because "aerospace" is a field word, and the reply
-    came back in 1.8 seconds saying "I searched for what that field currently
-    asks for" -- a claim about a search that had not happened. Falling through
-    to the role path both tells the truth and answers the question that was
-    actually asked.
+    What replaced it is not a smaller answer. The design document ranks every
+    profile WITHIN each of six industries, which is better than anything the
+    search returned -- it is specific to this programme's fourteen profiles and
+    it is reviewed. An industry we do not cover gets the menu of the six we do,
+    rather than a plausible answer about a seventh.
     """
-    body, codes = recommend_for_question(llm, question)
-    if body:
-        return BotReply(body, [], "industry-catalog", route=router.INDUSTRY,
-                        route_confidence=route.confidence, refused=not codes)
-    reply = _uncurated_role(llm, route, conversation, question)
-    if not reply.refused:
-        return reply
-    return BotReply(NO_INDUSTRY_MATCH, [], "industry-none",
-                    route=router.INDUSTRY, route_confidence=route.confidence,
-                    refused=True)
+    industry = resolve_industry(question)
+    if industry:
+        return industry_roles_reply(conversation, industry, route.confidence)
+    return industry_menu_reply(conversation, router.INDUSTRY, route.confidence)
 
 
 # ---------------------------------------------------------------------------
@@ -924,15 +1549,16 @@ def _answer_industry(llm, route, conversation, question):
 # ---------------------------------------------------------------------------
 
 COMBINATION_JOIN = (
-    "\n\n---\n\n**Now the {industry} part.** The spine above is fixed by the "
-    "role; where the field changes things is which electives you pick around "
-    "it. Here is what that field currently asks for, matched only against this "
-    "catalog:\n\n")
+    "\n\n---\n\n**Now the {industry} part.** That role sits **#{rank} of "
+    "{total}** in how much this industry hires MSBA graduates into it{why}.\n\n"
+    "The electives above are still the spine \u2014 the role decides those. What "
+    "the industry changes is who you are competing with, so here is the rest of "
+    "the ranking for context:\n\n")
 
-COMBINATION_NO_FIELD = (
-    "\n\n---\n\n_On the {industry} side: I searched for what that field asks "
-    "for and couldn't match enough of it to this catalog to add anything "
-    "beyond the set above. That set is still the right spine for the role._")
+COMBINATION_NOT_RANKED = (
+    "\n\n---\n\n_On the {industry} side: that role isn't one this industry "
+    "is ranked for in the elective mapping, which usually means it is hired "
+    "for elsewhere. The set above is still the right spine for the role._")
 
 
 def _answer_combination(llm, route, conversation, question, history):
@@ -959,12 +1585,24 @@ def _answer_combination(llm, route, conversation, question, history):
         # and then re-ran the same lookup -- by which time `what-work` was
         # already marked as asked, so the second pass could only refuse.
         return spine
-    industry_body, codes = recommend_for_question(llm, question)
-    label = route.industry or "industry"
-    if industry_body and codes:
-        spine.body += COMBINATION_JOIN.format(industry=label) + industry_body
+    industry = resolve_industry(route.industry or question)
+    label = (industry or {}).get("label") or route.industry or "industry"
+    ranked = [r["id"] for r in industry["roles"]] if industry else []
+    if industry and route.role_id in ranked:
+        position = ranked.index(route.role_id)
+        why = next((r.get("why") for r in industry["roles"]
+                    if r["id"] == route.role_id), "") or ""
+        careers = electives.load_careers()
+        rest = "\n".join(
+            f"{i}. **{(careers.get(r['id']) or {}).get('short_label') or r['id']}**"
+            + (f" \u2014 {r['why']}" if r.get("why") else "")
+            + ("  \u2190 you" if r["id"] == route.role_id else "")
+            for i, r in enumerate(industry["roles"], 1))
+        spine.body += COMBINATION_JOIN.format(
+            industry=label, rank=position + 1, total=len(ranked),
+            why=f" \u2014 {why.lower()}" if why else "") + rest
     else:
-        spine.body += COMBINATION_NO_FIELD.format(industry=label)
+        spine.body += COMBINATION_NOT_RANKED.format(industry=label)
     spine.route = router.COMBINATION
     spine.model_note = "curated+industry"
     return spine
@@ -1038,6 +1676,13 @@ def _answer_factual(llm, route, question, history):
 def _answer_situational(llm, route, conversation, question):
     """Deterministic arithmetic, model-written interpretation. See `situation`."""
     stored = planner.load_session_situation(conversation)
+    # Seeded from the intake. The situational session is its own record, so a
+    # student who had given their track two turns earlier was asked for it
+    # again -- "I need to know which track you're on now" -- by a route that
+    # could have read it off the plan it was standing next to.
+    intake = planner.load_session_intake(conversation) or {}
+    if not stored.get("track") and intake.get("track"):
+        stored = {**stored, "track": intake["track"]}
     body, asked, resolved = situation.answer(llm, conversation.user, question,
                                              stored)
     # Written whether or not anything was asked: a partial position is exactly
@@ -1048,6 +1693,13 @@ def _answer_situational(llm, route, conversation, question):
     # route asked one turn ago.
     planner.save_session_situation(conversation,
                                    {**stored, **resolved, "awaiting": asked})
+    # And back the other way: a track this route worked out is a track the
+    # intake has. Without it a student who had just been told "11 month
+    # track, starting from Winter -- 2 quarters left" was asked which track
+    # they were on by the very next turn.
+    if resolved.get("track") in planner.TRACK_SKELETONS and not intake.get("track"):
+        planner.save_session_intake(conversation,
+                                    {**intake, "track": resolved["track"]})
     return BotReply(body, [], "situation", route=router.SITUATIONAL,
                     route_confidence=route.confidence)
 
@@ -1296,6 +1948,16 @@ def _apply_quarter_load(conversation, answers, index, load):
     options = planner.load_options_for(track, quarter["key"], chosen,
                                        set(decided))
 
+    if not planner.load_is_a_choice(track):
+        # Any quarter, Summer included: "moderate" said on the 11-month
+        # walk-through is answered with why there is nothing to choose,
+        # not with Summer's "say next quarter and I'll show you one you can
+        # change" -- on this track there is no such quarter.
+        reply = _review_reply(conversation, user, answers, index)
+        return spoken(BotReply(
+            LOAD_FIXED_ON_TRACK.format(label=quarter["label"],
+                                       units=quarter["unitsPlanned"], track=track)
+            + reply.body, [], "review", reply.quick_replies, route="plan"))
     if not planner.units_for_load(track, quarter["key"], "moderate"):
         return BotReply(NOT_ADJUSTABLE.format(label=quarter["label"]), [],
                         "review", route="plan")
@@ -1336,12 +1998,24 @@ def _apply_quarter_load(conversation, answers, index, load):
     planner.save_session_intake(conversation, answers)
     planner.save_intake(user, answers)
 
+    # Report what the plan ACTUALLY carries, not the target it was given. The
+    # lead said "Fall is now light -- 12 units" and the quarter rendered under
+    # it said "Fall -- 14 units": the target was 12, but the recommended set
+    # has no 2-unit course offered in Fall to come down to it, so the flex
+    # left it at 14. A student reading both numbers on one screen has been
+    # told two things, and the second one is the plan.
+    rebuilt = planner.build_for(answers, planner.taken_course_ids(user))
+    actual = {q["key"]: q["unitsPlanned"] for q in rebuilt["quarters"]}
+    here = actual.get(quarter["key"], wanted[quarter["key"]])
     others = [key for key in wanted if key != quarter["key"]]
-    lead = [f"**{quarter['label']}** is now {load} — "
-            f"{wanted[quarter['key']]} units.",
+    first = f"**{quarter['label']}** is now {load} — {here} units."
+    if here != wanted[quarter["key"]]:
+        first += (f" (Asked for {wanted[quarter['key']]}; the courses this path "
+                  f"needs land it at {here} — nothing smaller is offered there.)")
+    lead = [first,
             "The other quarters absorbed it: "
-            + ", ".join(f"{planner.quarter_label(track, key)} {wanted[key]} units"
-                        for key in others)
+            + ", ".join(f"{planner.quarter_label(track, key)} "
+                        f"{actual.get(key, wanted[key])} units" for key in others)
             + f". The degree is still {planner.TOTAL_UNITS} units."]
     reply = _review_reply(conversation, user, answers, index)
     return spoken(BotReply("\n\n".join(lead) + "\n\n---\n\n" + reply.body,
@@ -1397,9 +2071,26 @@ def _maintenance(llm, conversation, question, answers):
 
     change = _handle_change_request(user, answers, question)
     if change is not None:
-        if session is not None:
-            return spoken(_review_reply(conversation, user, answers, session["index"]))
+        if session is not None and change.body.startswith("Swapped"):
+            # Mid-walk-through, a successful swap re-renders the quarter on
+            # screen -- but SAYS what it did first. The re-render alone was
+            # returned before, so "swap MGTA 466 for MGTA 457" produced the
+            # same quarter again with no acknowledgement, and a swap that
+            # could NOT be made ("457 is already in your plan") was
+            # indistinguishable from one that had.
+            lead = change.lead or change.body.split("\n", 1)[0]
+            review = _review_reply(conversation, user, answers, session["index"])
+            return spoken(BotReply(f"{lead}\n\n---\n\n{review.body}", [],
+                                   "review", review.quick_replies, route="plan"))
         return change
+
+    # A course named that is in the catalog but not the plan, and wanted.
+    # After the change handler, which owns every turn naming a course that IS
+    # in the plan; before the router, which would answer from the catalog row
+    # without knowing which quarter of this plan the answer points at.
+    available = _course_availability(user, answers, question)
+    if available is not None:
+        return available
 
     if _wants_the_plan(question):
         return spoken(_plan_reply(user, answers))
@@ -1433,9 +2124,29 @@ NUDGES = (
 )
 
 
+NUDGE_TRACK_ONLY = (
+    "\n\n---\n\nWhenever you're ready, tell me **which track** you're on "
+    "\u2014 the 11-month or the 17-month \u2014 and I'll lay the plan out "
+    "quarter by quarter.")
+NUDGE_GOAL_ONLY = (
+    "\n\n---\n\nWhenever you're ready, tell me **what you're aiming for** "
+    "\u2014 a job title or an industry, or say you're not sure \u2014 and "
+    "I'll lay out your whole plan of study.")
+
+
 def _with_a_way_back(conversation, answers, reply):
     """Append the offer to plan, at most twice per conversation."""
     if reply.route not in _DETOURS or reply.model_note == "unclear-opening":
+        return reply
+    if reply.model_note in ("industry-menu", "industry-roles",
+                            "compare-roles", "compare-industries",
+                            "small-talk", "degree-fact"):
+        # A menu ends with its own instruction -- "pick one and I'll show you
+        # the roles it hires for". Appending "tell me what you're aiming for
+        # and which track you're on" under it asks a SECOND, different question
+        # about the same turn, and the student is left choosing which one to
+        # answer. Measured live: the menu printed six industries, the nudge
+        # asked for a job title, and the next turn was neither.
         return reply
     if answers.get("track") and answers.get("goals"):
         return reply            # the plan exists; nothing to come back to
@@ -1444,6 +2155,14 @@ def _with_a_way_back(conversation, answers, reply):
         if planner.session_has_asked(conversation, key):
             continue
         planner.note_session_asked(conversation, key)
+        # Only the half that is missing. With a goal on file the nudge still
+        # read "tell me what you're aiming for and which track" -- asking for
+        # something the student had said two turns earlier.
+        if position == 0:
+            if answers.get("goals"):
+                nudge = NUDGE_TRACK_ONLY
+            elif answers.get("track"):
+                nudge = NUDGE_GOAL_ONLY
         reply.body += nudge
         return reply
     return reply
@@ -1457,13 +2176,15 @@ CAREERS_INTRO = (
     "I have ready-made pathways for **{count}** careers. Each one is a "
     "hand-built set of electives rather than something assembled on the "
     "spot:\n\n")
+# The old second half promised "I'll look up what that job asks for, match it
+# against this catalog" -- the removed web lookup, still advertised. What
+# actually happens now is the industry menu, so that is what it says.
 CAREERS_OUTRO = (
     "\n\nName any of them and I'll build the whole plan of study — say the "
     "track in the same breath (*\"11 month, data scientist\"*) and I'll go "
-    "straight to it.\n\n**Not on the list?** Say what you're aiming for "
-    "anyway. I'll look up what that job asks for, match it against this "
-    "catalog, and tell you how much of it we actually cover — including the "
-    "parts we don't.")
+    "straight to it.\n\n**Not on the list?** Say **show me the industries** "
+    "and I'll go the other way round: pick a field, and I'll show you the "
+    "roles it hires MSBA graduates into, ranked.")
 
 
 def _answer_careers(route):
@@ -1584,6 +2305,14 @@ def answer(llm, conversation, question, history):
     bad" is a complaint about a black box rather than a finding about a route.
     """
     answers = planner.load_session_intake(conversation)
+
+    # Three cheap answers that need no route, ahead of plan maintenance --
+    # which claims any turn naming a course code, and was answering "why did
+    # you pick MGTA 463" with a table of alternatives to it.
+    direct = _direct_answer(conversation, answers, question)
+    if direct is not None:
+        return _with_a_way_back(conversation, answers, direct)
+
     maintained = _maintenance(llm, conversation, question, answers)
     if maintained is not None:
         if not maintained.route:
@@ -1599,26 +2328,72 @@ def answer(llm, conversation, question, history):
     # nothing was ruled, or when the rule was ROLE -- which is the one route
     # `_intake_progress` can legitimately complete, because a role plus a track
     # IS the plan.
+    # A title the industry menu just offered. Ahead of every route, because
+    # the menu is the authority on what it meant: "growth analyst" appears
+    # under two profiles, and free-text matching resolves it to the wrong one
+    # when it was picked off the Retail list. Nothing happens here unless this
+    # conversation has actually been shown a menu.
+    # A comparison of two things the menu just offered. Before the numbered
+    # pick, because "1 vs 2" contains numbers and is not a pick of either.
+    comparing = wants_a_comparison(conversation, question)
+    if comparing:
+        return _with_a_way_back(conversation, answers, comparison_reply(
+            conversation, comparing[0], comparing[1]))
+
+    # An industry named while the INDUSTRY MENU is on screen is a pick from
+    # it, whatever else the word could mean. "something in fintech", typed at
+    # the menu, is an alias for the Financial Analytics profile as well as an
+    # industry -- and the rule router, seeing the role, built that bundle. The
+    # menu never advanced, so the student's next turn, "5", picked the fifth
+    # INDUSTRY rather than the fifth role. Context settles it: they were
+    # looking at a list of industries.
+    if (planner.load_session_intake(conversation) or {}).get("menu") == "industries":
+        named = resolve_industry(question)
+        if named:
+            return _with_a_way_back(conversation, answers,
+                                    industry_roles_reply(conversation, named))
+
+    numbered = pick_by_number(conversation, question)
+    if numbered:
+        kind, value = numbered
+        if kind == "industry":
+            return _with_a_way_back(conversation, answers,
+                                    industry_roles_reply(conversation, value))
+        return _with_a_way_back(conversation, answers, _answer_role(
+            llm, router.Route(router.ROLE, role_id=value,
+                              why="picked by number from the menu"),
+            conversation, question, history))
+
+    picked = role_from_industry_menu(conversation, question)
+    if picked:
+        return _with_a_way_back(conversation, answers, _answer_role(
+            llm, router.Route(router.ROLE, role_id=picked,
+                              why="picked from the industry menu"),
+            conversation, question, history))
+
+    # "I don't know" is an answer, and the one this surface exists to handle.
+    # It is asked BEFORE classification because no classifier can place it --
+    # the words carry no subject at all -- and the old behaviour was to route
+    # it as UNCLEAR and ask the student to rephrase, which is the least useful
+    # possible reply to somebody who has just said they are stuck.
+    if wants_the_industry_menu(question):
+        return _with_a_way_back(conversation, answers,
+                                industry_menu_reply(conversation))
+
     ruled = router.rule_route(question)
 
-    # A turn answering "what kind of work do you want to do in it?".
-    #
-    # THE fix, rather than the longer acceptance list above. "yup" was not on
-    # that list, so a student who had answered the question was handed the
-    # generic opening as though they had said nothing -- and any word not on
-    # the list would have done the same. A question we asked one turn ago owns
-    # the next turn unless that turn is plainly about something else, which is
-    # the same rule the situational route already follows.
-    # Never for a turn that teaches the intake something: without this it
-    # stole "11 month", which is the very next thing this route asks for.
-    if (answers.get("suggested_goal")
-            and planner.session_has_asked(conversation, "what-work")
-            and not learned_from(question)
-            and (ruled is None or ruled.name == router.UNCLEAR)):
-        return _with_a_way_back(conversation, answers, _uncurated_role(
-            llm, router.Route(router.ROLE,
-                              why="answering the question this route asked"),
-            conversation, question))
+    # One of the six industries, named outright, with no job title alongside
+    # it. Deterministic on purpose: the six are a CLOSED SET, so recognising
+    # one is a lookup rather than a judgement, and paying a classifier call to
+    # be told "industry" about the word "fintech" is a second-long round trip
+    # for an answer already on disk. A turn that names a role as well falls
+    # through to the router, which has a combination route for exactly that.
+    if ruled is None and not router.matched_role(question):
+        named = resolve_industry(question)
+        if named:
+            return _with_a_way_back(
+                conversation, answers,
+                industry_roles_reply(conversation, named))
 
     # A turn that answers a question this surface asked one turn ago. Only the
     # situational route asks anything, and what comes back is usually a single
@@ -1633,7 +2408,7 @@ def answer(llm, conversation, question, history):
                               why="answering a question this route asked"),
             conversation, question)
 
-    if ruled is None or ruled.name == router.ROLE:
+    if ruled is None or ruled.name in (router.ROLE, router.COMBINATION):
         progressed = _intake_progress(conversation, question, answers)
         if progressed is not None:
             return progressed

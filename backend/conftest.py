@@ -40,3 +40,19 @@ def _no_real_llm(settings):
     # so tests overlay the fake-calibrated thresholds — the same deploy-free
     # override mechanism production tuning uses.
     settings.THRIVE_BOT_CONFIG = _BOTS_TEST_CONFIG
+
+
+@pytest.fixture(autouse=True)
+def _cold_retrieval_cache():
+    """Every test starts with no cached corpus.
+
+    The cache keys on a fingerprint of the corpus, and the fingerprint is
+    strong enough that this is belt-and-braces -- but a test that edits a
+    chunk in place, keeping its length and its document's timestamp, would be
+    the one case the fingerprint cannot see, and tests are exactly where
+    someone does that.
+    """
+    from rsm_thrive.services import retrieval
+    retrieval.forget_corpus()
+    yield
+    retrieval.forget_corpus()

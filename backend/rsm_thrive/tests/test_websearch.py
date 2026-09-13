@@ -9,7 +9,7 @@ below is really the same test: that the promise and the behaviour agree.
 
 import pytest
 
-from rsm_thrive.services import role_lookup, websearch
+from rsm_thrive.services import websearch
 from rsm_thrive.services.llm import LLM, FakeLLM
 
 
@@ -160,54 +160,6 @@ class TestSearchChatActuallySearches:
         assert seen["search"] is True and got == []
 
 
-class TestCitation:
-    def test_a_grounded_profile_says_where_it_read(self):
-        line = role_lookup.cite({"sources": [
-            {"title": "Esports analyst skills", "url": "https://example.com/a"}]})
-        assert "[Esports analyst skills](https://example.com/a)" in line
-
-    def test_it_credits_the_web_for_skills_and_us_for_courses(self):
-        """The separation the uncurated path is built on must survive the citation."""
-        line = role_lookup.cite({"sources": [{"title": "t", "url": "https://e.com"}]})
-        assert "role needs was read from the web" in line
-        assert "courses are ours" in line
-
-    @pytest.mark.parametrize("profile", [
-        {}, {"sources": []}, {"sources": [{"title": "no url", "url": ""}]}])
-    def test_nothing_is_claimed_when_nothing_was_searched(self, profile):
-        assert role_lookup.cite(profile) == ""
-
-    def test_at_most_three_are_listed(self):
-        line = role_lookup.cite({"sources": [
-            {"title": f"t{i}", "url": f"https://e.com/{i}"} for i in range(6)]})
-        assert line.count("](http") == 3
-
-    def test_the_recommendation_carries_the_citation(self, settings, monkeypatch):
-        settings.THRIVE_SEARCH = "duckduckgo"
-        monkeypatch.setattr(websearch, "_PROVIDERS", {"duckduckgo": lambda q, limit: [
-            websearch.Result("Hiring guide", "https://example.com/guide", "snippet")]})
-        llm = FakeLLM([
-            '{"known": true, "role": "Esports Analyst", "summary": "s",'
-            ' "skills": ["sql", "dashboards", "forecasting"], "tools": ["python"],'
-            ' "topics": ["gaming"]}',
-            "Here is what the catalog offers.",
-        ])
-        reply, matches = role_lookup.recommend_for_unknown_role(llm, "esports analyst")
-        assert matches
-        assert "https://example.com/guide" in reply
-
-    def test_an_unsearched_recommendation_claims_nothing(self, settings):
-        settings.THRIVE_SEARCH = "none"
-        llm = FakeLLM([
-            '{"known": true, "role": "Esports Analyst", "summary": "s",'
-            ' "skills": ["sql", "dashboards", "forecasting"], "tools": ["python"],'
-            ' "topics": ["gaming"]}',
-            "Here is what the catalog offers.",
-        ])
-        reply, _ = role_lookup.recommend_for_unknown_role(llm, "esports analyst")
-        assert "read from the web" not in reply
-
-
 class TestTheQueryCache:
     """Repeats are free, misses are not cached, and tests never share state."""
 
@@ -265,31 +217,6 @@ class TestWhatGetsSearched:
             [{"role": "user", "content": "what should I take to work in esports?"}],
             search_query="esports jobs required skills")
         assert asked == ["esports jobs required skills"]
-
-    def test_the_advisor_searches_the_field_not_the_question(self, settings, monkeypatch):
-        """Searched verbatim, this question returns course listings, not hiring pages."""
-        from rsm_thrive.services.grounded_course_advisor import advisor
-
-        settings.THRIVE_SEARCH = "duckduckgo"
-        asked = []
-        monkeypatch.setattr(websearch, "_PROVIDERS", {
-            "duckduckgo": lambda q, limit: (asked.append(q), _results(1))[1]})
-        advisor._requirements(
-            FakeLLM(['{"summary":"s","skills":["sql"],"tools":[],"topics":[]}']),
-            "what should I take if I want to work in esports?", field="esports")
-        assert asked == ["esports jobs required skills"]
-
-    def test_role_lookup_searches_the_job(self, settings, monkeypatch):
-        settings.THRIVE_SEARCH = "duckduckgo"
-        asked = []
-        monkeypatch.setattr(websearch, "_PROVIDERS", {
-            "duckduckgo": lambda q, limit: (asked.append(q), _results(1))[1]})
-        role_lookup.skills_for_role(
-            FakeLLM(['{"known":true,"role":"r","summary":"s","skills":["sql"],'
-                     '"tools":[],"topics":[]}']),
-            "esports analyst")
-        assert asked == ["esports analyst job required skills"]
-
 
 class TestTheKeylessProvider:
     """`_duckduckgo` itself, which every other test monkeypatches away.
@@ -443,43 +370,3 @@ class TestTheProviderChain:
                             {"duckduckgo": lambda q, limit: _results(1)})
         assert len(websearch.search("q")) == 1
 
-
-class TestTheRolePathCitesToo:
-    """It assembles its own reply rather than calling
-    `role_lookup.recommend_for_unknown_role`, so it needed the citation adding
-    separately -- and shipped once without it."""
-
-    def _reply(self, settings, monkeypatch, django_user_model):
-        from rsm_thrive.models import Conversation
-        from rsm_thrive.services import orchestrator, router
-
-        settings.THRIVE_SEARCH = "duckduckgo"
-        monkeypatch.setattr(websearch, "_PROVIDERS", {"duckduckgo": lambda q, limit: [
-            websearch.Result("Sports Analytics Hiring", "https://example.com/hiring",
-                             "SQL, dashboards, forecasting, experiment design.")]})
-        user = django_user_model.objects.create_user(username="s", password="x")
-        conversation = Conversation.objects.create(
-            user=user, destination="courses", title="t")
-        llm = FakeLLM([
-            '{"known": true, "role": "Sports Analytics Manager", "summary": "s",'
-            ' "skills": ["sql", "dashboards", "forecasting"], "tools": ["python"],'
-            ' "topics": ["sport"]}',
-            "Here is what the catalog offers for that.",
-        ])
-        return orchestrator._uncurated_role(
-            llm, router.Route(router.ROLE), conversation,
-            "i want to be a sports analytics manager")
-
-    @pytest.mark.django_db
-    def test_the_uncurated_role_reply_shows_its_sources(
-            self, settings, monkeypatch, django_user_model):
-        body = self._reply(settings, monkeypatch, django_user_model).body
-        assert "https://example.com/hiring" in body, "the role path cited nothing"
-
-    @pytest.mark.django_db
-    def test_the_citation_precedes_the_what_next_prompt(
-            self, settings, monkeypatch, django_user_model):
-        from rsm_thrive.services.orchestrator import UNCURATED_NEXT
-
-        body = self._reply(settings, monkeypatch, django_user_model).body
-        assert body.index("read from the web") < body.index(UNCURATED_NEXT.strip()[:30])
