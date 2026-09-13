@@ -1,0 +1,205 @@
+<title>THRIVE Console Manual</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=Libre+Franklin:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --paper:#FFFFFF; --surface:#F6F8FC; --ink:#141C28; --ink-2:#485463;
+    --ink-3:#6B7787; --line:#D8E0EA; --accent:#2B4FD0; --accent-ink:#1E3AA8;
+    --accent-soft:#E7ECFB; --ship:#1E9C5B; --ship-soft:#E1F4E9; --warn:#B4761A; --warn-soft:#F7EEDB;
+    --display:"Bricolage Grotesque","Libre Franklin",sans-serif;
+    --body:"Libre Franklin",system-ui,sans-serif; --mono:"IBM Plex Mono",monospace;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font-family:var(--body);
+    font-size:11pt; line-height:1.6; }
+  .page { max-width:820px; margin:0 auto; padding:0 26px 60px; }
+  h1,h2,h3 { font-family:var(--display); font-weight:700; line-height:1.15; text-wrap:balance; }
+  h1 { font-size:2.2rem; letter-spacing:-.015em; margin:0 0 8px; }
+  h2 { font-size:1.4rem; margin:34px 0 12px; padding-bottom:6px; border-bottom:1px solid var(--line); }
+  h3 { font-size:1.08rem; margin:20px 0 6px; }
+  p { max-width:70ch; }
+  code, .mono { font-family:var(--mono); font-size:.9em; }
+  code { background:var(--surface); padding:1px 5px; border-radius:5px; }
+  a { color:var(--accent-ink); }
+  .eyebrow { font-family:var(--mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--accent-ink); margin:0 0 14px; }
+  header.top { padding:36px 0 20px; border-bottom:2px solid var(--ink); }
+  .meta { font-family:var(--mono); font-size:11.5px; color:var(--ink-3); margin-top:12px; }
+
+  .callout { background:var(--accent-soft); border-left:3px solid var(--accent); border-radius:8px;
+    padding:12px 16px; margin:14px 0; font-size:.95em; }
+  .warn { background:var(--warn-soft); border-left-color:var(--warn); }
+  .warn strong { color:var(--warn); }
+
+  ol.steps { padding-left:22px; }
+  ol.steps li { margin-bottom:8px; }
+  ul.tight li { margin-bottom:5px; }
+
+  table { border-collapse:collapse; width:100%; font-size:.92em; margin:12px 0; }
+  th, td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { font-family:var(--mono); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--ink-3); }
+  td:first-child { font-weight:600; white-space:nowrap; }
+
+  .role { display:inline-block; font-family:var(--mono); font-size:10.5px; font-weight:500;
+    padding:2px 8px; border-radius:99px; }
+  .role-a { color:var(--accent-ink); background:var(--accent-soft); }
+  .role-f { color:var(--warn); background:var(--warn-soft); }
+
+  .task { background:var(--surface); border:1px solid var(--line); border-radius:10px;
+    padding:16px 20px; margin:14px 0; }
+  .task h3 { margin-top:0; display:flex; align-items:center; gap:10px; }
+
+  @page { size:A4; margin:15mm 15mm; }
+  @media print {
+    * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    h2, h3 { break-after:avoid; }
+    .task, .callout, table { break-inside:avoid; }
+  }
+</style>
+
+<div class="page">
+  <header class="top">
+    <p class="eyebrow">Instruction Manual</p>
+    <h1>THRIVE Console</h1>
+    <p>The backend where staff and faculty manage the THRIVE student hub — its
+    content, records, and day-to-day operations.</p>
+    <p class="meta">Version 1 · 12 Sep 2026 · covers the admin-console build</p>
+  </header>
+
+  <h2>1. What this is</h2>
+  <p>The THRIVE Console is the control panel behind the student app. From one
+  place you can edit what the assistant knows, review and correct its answers,
+  manage courses, advisors, events and student records, and run maintenance
+  jobs. It runs at the web address <code>/admin/</code> on the THRIVE server.</p>
+  <p>There are two kinds of user:</p>
+  <ul class="tight">
+    <li><span class="role role-a">Admin</span> &nbsp;Full access — every record, plus Content management and Operations.</li>
+    <li><span class="role role-f">Faculty</span> &nbsp;Scoped access — read the curriculum and review/correct the bot's answers.</li>
+  </ul>
+
+  <h2>2. Getting in</h2>
+  <ol class="steps">
+    <li>Open the console at <code>https://rsm-vnijs.ucsd.edu/thrive/admin/</code> (or, when testing locally, <code>http://127.0.0.1:8000/admin/</code>).</li>
+    <li>Sign in with the username and password you were given.</li>
+    <li>You'll land on the console home, which lists the sections you're allowed to use.</li>
+  </ol>
+  <div class="callout">If you see a login page again after signing in, your
+  account isn't in a console group yet. Ask an administrator to add you to
+  <strong>THRIVE Admin</strong> or <strong>THRIVE Faculty</strong>.</div>
+
+  <h2>3. The home page</h2>
+  <p>The home page groups everything by area. The main things you'll use:</p>
+  <table>
+    <tr><th>Section</th><th>What's there</th><th>Who</th></tr>
+    <tr><td>Content management</td><td>Edit the catalog; re-ingest the corpus the bots answer from.</td><td>Admin</td></tr>
+    <tr><td>Operations</td><td>Run maintenance jobs (rebuild catalog, refresh jobs, reports, evals).</td><td>Admin</td></tr>
+    <tr><td>Answer review</td><td>Read the bot's answers and record corrections.</td><td>Admin, Faculty</td></tr>
+    <tr><td>Courses / Syllabi</td><td>The curriculum. Faculty can read; admins edit.</td><td>Admin edit, Faculty read</td></tr>
+    <tr><td>Advisors, Appointments, Events</td><td>Scheduling records.</td><td>Admin</td></tr>
+    <tr><td>Jobs, Resume, Skills</td><td>Career records.</td><td>Admin</td></tr>
+    <tr><td>Students, Requests, Tasks</td><td>Student profiles and their activity.</td><td>Admin</td></tr>
+    <tr><td>Chat oversight</td><td>Full turn traces with the passages behind each answer.</td><td>Admin</td></tr>
+  </table>
+
+  <h2>4. Common tasks</h2>
+
+  <div class="task">
+    <h3>Edit the catalog <span class="role role-a">Admin</span></h3>
+    <ol class="steps">
+      <li>Open <strong>Content management</strong>.</li>
+      <li>Under Catalog, click the file to edit (<code>courses.json</code>, <code>careers.json</code>, or <code>bundles.json</code>).</li>
+      <li>Make your change in the editor. It must stay valid JSON.</li>
+      <li>Click <strong>Validate &amp; save</strong>. The console checks the JSON, saves the file, and refreshes the bots' caches so the change is live.</li>
+    </ol>
+    <div class="callout">For course facts that come from a syllabus, the durable
+    path is to edit the syllabus and then run <strong>Rebuild catalog</strong>
+    on the Operations page, rather than editing <code>courses.json</code> by hand.</div>
+  </div>
+
+  <div class="task">
+    <h3>Re-ingest the corpus <span class="role role-a">Admin</span></h3>
+    <ol class="steps">
+      <li>Update the source markdown for the corpus on the server (under <code>data/corpus/</code>).</li>
+      <li>Open <strong>Content management</strong> → Corpus re-ingest.</li>
+      <li>Choose the directory that changed, then click <strong>Re-ingest</strong>.</li>
+      <li>Wait for the confirmation. Re-ingest re-reads, re-chunks, and re-embeds the documents.</li>
+    </ol>
+    <div class="callout warn"><strong>Important:</strong> on the live server,
+    re-ingest must run with the production model backend so the new text is
+    embedded the same way as everything else. If in doubt, ask the maintainer
+    before running it in production.</div>
+  </div>
+
+  <div class="task">
+    <h3>Review and correct a bot answer <span class="role role-f">Faculty</span> <span class="role role-a">Admin</span></h3>
+    <ol class="steps">
+      <li>Open <strong>Answer review</strong>.</li>
+      <li>Filter or search to find the answer you want (by topic, route, or whether it was refused).</li>
+      <li>Open the turn to see the question and the bot's reply.</li>
+      <li>In the Corrections box, add a note describing what's wrong and what's correct, then Save. Your name and the date are recorded automatically.</li>
+    </ol>
+    <p class="mono" style="font-size:11px;color:var(--ink-3)">Note: corrections are recorded for review today; feeding them back into the bot's answers is a planned next step.</p>
+  </div>
+
+  <div class="task">
+    <h3>Run a maintenance job <span class="role role-a">Admin</span></h3>
+    <ol class="steps">
+      <li>Open <strong>Operations</strong>.</li>
+      <li>Find the job you want (rebuild catalog, refresh jobs, retry notifications, refusal report, export evals, run evals, seed demo).</li>
+      <li>Click <strong>Run</strong>. The job runs and its result is shown at the top of the page.</li>
+    </ol>
+  </div>
+
+  <div class="task">
+    <h3>Manage a record (course, advisor, event, …) <span class="role role-a">Admin</span></h3>
+    <ol class="steps">
+      <li>Click the section on the home page (for example, Courses).</li>
+      <li>Use search and the filters on the right to find a row, or click <strong>Add</strong> to create one.</li>
+      <li>Edit the fields and Save. Related items (a course's meetings, an advisor's slots) are edited inline on the same page.</li>
+    </ol>
+  </div>
+
+  <div class="task">
+    <h3>Give someone console access <span class="role role-a">Admin</span></h3>
+    <ol class="steps">
+      <li>Open <strong>Authentication → Users</strong> and find the person (they must have signed in at least once, or be created here).</li>
+      <li>Set <strong>Staff status</strong> on, so they can reach the console.</li>
+      <li>Add them to the group <strong>THRIVE Admin</strong> or <strong>THRIVE Faculty</strong>, then Save.</li>
+    </ol>
+  </div>
+
+  <h2>5. Good habits &amp; safety</h2>
+  <ul class="tight">
+    <li>Catalog edits go live immediately — double-check JSON before saving.</li>
+    <li>Corpus chunks are shown read-only on purpose; change corpus text by editing the source and re-ingesting, not by editing chunks.</li>
+    <li>Run re-ingest and heavy Operations jobs at quiet times; they run while you wait.</li>
+    <li>Student records contain personal information — only admins see them, and only for legitimate program work.</li>
+  </ul>
+
+  <h2>6. Troubleshooting</h2>
+  <table>
+    <tr><th>Symptom</th><th>Fix</th></tr>
+    <tr><td>Sent back to login after signing in</td><td>Your account isn't in a console group. An admin adds you to THRIVE Admin or Faculty.</td></tr>
+    <tr><td>"Bad Request (400)"</td><td>You opened a web address the server doesn't recognize. Use the exact console URL.</td></tr>
+    <tr><td>A section is missing from your home page</td><td>Your role doesn't include it. Faculty see the curriculum and Answer review only.</td></tr>
+    <tr><td>"Not saved — invalid JSON"</td><td>The catalog edit has a JSON error; the message points to where. Fix it and save again.</td></tr>
+    <tr><td>An Operations job reports an error</td><td>The message shows why. Note it and send it to the maintainer.</td></tr>
+  </table>
+
+  <h2>7. For the maintainer</h2>
+  <p>Setting the console up on a machine, from the <code>backend/</code> directory:</p>
+  <table>
+    <tr><th>Step</th><th>Command</th></tr>
+    <tr><td>Install deps</td><td><code>uv sync</code></td></tr>
+    <tr><td>Apply migrations</td><td><code>uv run python manage.py migrate</code></td></tr>
+    <tr><td>Create an admin</td><td><code>uv run python manage.py createsuperuser</code></td></tr>
+    <tr><td>(Optional) demo data</td><td><code>uv run python manage.py seed_demo</code></td></tr>
+    <tr><td>Run it</td><td><code>uv run python manage.py runserver</code> → open <code>/admin/</code></td></tr>
+  </table>
+  <p>The two groups (THRIVE Admin, THRIVE Faculty) are created automatically by
+  the migrations. Assign users to them under Authentication → Users. The code
+  lives in <code>backend/rsm_thrive/admin_modules/</code>; the companion
+  blueprint document has the full file map and diagrams.</p>
+</div>
