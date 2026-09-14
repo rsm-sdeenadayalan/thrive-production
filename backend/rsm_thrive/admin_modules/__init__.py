@@ -21,8 +21,8 @@ ADMIN_GROUP = "THRIVE Admin"
 FACULTY_GROUP = "THRIVE Faculty"
 
 # Submodules register on import; each registers its own models/views.
-from . import (academic, careers, content, knowledge, operations,  # noqa: E402,F401
-               oversight, people, scheduling)
+from . import (academic, careers, content, integrations, knowledge,  # noqa: E402,F401
+               operations, oversight, people, scheduling)
 
 
 def _register_remaining_models():
