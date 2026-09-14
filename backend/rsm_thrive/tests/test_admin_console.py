@@ -102,3 +102,15 @@ def test_admin_opens_changelist_plain_staff_blocked():
     plain_client = _client()
     plain_client.force_login(plain)
     assert plain_client.get(url).status_code == 403
+
+
+@pytest.mark.django_db
+def test_graph_connection_admin_hides_tokens():
+    from django.contrib import admin
+    from rsm_thrive.models import AdvisorCalendarConnection
+    ma = admin.site._registry[AdvisorCalendarConnection]
+    # The OAuth tokens must never be exposed in the console.
+    assert "access_token" in ma.exclude
+    assert "refresh_token" in ma.exclude
+    assert "access_token" not in ma.list_display
+    assert "refresh_token" not in ma.list_display
