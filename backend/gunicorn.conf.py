@@ -20,17 +20,18 @@ error and everybody seeing one.
 
 ## The timeout
 
-Sixty seconds, well above the default 30. A cold career search is a real
-outlier: it fans out roughly 24 LLM scoring calls, and measured cold it took
-about 24 seconds end to end. The default would kill exactly the request the
-career feature exists to serve, and the student would see a worker timeout
-rather than results.
+Ninety seconds. It must sit ABOVE the courses bot's per-turn budget
+(TRITONAI_TURN_BUDGET_SECONDS, 75s) or gunicorn would kill a slow turn before
+the app's own budget can return a graceful answer. A cold career search is the
+other outlier: it fans out roughly 24 LLM scoring calls. The default 30s would
+kill exactly the requests these features exist to serve, leaving the student a
+worker timeout instead of results.
 """
 
 bind = "127.0.0.1:8039"
 workers = 2
 threads = 4
-timeout = 60
+timeout = 90
 graceful_timeout = 30
 
 # Long enough that a keep-alive connection survives a student reading a page,
