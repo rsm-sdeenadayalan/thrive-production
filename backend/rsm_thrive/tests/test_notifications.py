@@ -6,8 +6,14 @@ from django.core import mail
 from django.core.mail import EmailMessage
 
 from rsm_thrive.models import Appointment, AppointmentNotification
+from rsm_thrive.services import graph
 from rsm_thrive.services.zoom import FakeZoomClient, ZoomError
-from rsm_thrive.testing import make_advisor, make_slot, make_student
+from rsm_thrive.testing import (
+    make_advisor,
+    make_calendar_connection,
+    make_slot,
+    make_student,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -105,6 +111,45 @@ def test_email_send_failure_recorded_booking_survives(client):
     row = appt.notifications.get(kind="email_request")
     assert row.status == "failed" and "smtp down" in row.detail
     assert len(mail.outbox) == 0
+
+
+def test_booking_not_connected_skips_graph_entirely(client):
+    me = make_student()
+    slot = make_slot(make_advisor(), mode="in person")
+    client.force_login(me.user)
+    with patch("rsm_thrive.services.notifications.get_zoom_client", return_value=None):
+        assert _book(client, slot).status_code == 201
+    appt = Appointment.objects.get()
+    assert not appt.notifications.filter(kind="graph_event").exists()
+
+
+def test_booking_connected_creates_graph_event(client):
+    me = make_student()
+    adv = make_advisor()
+    make_calendar_connection(adv)
+    slot = make_slot(adv, mode="in person")
+    client.force_login(me.user)
+    with patch("rsm_thrive.services.graph.create_event", return_value="graph-event-1"):
+        assert _book(client, slot).status_code == 201
+    appt = Appointment.objects.get()
+    row = appt.notifications.get(kind="graph_event")
+    assert row.status == "sent" and row.detail == "graph-event-1"
+
+
+def test_booking_graph_failure_recorded_booking_survives(client):
+    me = make_student()
+    adv = make_advisor()
+    make_calendar_connection(adv)
+    slot = make_slot(adv, mode="in person")
+    client.force_login(me.user)
+    with patch("rsm_thrive.services.graph.create_event",
+              side_effect=graph.GraphError("graph down")):
+        assert _book(client, slot).status_code == 201
+    appt = Appointment.objects.get()
+    row = appt.notifications.get(kind="graph_event")
+    assert row.status == "failed" and "graph down" in row.detail
+    # ICS + email still fired -- a Graph failure never blocks the rest.
+    assert appt.notifications.get(kind="email_request").status == "sent"
 
 
 def test_cancel_fires_cancel_email_once(client):

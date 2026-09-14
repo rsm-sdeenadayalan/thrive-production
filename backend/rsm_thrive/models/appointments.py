@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from django.conf import settings
 from django.db import models
 from django.db.models import Q
@@ -7,6 +9,7 @@ MODE_CHOICES = [("in person", "in person"), ("zoom", "zoom")]
 APPOINTMENT_STATUS_CHOICES = [("confirmed", "confirmed"), ("cancelled", "cancelled")]
 NOTIFICATION_KIND_CHOICES = [
     ("zoom", "zoom"), ("email_request", "email_request"), ("email_cancel", "email_cancel"),
+    ("graph_event", "graph_event"),
 ]
 NOTIFICATION_STATUS_CHOICES = [("sent", "sent"), ("failed", "failed"), ("skipped", "skipped")]
 
@@ -40,12 +43,28 @@ class Appointment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        constraints = [
+        constraints: ClassVar[list] = [
             models.UniqueConstraint(
                 fields=["slot"], condition=Q(status="confirmed"),
                 name="uniq_confirmed_slot",
             ),
         ]
+
+
+class AdvisorCalendarConnection(models.Model):
+    """An advisor's connected Outlook calendar (MS Graph OAuth).
+
+    Production should encrypt access_token/refresh_token at rest. Never log
+    either value.
+    """
+    advisor = models.OneToOneField(Advisor, on_delete=models.CASCADE,
+                                   related_name="calendar_connection")
+    access_token = models.TextField()
+    refresh_token = models.TextField()
+    expires_at = models.DateTimeField()
+    account_email = models.EmailField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
 
 class AppointmentNotification(models.Model):

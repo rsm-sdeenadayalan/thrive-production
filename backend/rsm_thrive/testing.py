@@ -6,10 +6,10 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from rsm_thrive.models import (
-    Advisor, AppointmentSlot, Assignment, ChatMessage, ChatTurnLog, Conversation, Course,
-    CourseMeeting, CourseRequest, CustomCalendarEvent, DegreeGap, DegreeRequirement, Enrollment,
-    Event, ProgramPhaseRow, QuickListItem, ResumeCourseHighlight, ResourceLink, SharedTask,
-    Skill, StudentAssignment, StudentProfile, StudentTask, Syllabus,
+    Advisor, AdvisorCalendarConnection, AppointmentSlot, Assignment, ChatMessage, ChatTurnLog,
+    Conversation, Course, CourseMeeting, CourseRequest, CustomCalendarEvent, DegreeGap,
+    DegreeRequirement, Enrollment, Event, ProgramPhaseRow, QuickListItem, ResumeCourseHighlight,
+    ResourceLink, SharedTask, Skill, StudentAssignment, StudentProfile, StudentTask, Syllabus,
     TaskOverride, TurnFeedback,
 )
 
@@ -168,6 +168,17 @@ def make_advisor(id=None, **overrides) -> Advisor:
     }
     fields.update(overrides)
     return Advisor.objects.create(**fields)
+
+
+def make_calendar_connection(advisor, **overrides) -> AdvisorCalendarConnection:
+    fields = {
+        "access_token": "fake-access-token",
+        "refresh_token": "fake-refresh-token",
+        "expires_at": timezone.now() + dt.timedelta(hours=1),
+        "account_email": "advisor@ucsd.edu",
+    }
+    fields.update(overrides)
+    return AdvisorCalendarConnection.objects.create(advisor=advisor, **fields)
 
 
 def make_slot(advisor, start=None, **overrides) -> AppointmentSlot:
