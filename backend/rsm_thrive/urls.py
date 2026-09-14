@@ -1,18 +1,21 @@
 from django.urls import path
 
-from .views import advisors, appointments, assignments, auth, chat, courses, degree, events, feedback, health, jobs, overlay, personal, planner, requests, resources, resume, students, tasks, traces
+from .views import advisors, appointments, assignments, auth, calendar, chat, courses, degree, events, feedback, health, jobs, overlay, personal, planner, requests, resources, resume, students, tasks, traces
 
 app_name = "rsm_thrive"
 
 urlpatterns = [
     path("advisors", advisors.advisors, name="advisors"),
     path("advisors/<str:advisor_id>/slots", advisors.advisor_slots, name="advisor-slots"),
+    path("advisors/<str:advisor_id>/calendar/connect", calendar.connect,
+         name="advisor-calendar-connect"),
     path("appointments", appointments.appointments_dispatch, name="appointments"),
     path("appointments/<str:appointment_id>/cancel", appointments.cancel_appointment, name="appointment-cancel"),
     path("assignments", assignments.assignments, name="assignments"),
     path("calendar-items/<str:item_key>/label", personal.item_label, name="calendar-item-label"),
     path("calendar-items/<str:item_key>/urgent", personal.item_urgent, name="calendar-item-urgent"),
     path("calendar-prefs", overlay.calendar_prefs, name="calendar-prefs"),
+    path("calendar/callback", calendar.callback, name="advisor-calendar-callback"),
     path("conversations", chat.conversations, name="conversations"),
     path("conversations/<str:conversation_id>/messages",
          chat.conversation_messages, name="conversation_messages"),
