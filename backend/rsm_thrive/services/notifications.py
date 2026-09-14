@@ -10,6 +10,7 @@ from django.core.mail import EmailMessage
 from django.utils import timezone
 
 from rsm_thrive.models import AppointmentNotification
+from rsm_thrive.services import graph
 from rsm_thrive.services.ics import build_ics
 from rsm_thrive.services.zoom import get_zoom_client
 
@@ -73,9 +74,25 @@ def _create_zoom(appointment):
             logger.exception("could not record zoom failure")
 
 
+def _create_graph_event(appointment):
+    advisor = appointment.slot.advisor
+    if getattr(advisor, "calendar_connection", None) is None:
+        return
+    try:
+        event_id = graph.create_event(advisor, appointment)
+        _record(appointment, "graph_event", "sent", event_id or "")
+    except Exception as exc:  # audited, never fatal
+        logger.exception("graph event creation failed")
+        try:
+            _record(appointment, "graph_event", "failed", str(exc))
+        except Exception:
+            logger.exception("could not record graph event failure")
+
+
 def dispatch_booking_side_effects(appointment) -> None:
     if appointment.slot.mode == "zoom":
         _create_zoom(appointment)
+    _create_graph_event(appointment)
     _send_invite(appointment, "REQUEST", "email_request")
 
 
