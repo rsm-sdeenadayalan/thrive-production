@@ -297,3 +297,15 @@ def dev_login(request):
         "<p><button>Sign in</button></p></form>"
     )
     return HttpResponse(html)
+
+
+def logout_view(request):
+    """Sign out: flush the session, then return to the login page.
+
+    Accepts GET so the profile menu can link to it directly; Django's own
+    LogoutView requires POST, but this custom view is intentionally a link
+    target. The only effect is clearing the current user's session.
+    """
+    logout(request)
+    base_path = getattr(settings, "THRIVE_FRONTEND_BASE_PATH", "") or ""
+    return HttpResponseRedirect(f"{base_path}/api/thrive/login")
