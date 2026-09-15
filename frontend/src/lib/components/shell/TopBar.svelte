@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Bell from '@lucide/svelte/icons/bell';
+	import LogOut from '@lucide/svelte/icons/log-out';
 
 	import Avatar from '$lib/components/Avatar.svelte';
 	import type { Student } from '$lib/data/types';
@@ -32,7 +33,24 @@
 		student,
 		notificationCount = 0
 	}: { student: Student; notificationCount?: number } = $props();
+
+	// The account menu: the profile circle opens a small popover whose only
+	// action, for now, is signing out. Closes on an outside click or Escape.
+	let menuOpen = $state(false);
+	let menuRef = $state<HTMLDivElement>();
+
+	function onWindowClick(event: MouseEvent) {
+		if (menuOpen && menuRef && !menuRef.contains(event.target as Node)) {
+			menuOpen = false;
+		}
+	}
+
+	function onWindowKey(event: KeyboardEvent) {
+		if (event.key === 'Escape') menuOpen = false;
+	}
 </script>
+
+<svelte:window onclick={onWindowClick} onkeydown={onWindowKey} />
 
 <!-- Solid, not translucent. A blurred layer separates itself by depth, and depth
      is what this system stopped using: the header is a bounded region, held
@@ -92,12 +110,37 @@
 		<!-- A hit area around a smaller mark: the target clears the touch minimum
 		     without the avatar itself growing into a headline. Both shrink together
 		     above `lg` so the ring of space around the avatar stays even. -->
-		<button
-			type="button"
-			aria-label={`Account menu for ${student.name}`}
-			class="flex size-11 items-center justify-center rounded-pill transition-opacity duration-(--motion-fast) ease-standard hover:opacity-80 lg:size-9"
-		>
-			<Avatar name={student.name} src={student.avatarUrl} class="size-9 lg:size-7" />
-		</button>
+		<div class="relative" bind:this={menuRef}>
+			<button
+				type="button"
+				aria-label={`Account menu for ${student.name}`}
+				aria-haspopup="menu"
+				aria-expanded={menuOpen}
+				onclick={() => (menuOpen = !menuOpen)}
+				class="flex size-11 items-center justify-center rounded-pill transition-opacity duration-(--motion-fast) ease-standard hover:opacity-80 lg:size-9"
+			>
+				<Avatar name={student.name} src={student.avatarUrl} class="size-9 lg:size-7" />
+			</button>
+
+			{#if menuOpen}
+				<div
+					role="menu"
+					class="absolute right-0 top-full z-30 mt-1 min-w-44 rounded-md border border-line bg-surface py-1"
+				>
+					<p class="truncate px-3 py-1.5 text-2xs font-medium tracking-[0.14em] text-muted-ink uppercase">
+						{student.name}
+					</p>
+					<a
+						href={hrefFor('/api/thrive/logout')}
+						data-sveltekit-reload
+						role="menuitem"
+						class="flex items-center gap-2 px-3 py-2 text-ink transition-colors duration-(--motion-fast) ease-standard hover:bg-sunken"
+					>
+						<LogOut class="size-4" />
+						Sign out
+					</a>
+				</div>
+			{/if}
+		</div>
 	</div>
 </header>
