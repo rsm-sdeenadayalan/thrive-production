@@ -107,7 +107,43 @@ def _trimmed(history, config):
     return history[-config["max_history_turns"]:]
 
 
+_GREETING_WORDS = {"hi", "hii", "hey", "heya", "hiya", "hello", "helloo", "yo",
+                   "sup", "greetings", "howdy"}
+_SMALLTALK = _GREETING_WORDS | {
+    "hey there", "hi there", "hello there", "good morning", "good afternoon",
+    "good evening", "help", "what can you do", "what can u do", "what do you do",
+    "what can you help with", "what can i ask", "how can you help",
+    "who are you", "what are you", "what is this", "what is thrive",
+    "your capabilities", "capabilities",
+}
+
+_ASSISTANT_INTRO = (
+    "Hi! I'm THRIVE, the assistant for the Rady MSBA program. I can help with:\n\n"
+    "- Program resources, deadlines, and FAQs\n"
+    "- Planning your electives and course load\n"
+    "- Career prep and the job search\n"
+    "- Booking time with an advisor\n\n"
+    "Ask me anything, or tell me what you're working on.")
+
+
+def _smalltalk_reply(question):
+    """A friendly intro for greetings and 'what can you do', so those don't
+    fall through to a grounded refusal. Returns None for a real question."""
+    text = (question or "").strip().lower().rstrip("!.?, ")
+    if not text:
+        return None
+    words = text.split()
+    if text in _SMALLTALK:
+        return _ASSISTANT_INTRO
+    if len(words) <= 2 and words[0] in _GREETING_WORDS:
+        return _ASSISTANT_INTRO
+    return None
+
+
 def answer_faq(llm, question, history):
+    intro = _smalltalk_reply(question)
+    if intro:
+        return BotReply(intro, [], "small_talk")
     config = bot_config("faq")
     hits = retrieve(question, "resources", config["top_k"],
                     config["min_similarity"], config.get("lexical_min"),
@@ -187,6 +223,9 @@ def _answer_from_the_web(llm, config, question, history):
 
 
 def answer_career(llm, question, history):
+    intro = _smalltalk_reply(question)
+    if intro:
+        return BotReply(intro, [], "small_talk")
     # OURS, deliberately. The bots port took only the FAQ bot and the course
     # recommender; the career bot stays on our own retrieval call, without the
     # lexical tier its config does not configure.
