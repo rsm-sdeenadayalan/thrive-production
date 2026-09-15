@@ -151,3 +151,6 @@ class ConversationAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False
+
+# THRIVE Console — register the rest of the backend UI.
+from rsm_thrive import admin_modules  # noqa: E402,F401

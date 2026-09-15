@@ -1,6 +1,7 @@
 import { error as kitError, redirect, type Handle } from "@sveltejs/kit";
 
-import { ApiError, apiEnabled, apiFetch, apiOrigin } from "$lib/data/api/client";
+import { base } from "$app/paths";
+import { ApiError, apiEnabled, apiFetch } from "$lib/data/api/client";
 import type { Student } from "$lib/data/types";
 import { runWithAuth, type RequestAuth } from "$lib/server/requestContext";
 
@@ -20,7 +21,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 				kitError(403, "This account has no student profile. Ask the program team to set one up.");
 			}
 			if (caught instanceof ApiError && (caught.status === 401 || caught.status === 403)) {
-				const login = process.env.THRIVE_LOGIN_URL ?? `${apiOrigin()}/api/thrive/dev-login`;
+				const login = process.env.THRIVE_LOGIN_URL ?? `${base}/api/thrive/login`;
 				redirect(303, `${login}?next=${encodeURIComponent(event.url.href)}`);
 			}
 			throw caught;

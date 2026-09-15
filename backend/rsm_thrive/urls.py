@@ -24,6 +24,7 @@ urlpatterns = [
     path("degree/progress", degree.progress, name="degree-progress"),
     path("degree/timeline", degree.timeline, name="degree-timeline"),
     path("dev-login", auth.dev_login, name="dev-login"),
+    path("login", auth.login_view, name="login"),
     path("events", events.events, name="events"),
     path("events/<str:event_id>/ignore", overlay.ignore_event, name="event-ignore"),
     path("events/<str:event_id>/join", overlay.join_event, name="event-join"),

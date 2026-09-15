@@ -13,6 +13,7 @@
  * throw already had: the optimistic local value stands, and the next full
  * reload re-seeds from whatever the server actually has.
  */
+import { hrefFor } from '$lib/nav';
 
 export interface OverlaySeed {
 	stores: Record<string, Record<string, unknown>>;
@@ -42,7 +43,7 @@ export function seedFor(key: string): Record<string, unknown> | null {
 
 function send(op: string, payload: Record<string, unknown>): void {
 	try {
-		fetch("/overlay-sync", {
+		fetch(hrefFor("/overlay-sync"), {
 			method: "POST",
 			headers: { "content-type": "application/json" },
 			body: JSON.stringify({ op, ...payload }),

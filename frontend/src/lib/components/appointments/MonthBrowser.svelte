@@ -3,6 +3,7 @@
 
 	import MiniCalendar from '$lib/components/calendar/MiniCalendar.svelte';
 	import { messages } from '$lib/messages';
+	import { hrefFor } from '$lib/nav';
 	import type { ScheduleData } from '$lib/schedule';
 
 	/**
@@ -82,7 +83,7 @@
 
 		<!-- Kept: this grid shows the month, the real calendar does everything else. -->
 		<a
-			href="/calendar"
+			href={hrefFor('/calendar')}
 			class="inline-flex min-h-11 items-center gap-1 rounded-sm px-1 text-3xs text-muted-ink hover:text-ink"
 		>
 			{copy.seeCalendar}

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { hrefFor } from '$lib/nav';
+
 	/**
 	 * THROWAWAY. Delete before Release 1.
 	 *
@@ -625,7 +627,7 @@
 			<button class="rounded-md border border-line bg-surface px-3 py-1.5 text-2xs text-body">
 				button
 			</button>
-			<a href="/swatch" class="rounded-md border border-line bg-surface px-3 py-1.5 text-2xs text-body">
+			<a href={hrefFor('/swatch')} class="rounded-md border border-line bg-surface px-3 py-1.5 text-2xs text-body">
 				link
 			</a>
 			<input

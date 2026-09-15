@@ -1,0 +1,29 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<div id="content-main">
+  <h1>Operations</h1>
+  <p>Run a maintenance command. Each runs synchronously and reports its output.
+  Corpus ingest lives under <a href="{% url 'admin:rsm_thrive_contenttool_changelist' %}">Content management</a>.</p>
+
+  <div class="module">
+    <table>
+      <thead><tr><th>Command</th><th>What it does</th><th></th></tr></thead>
+      <tbody>
+        {% for name, label, help in operations %}
+        <tr>
+          <td><strong>{{ label }}</strong><br><code>{{ name }}</code></td>
+          <td>{{ help }}</td>
+          <td>
+            <form method="post" action="{% url 'admin:operation_run' %}">
+              {% csrf_token %}
+              <input type="hidden" name="command" value="{{ name }}">
+              <button type="submit" class="default">Run</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

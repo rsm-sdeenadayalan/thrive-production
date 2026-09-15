@@ -1,6 +1,7 @@
 import { redirect } from "@sveltejs/kit";
 
 import { DEFAULT_DESTINATION } from "$lib/ask";
+import { hrefFor } from "$lib/nav";
 import type { PageServerLoad } from "./$types";
 
 /**
@@ -28,5 +29,5 @@ import type { PageServerLoad } from "./$types";
  * students' browsers past the change.
  */
 export const load: PageServerLoad = async () => {
-	redirect(307, `/ask/${DEFAULT_DESTINATION}`);
+	redirect(307, hrefFor(`/ask/${DEFAULT_DESTINATION}`));
 };

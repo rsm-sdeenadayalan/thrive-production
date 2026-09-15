@@ -42,6 +42,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "rsm_thrive.views.auth.ThriveAllowlistMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
 ]
 
@@ -78,17 +79,53 @@ USE_TZ = True
 STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 DEFAULT_FROM_EMAIL = os.environ.get("THRIVE_FROM_EMAIL", "thrive-noreply@rady.ucsd.edu")
+SESSION_COOKIE_NAME = os.environ.get("THRIVE_SESSION_COOKIE_NAME", "sessionid_thrive")
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-# No EMAIL_BACKEND was configured before Django's MAILERS setting existed, so
-# email implicitly used the SMTP backend. MAILERS makes that explicit (Django
-# test runner overrides "default" to locmem for the test suite regardless).
+# Send mail to the local Postfix listener. Postfix is configured on this server
+# to relay through UCSD with TLS and without an application plaintext password.
+# Django only talks to localhost; override these if a different relay is needed.
+THRIVE_EMAIL_HOST = os.environ.get("THRIVE_EMAIL_HOST", "127.0.0.1")
+THRIVE_EMAIL_PORT = int(os.environ.get("THRIVE_EMAIL_PORT", "25"))
+THRIVE_EMAIL_USE_TLS = os.environ.get("THRIVE_EMAIL_USE_TLS", "0") == "1"
+THRIVE_EMAIL_TIMEOUT = int(os.environ.get("THRIVE_EMAIL_TIMEOUT", "15"))
+
+# No EMAIL_BACKEND was configured before Django's MAILERS setting existed. With
+# Django 6.1, MAILERS must provide explicit SMTP OPTIONS.
 MAILERS = {
     "default": {
         "BACKEND": "django.core.mail.backends.smtp.EmailBackend",
+        "OPTIONS": {
+            "host": THRIVE_EMAIL_HOST,
+            "port": THRIVE_EMAIL_PORT,
+            "use_tls": THRIVE_EMAIL_USE_TLS,
+            "timeout": THRIVE_EMAIL_TIMEOUT,
+        },
     },
 }
 
 THRIVE_DEV_LOGIN_ENABLED = os.environ.get("THRIVE_DEV_LOGIN", "1") == "1"
+THRIVE_AUTH = os.environ.get("THRIVE_AUTH", "local").lower()
+THRIVE_REQUIRE_ALLOWLIST = os.environ.get(
+    "THRIVE_REQUIRE_ALLOWLIST",
+    "1" if THRIVE_AUTH == "ucsd_ldap" else "0",
+) == "1"
+THRIVE_ALLOWED_USERS = [
+    user.strip().lower().removesuffix("@ucsd.edu")
+    for user in os.environ.get("THRIVE_ALLOWED_USERS", "").split(",")
+    if user.strip()
+]
+THRIVE_ALLOWED_USERS_FILE = os.environ.get("THRIVE_ALLOWED_USERS_FILE", "")
+THRIVE_AUTO_CREATE_PROFILE = os.environ.get("THRIVE_AUTO_CREATE_PROFILE", "1") == "1"
+THRIVE_DEFAULT_PROFILE_PROGRAM = os.environ.get("THRIVE_DEFAULT_PROFILE_PROGRAM", "MSBA")
+THRIVE_DEFAULT_PROFILE_TRACK = os.environ.get("THRIVE_DEFAULT_PROFILE_TRACK", "11 month")
+THRIVE_DEFAULT_PROFILE_CURRENT_TERM = os.environ.get(
+    "THRIVE_DEFAULT_PROFILE_CURRENT_TERM", "Fall 2026")
+THRIVE_DEFAULT_PROFILE_PROGRAM_START = os.environ.get(
+    "THRIVE_DEFAULT_PROFILE_PROGRAM_START", "2026-09-01")
+THRIVE_FRONTEND_BASE_PATH = os.environ.get("THRIVE_FRONTEND_BASE_PATH", "").rstrip("/")
 THRIVE_FRONTEND_ORIGINS = [
     origin.strip()
     for origin in os.environ.get(
@@ -104,6 +141,26 @@ THRIVE_FRONTEND_ORIGINS = [
 CSRF_TRUSTED_ORIGINS = [
     origin for origin in THRIVE_FRONTEND_ORIGINS if origin.startswith("http")
 ]
+
+AUTHENTICATION_BACKENDS = ["django.contrib.auth.backends.ModelBackend"]
+if THRIVE_AUTH == "ucsd_ldap":
+    AUTHENTICATION_BACKENDS = ["rsm_thrive.views.auth.UCSDLDAPBackend"]
+    if os.environ.get("THRIVE_LOCAL_AUTH_FALLBACK", "0") == "1":
+        AUTHENTICATION_BACKENDS.append("django.contrib.auth.backends.ModelBackend")
+    LDAP_AUTH_URL = os.environ.get("LDAP_AUTH_URL", "ldaps://ldap.ad.ucsd.edu:636")
+    LDAP_AUTH_SEARCH_BASE = os.environ.get("LDAP_AUTH_SEARCH_BASE", "dc=ad,dc=ucsd,dc=edu")
+    LDAP_AUTH_OBJECT_CLASS = os.environ.get("LDAP_AUTH_OBJECT_CLASS", "user")
+    LDAP_AUTH_CONNECTION_USERNAME = os.environ.get(
+        "LDAP_AUTH_CONNECTION_USERNAME",
+        "cn=LDAP Access,OU=Service Account,OU=ITS,OU=SDSC,dc=ad,dc=ucsd,dc=edu",
+    )
+    LDAP_AUTH_CONNECTION_PASSWORD = os.environ.get("LDAP_AUTH_CONNECTION_PASSWORD", "")
+    LDAP_AUTH_CONNECTION_PASSWORD_FILE = os.environ.get(
+        "LDAP_AUTH_CONNECTION_PASSWORD_FILE",
+        "/etc/shiny-server/ldap-base-bind-password.txt",
+    )
+    LDAP_AUTH_ACTIVE_DIRECTORY_DOMAIN = os.environ.get(
+        "LDAP_AUTH_ACTIVE_DIRECTORY_DOMAIN", "UCSD.EDU")
 
 # Which chat backend answers a turn:
 #

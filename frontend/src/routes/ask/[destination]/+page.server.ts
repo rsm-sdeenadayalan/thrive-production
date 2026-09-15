@@ -4,6 +4,7 @@ import { isAskDestination, toConversationDetailView } from "$lib/ask";
 import { apiEnabled } from "$lib/data/api/client";
 import { deleteConversation, getConversation, getConversationStarter } from "$lib/data";
 import { messages } from "$lib/messages";
+import { hrefFor } from "$lib/nav";
 import { dayKeyOf } from "$lib/schedule";
 import type { Actions, PageServerLoad } from "./$types";
 
@@ -141,7 +142,7 @@ export const actions = {
 		 * page invalidates, and only the rail changes.
 		 */
 		if (url.searchParams.get("c") === conversationId) {
-			redirect(303, `/ask/${params.destination}`);
+			redirect(303, hrefFor(`/ask/${params.destination}`));
 		}
 
 		return { deleted: conversationId };

@@ -35,19 +35,20 @@
     <key>PATH</key><string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
     <key>HOST</key><string>127.0.0.1</string>
     <key>PORT</key><string>8040</string>
-    <!-- adapter-node checks the Origin header of every form POST against this
-         and rejects a mismatch with a 403. It has to be the URL the BROWSER
-         sees, which is the Tailscale Serve address, not the loopback port this
-         process binds. Getting this wrong fails silently until the first form
-         submit, which is how a login page ends up looking broken for no
-         visible reason. -->
-    <key>ORIGIN</key><string>https://ms-macos.tail37260b.ts.net:8443</string>
+    <!-- The app is mounted below /thrive. This is a build-time SvelteKit path,
+         and is also supplied at runtime for consistency with the generated
+         server bundle. -->
+    <key>THRIVE_BASE_PATH</key><string>/thrive</string>
+    <!-- Let adapter-node derive the request origin from Caddy's forwarded
+         headers, so both rsm-vnijs.ucsd.edu and the tailnet hostname work. -->
+    <key>PROTOCOL_HEADER</key><string>X-Forwarded-Proto</string>
+    <key>HOST_HEADER</key><string>X-Forwarded-Host</string>
     <!-- Server-side calls go straight to gunicorn on loopback, never back out
          through the tunnel. -->
     <key>THRIVE_API_ORIGIN</key><string>http://127.0.0.1:8039</string>
     <!-- Relative, so the redirect keeps the student on the public hostname
          rather than sending their browser to a loopback address it cannot
          reach. -->
-    <key>THRIVE_LOGIN_URL</key><string>/api/thrive/dev-login</string>
+    <key>THRIVE_LOGIN_URL</key><string>/thrive/api/thrive/login</string>
   </dict>
 </dict></plist>

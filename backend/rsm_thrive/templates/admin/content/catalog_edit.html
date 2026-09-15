@@ -1,0 +1,16 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<div id="content-main">
+  <h1>Edit {{ name }}</h1>
+  <p><a href="{% url 'admin:rsm_thrive_contenttool_changelist' %}">&larr; Back to content management</a></p>
+  <form method="post" action="{% url 'admin:content_catalog_edit' name %}">
+    {% csrf_token %}
+    <p>
+      <textarea name="content" rows="30" style="width:100%; font-family:monospace; white-space:pre;">{{ content }}</textarea>
+    </p>
+    <p class="help">Must be valid JSON. Saving validates the JSON, writes the file,
+    and refreshes the bots' caches so the change is live.</p>
+    <p><button type="submit" class="default">Validate &amp; save</button></p>
+  </form>
+</div>
+{% endblock %}

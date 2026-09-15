@@ -3,6 +3,7 @@ import { fail, redirect } from "@sveltejs/kit";
 import { apiEnabled, ApiError } from "$lib/data/api/client";
 import { getJobFeed, uploadResume } from "$lib/data";
 import { messages } from "$lib/messages";
+import { hrefFor } from "$lib/nav";
 import type { Actions, PageServerLoad } from "./$types";
 
 /**
@@ -29,7 +30,7 @@ import type { Actions, PageServerLoad } from "./$types";
  */
 export const load: PageServerLoad = async ({ url }) => {
 	if (url.searchParams.has("q") || url.searchParams.has("tab") || url.searchParams.has("minScore")) {
-		redirect(303, `/jobs/results?${url.searchParams.toString()}`);
+		redirect(303, hrefFor(`/jobs/results?${url.searchParams.toString()}`));
 	}
 
 	const feed = await getJobFeed({});
@@ -88,6 +89,6 @@ export const actions: Actions = {
 
 		// Back to this same page -- the resume panel switches to its
 		// "on file" shape and the banner disappears on its own.
-		redirect(303, "/jobs");
+		redirect(303, hrefFor("/jobs"));
 	},
 };

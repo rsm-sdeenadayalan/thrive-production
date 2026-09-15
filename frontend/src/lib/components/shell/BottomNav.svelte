@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 
-	import { isActiveRoute, primaryNav, type NavItem } from '$lib/nav';
+	import { hrefFor, isActiveRoute, primaryNav, type NavItem } from '$lib/nav';
 
 	/**
 	 * Mobile navigation. Replaces SideRail below `lg`.
@@ -43,7 +43,7 @@
 	{@const active = isActiveRoute(item.href, pathname)}
 	{@const Icon = item.icon}
 	<a
-		href={item.href}
+		href={hrefFor(item.href)}
 		aria-current={active ? 'page' : undefined}
 		class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-md border py-1 text-2xs font-medium transition-colors duration-(--motion-fast) ease-standard
 			{active
