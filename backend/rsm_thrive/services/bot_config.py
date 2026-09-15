@@ -17,7 +17,7 @@ _DEFAULTS_PATH = Path(settings.BASE_DIR) / "config" / "bots.json"
 def load_bot_config() -> dict:
     config = json.loads(_DEFAULTS_PATH.read_text())
     override_path = getattr(settings, "THRIVE_BOT_CONFIG", "")
-    if override_path:
+    if override_path and Path(override_path).exists():
         override = json.loads(Path(override_path).read_text())
         for bot, entry in override.items():
             config.setdefault(bot, {}).update(entry)
