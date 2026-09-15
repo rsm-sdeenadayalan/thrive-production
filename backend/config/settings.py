@@ -38,6 +38,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -76,7 +77,9 @@ LANGUAGE_CODE = "en-us"
 TIME_ZONE = "America/Los_Angeles"
 USE_TZ = True
 
-STATIC_URL = "static/"
+_static_base = os.environ.get("THRIVE_FRONTEND_BASE_PATH", "").rstrip("/")
+STATIC_URL = f"{_static_base}/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 DEFAULT_FROM_EMAIL = os.environ.get("THRIVE_FROM_EMAIL", "thrive-noreply@rady.ucsd.edu")
 SESSION_COOKIE_NAME = os.environ.get("THRIVE_SESSION_COOKIE_NAME", "sessionid_thrive")
