@@ -6,6 +6,7 @@
 
 	import Button, { buttonClasses } from '$lib/components/ui/Button.svelte';
 	import { messages } from '$lib/messages';
+	import { hrefFor } from '$lib/nav';
 	import { pageTitle } from '$lib/title';
 	import type { PageData } from './$types';
 
@@ -76,7 +77,7 @@
 
 	/** A quick-pick chip's link -- straight to the results this page exists to lead to. */
 	function roleHref(role: string): string {
-		return `/jobs/results?q=${encodeURIComponent(role)}`;
+		return hrefFor(`/jobs/results?q=${encodeURIComponent(role)}`);
 	}
 </script>
 
@@ -253,7 +254,7 @@
 		a stray control floating on the page background.
 	-->
 	<section class="thrive-panel space-y-3 p-4">
-		<form method="GET" action="/jobs/results" class="flex flex-wrap items-end gap-2.5">
+		<form method="GET" action={hrefFor('/jobs/results')} class="flex flex-wrap items-end gap-2.5">
 			<div class="min-w-0 flex-1">
 				<label for="jobs-role" class="thrive-eyebrow mb-1.5 block">
 					{setup.roleLabel}
@@ -286,7 +287,7 @@
 			</ul>
 		</div>
 
-		<a href="/jobs/results?tab=liked" class="inline-block text-2xs font-medium text-primary hover:underline">
+		<a href={hrefFor('/jobs/results?tab=liked')} class="inline-block text-2xs font-medium text-primary hover:underline">
 			{setup.likedLink}
 		</a>
 	</section>

@@ -6,12 +6,12 @@
 	import ThumbsUp from '@lucide/svelte/icons/thumbs-up';
 
 	import { goto } from '$app/navigation';
-	import { base } from '$app/paths';
 	import { showsDayLabel, type ChatMessageView, type ConversationDetailView } from '$lib/ask';
 	import type { ConversationStarter, RatingForm, TurnFeedback, UnitsForm } from '$lib/data';
 	import RichMessage from '$lib/components/ask/RichMessage.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import { messages } from '$lib/messages';
+	import { hrefFor } from '$lib/nav';
 	import type { AskDestination } from '$lib/data';
 	import { cn } from '$lib/utils';
 
@@ -402,7 +402,7 @@
 		scrollToNewest();
 
 		try {
-			const response = await fetch('/ask-sync', {
+			const response = await fetch(hrefFor('/ask-sync'), {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
 				body: JSON.stringify(
@@ -416,7 +416,7 @@
 
 			const payload = (await response.json()) as { conversation: { id: string } };
 
-			await goto(`${base}/ask/${destination}?c=${payload.conversation.id}`, { invalidateAll: true });
+			await goto(hrefFor(`/ask/${destination}?c=${payload.conversation.id}`), { invalidateAll: true });
 
 			// The `{#key}` above only remounts for a NEW conversation id; the
 			// same-conversation case (a second message in an already-open thread)

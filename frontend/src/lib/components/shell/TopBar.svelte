@@ -3,6 +3,7 @@
 
 	import Avatar from '$lib/components/Avatar.svelte';
 	import type { Student } from '$lib/data/types';
+	import { hrefFor } from '$lib/nav';
 
 	/**
 	 * Application header: identity on the left, bell and avatar on the right.
@@ -44,7 +45,7 @@
 	     this block replaced. -->
 	<div class="flex min-w-0 shrink-0 items-center gap-2">
 		<a
-			href="/"
+			href={hrefFor('/')}
 			class="rounded-sm text-2xs font-medium tracking-[0.14em] text-ink uppercase lg:hidden"
 		>
 			THRIVE

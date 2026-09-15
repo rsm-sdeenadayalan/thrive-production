@@ -4,7 +4,7 @@
 
 	import { cn } from '$lib/utils';
 	import { messages } from '$lib/messages';
-	import { isBuiltRoute, isKnownRoute } from '$lib/nav';
+	import { hrefFor, isBuiltRoute, isKnownRoute } from '$lib/nav';
 
 	/**
 	 * The standard container for a Home dashboard section.
@@ -136,7 +136,7 @@
 
 		{#if showLink}
 			<a
-				href={href!}
+				href={hrefFor(href!)}
 				class="group inline-flex min-h-11 shrink-0 items-center gap-0.5 rounded-sm border border-line bg-surface px-2 text-3xs font-medium text-body transition-colors duration-(--motion-fast) ease-standard hover:border-primary hover:text-primary lg:min-h-0 lg:py-1"
 			>
 				{linkLabel}

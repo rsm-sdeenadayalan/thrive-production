@@ -47,9 +47,21 @@ import { sveltekit } from '@sveltejs/kit/vite';
  * has no Node globals declared. Narrowing `globalThis` states the assumption --
  * there may or may not be a Node process here -- and type-checks without one.
  */
-const useNode =
-	(globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
-		?.ADAPTER === 'node';
+const env =
+	(globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
+
+const useNode = env.ADAPTER === 'node';
+
+function normalizeBasePath(path: string | undefined): '' | `/${string}` {
+	if (!path || path === '/') return '';
+	const normalized = path.replace(/\/+$/, '');
+	if (!normalized.startsWith('/')) {
+		throw new Error('THRIVE_BASE_PATH must start with /');
+	}
+	return normalized as `/${string}`;
+}
+
+const basePath = normalizeBasePath(env.THRIVE_BASE_PATH);
 
 /*
  * Team-demo tunnel mode, opt-in via THRIVE_TUNNEL_HOST (set by
@@ -61,9 +73,7 @@ const useNode =
 const tunnelHost = (
 	globalThis as { process?: { env?: Record<string, string | undefined> } }
 ).process?.env?.THRIVE_TUNNEL_HOST;
-const tunnelApi =
-	(globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
-		?.THRIVE_API_ORIGIN ?? 'http://localhost:8002';
+const tunnelApi = env.THRIVE_API_ORIGIN ?? 'http://localhost:8002';
 
 export default defineConfig({
 	server: tunnelHost
@@ -75,6 +85,9 @@ export default defineConfig({
 	plugins: [
 		tailwindcss(),
 		sveltekit({
+			paths: {
+				base: basePath
+			},
 			compilerOptions: {
 				// Force runes mode for the project, except for libraries. Can be removed in svelte 6.
 				runes: ({ filename }) => filename.split(/[/\\]/).includes('node_modules') ? undefined : true

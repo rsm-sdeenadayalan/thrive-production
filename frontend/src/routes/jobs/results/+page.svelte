@@ -9,6 +9,7 @@
 	import type { JobFeedTab, JobRegion } from '$lib/data';
 	import { feedEmptyState, JOB_REGIONS, jobRegionLabel } from '$lib/jobs';
 	import { messages } from '$lib/messages';
+	import { hrefFor } from '$lib/nav';
 	import { pageTitle } from '$lib/title';
 	import { cn } from '$lib/utils';
 	import type { PageData } from './$types';
@@ -51,7 +52,7 @@
 		if (data.minScore !== undefined) params.set('minScore', String(data.minScore));
 		if (data.region !== '') params.set('region', data.region);
 		const query = params.toString();
-		return query ? `/jobs/results?${query}` : '/jobs/results';
+		return hrefFor(query ? `/jobs/results?${query}` : '/jobs/results');
 	}
 
 	/** A region chip's link -- same preserve-everything-else pattern as `tabHref`,
@@ -63,7 +64,7 @@
 		if (data.minScore !== undefined) params.set('minScore', String(data.minScore));
 		if (region !== '') params.set('region', region);
 		const query = params.toString();
-		return query ? `/jobs/results?${query}` : '/jobs/results';
+		return hrefFor(query ? `/jobs/results?${query}` : '/jobs/results');
 	}
 
 	const regionsCopy = resultsCopy.regions;
@@ -130,7 +131,7 @@
 				</p>
 			{/if}
 		</div>
-		<a href="/jobs" class="shrink-0 text-2xs font-medium text-primary hover:underline">
+		<a href={hrefFor('/jobs')} class="shrink-0 text-2xs font-medium text-primary hover:underline">
 			{resultsCopy.backToSetup}
 		</a>
 	</header>
@@ -223,7 +224,7 @@
 		     second copy of the form. -->
 		<div data-tone="sunken" class="thrive-panel flex flex-wrap items-center justify-between gap-2.5 p-2.5">
 			<p class="text-2xs text-body">{copy.profileBanner.message}</p>
-			<a href="/jobs" class={buttonClasses('secondary', 'sm')}>{resultsCopy.backToSetup}</a>
+			<a href={hrefFor('/jobs')} class={buttonClasses('secondary', 'sm')}>{resultsCopy.backToSetup}</a>
 		</div>
 	{/if}
 

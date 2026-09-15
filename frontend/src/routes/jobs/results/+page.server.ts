@@ -5,6 +5,7 @@ import { dismissJob, getJobFeed, likeJob, searchJobs } from "$lib/data";
 import type { JobFeedTab, JobRegion, RoleBenchmark } from "$lib/data";
 import { isJobRegion, targetResults, toJobFeedEntryView } from "$lib/jobs";
 import { messages } from "$lib/messages";
+import { hrefFor } from "$lib/nav";
 import type { Actions, PageServerLoad } from "./$types";
 
 /**
@@ -128,7 +129,7 @@ function redirectTarget(form: FormData, url: URL): string {
 	if (region !== "") params.set("region", region);
 
 	const query = params.toString();
-	return query ? `/jobs/results?${query}` : "/jobs/results";
+	return hrefFor(query ? `/jobs/results?${query}` : "/jobs/results");
 }
 
 /**

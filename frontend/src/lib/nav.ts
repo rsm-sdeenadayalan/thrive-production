@@ -1,3 +1,4 @@
+import { base } from '$app/paths';
 import type House from '@lucide/svelte/icons/house';
 import BookOpen from '@lucide/svelte/icons/book-open';
 import BriefcaseBusiness from '@lucide/svelte/icons/briefcase-business';
@@ -291,12 +292,27 @@ export function isKnownRoute(href: string): boolean {
 	return allNav.some((item) => item.href === href);
 }
 
+export function hrefFor(href: string): string {
+	if (!base) return href;
+	if (href === '/') return `${base}/`;
+	if (href.startsWith('/')) return `${base}${href}`;
+	return href;
+}
+
+function pathnameWithoutBase(pathname: string): string {
+	if (!base) return pathname;
+	if (pathname === base) return '/';
+	if (pathname.startsWith(`${base}/`)) return pathname.slice(base.length) || '/';
+	return pathname;
+}
+
 /**
  * True when `href` is the section the user is currently in. Exact match for
  * Home so it doesn't stay lit on every route; prefix match elsewhere so
  * nested routes still highlight their section.
  */
 export function isActiveRoute(href: string, pathname: string): boolean {
-	if (href === '/') return pathname === '/';
-	return pathname === href || pathname.startsWith(`${href}/`);
+	const routePathname = pathnameWithoutBase(pathname);
+	if (href === '/') return routePathname === '/';
+	return routePathname === href || routePathname.startsWith(`${href}/`);
 }

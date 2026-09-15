@@ -3,7 +3,7 @@
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 
 	import { messages } from '$lib/messages';
-	import { isActiveRoute, primaryNav, type NavItem } from '$lib/nav';
+	import { hrefFor, isActiveRoute, primaryNav, type NavItem } from '$lib/nav';
 
 	/**
 	 * Desktop navigation rail. Hidden below `lg`, where BottomNav takes over.
@@ -108,7 +108,7 @@
 	     one item while being two controls. -->
 	<div class="flex items-stretch gap-0.5">
 		<a
-			href={item.href}
+			href={hrefFor(item.href)}
 			aria-current={selfCurrent ? 'page' : undefined}
 			title={item.description}
 			class="group relative flex min-h-10 flex-1 items-center gap-2.5 rounded-md border px-2.5 py-1.5 text-2xs font-medium transition-colors duration-(--motion-fast) ease-standard
@@ -189,7 +189,7 @@
 		     13px / 0.14em, letting the content be the loudest thing on screen.
 		     Weight is set here, at the call site: the type scale carries size,
 		     leading and tracking only. -->
-		<a href="/" class="rounded-sm text-2xs font-medium tracking-[0.14em] text-ink uppercase">
+		<a href={hrefFor('/')} class="rounded-sm text-2xs font-medium tracking-[0.14em] text-ink uppercase">
 			THRIVE
 			<span class="sr-only"> home</span>
 		</a>
