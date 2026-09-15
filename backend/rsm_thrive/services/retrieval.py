@@ -62,6 +62,9 @@ coverage worse, not better.
 
 import math
 import re
+import threading
+
+import numpy
 
 
 from rsm_thrive.models import DocumentChunk
@@ -295,6 +298,136 @@ def keyword_score(query_terms, chunk):
                   _terms(f"{chunk.heading or ''} {chunk.text or ''}"))
 
 
+# ---------------------------------------------------------------------------
+# The corpus, held in memory between turns
+# ---------------------------------------------------------------------------
+#
+# Every turn on the resources bot used to load ALL 5,889 chunks from the
+# database with their documents, JSON-parse 67 MB of stored vectors, tokenise
+# every chunk, and then run a pure-Python cosine over 512 floats per chunk.
+# Measured: 582 ms median per query, of which embedding the question was 0.1
+# ms. The scan was the whole cost, and it grew linearly with the corpus.
+#
+# None of that changes between turns. It changes when the corpus does, which
+# is `ingest_corpus` -- so it is computed once per process and again whenever
+# the corpus fingerprint moves. Numerically identical to the loop it replaces:
+# the eval, the golden set and every retrieval test run unchanged on it.
+
+_CORPUS_LOCK = threading.Lock()
+_CORPUS = None            # (fingerprint, {destination: _Corpus})
+
+
+def _fingerprint():
+    """Changes whenever the corpus does; one cheap aggregate query.
+
+    Count and highest id catch an ingest. Total text length and the newest
+    document's fetch time are there for the test suite, where a transaction
+    rollback lets SQLite hand the same ids to a different fixture: measured,
+    one retrieval test passed alone and failed in the suite, served a corpus
+    from the test before it. Four fields agreeing across two different
+    corpora is not a case worth designing for.
+    """
+    from django.db.models import Count, Max, Sum
+    from django.db.models.functions import Length
+
+    from rsm_thrive.models import Document
+
+    row = DocumentChunk.objects.aggregate(
+        n=Count("id"), top=Max("id"), size=Sum(Length("text")))
+    # The newest document's fetch time, so two corpora that agree on count,
+    # ids and total length -- which the test suite produces, because SQLite
+    # hands back the same ids after a rollback -- still read as different.
+    # Every ingest sets it; nothing else does.
+    newest = Document.objects.aggregate(t=Max("fetched_at"))["t"]
+    return (row["n"] or 0, row["top"] or 0, row["size"] or 0,
+            newest.isoformat() if newest else "")
+
+
+def forget_corpus():
+    """Drop the cache by hand.
+
+    Not needed after an ingest: the fingerprint is re-read on every call, so
+    a corpus that changed in this process is rebuilt on the very next query.
+    This exists for the cases the fingerprint cannot see -- a test that edits
+    a chunk in place without changing its length, or anyone who wants the
+    rebuild now for their own reasons."""
+    global _CORPUS
+    with _CORPUS_LOCK:
+        _CORPUS = None
+
+
+class _Corpus:
+    """One destination's chunks, tokenised and stacked, ready to score."""
+
+    def __init__(self, rows):
+        # rows: (id, heading, text, title, embedding)
+        self.ids = [r[0] for r in rows]
+        texts = [f"{r[1] or ''} {r[2] or ''}" for r in rows]
+        self.haystacks = [_terms(t) for t in texts]
+        self.abouts = [_terms(f"{r[1] or ''} {r[3] or ''}") for r in rows]
+        self.counts = [_term_counts(t) for t in texts]
+        self.vocabulary = vocabulary_of(self.haystacks)
+        vectors = [r[4] for r in rows]
+        width = max((len(v) for v in vectors if v), default=0)
+        if width:
+            matrix = numpy.zeros((len(vectors), width), dtype=numpy.float32)
+            for i, v in enumerate(vectors):
+                if v and len(v) == width:
+                    matrix[i] = v
+            norms = numpy.linalg.norm(matrix, axis=1)
+            norms[norms == 0.0] = 1.0        # a zero row stays zero, scores 0.0
+            self.unit = matrix / norms[:, None]
+        else:
+            self.unit = numpy.zeros((len(vectors), 0), dtype=numpy.float32)
+
+    def similarities(self, query_vector):
+        if not query_vector or self.unit.shape[1] != len(query_vector):
+            # `cosine` returns 0.0 for a width mismatch; so does this.
+            return [0.0] * len(self.ids)
+        q = numpy.asarray(query_vector, dtype=numpy.float32)
+        norm = numpy.linalg.norm(q)
+        if norm == 0.0:
+            return [0.0] * len(self.ids)
+        return (self.unit @ (q / norm)).tolist()
+
+
+def _corpus_for(destination):
+    global _CORPUS
+    key = _fingerprint()
+    with _CORPUS_LOCK:
+        if _CORPUS is None or _CORPUS[0] != key:
+            by_destination = {}
+            rows = DocumentChunk.objects.select_related("document").values_list(
+                "id", "heading", "text", "document__title", "embedding",
+                "document__destinations")
+            grouped = {}
+            for cid, heading, text, title, embedding, destinations in rows:
+                for dest in (destinations or []):
+                    grouped.setdefault(dest, []).append(
+                        (cid, heading, text, title, embedding))
+            for dest, chunk_rows in grouped.items():
+                by_destination[dest] = _Corpus(chunk_rows)
+            _CORPUS = (key, by_destination)
+        return _CORPUS[1].get(destination) or _Corpus([])
+
+
+def _rows(ranked):
+    """(chunk, similarity) pairs, in rank order, as real model instances.
+
+    Only the top-k are fetched. Callers read `chunk.document.title` and
+    `source_url` off these to cite sources, so what comes back has to be the
+    same objects it always was -- the cache changes how the ranking is
+    computed, not what a caller receives.
+    """
+    if not ranked:
+        return []
+    wanted = [chunk_id for chunk_id, _s, _r in ranked]
+    fetched = {c.id: c for c in
+               DocumentChunk.objects.filter(id__in=wanted).select_related("document")}
+    return [(fetched[chunk_id], similarity)
+            for chunk_id, similarity, _rank in ranked if chunk_id in fetched]
+
+
 def retrieve(query, destination, top_k, min_similarity, lexical_min=None,
              lexical_floor=0.0, embeddings=None):
     """Top-k (chunk, cosine) pairs for `query`, scoped to one bot's corpus.
@@ -329,21 +462,15 @@ def retrieve(query, destination, top_k, min_similarity, lexical_min=None,
     # tokenising, the same typo repair, the same `_score` -- only the cosine
     # contribution is absent, which is what `lexical_only` accounts for.
     lexical_only = not query_vector
-    # Tokenise each in-scope chunk ONCE and keep it: the vocabulary and the
-    # keyword score both need it, and scoring used to redo this work per chunk.
-    scoped, haystacks, counts = [], [], []
-    for chunk in DocumentChunk.objects.select_related("document"):
-        if destination not in (chunk.document.destinations or []):
-            continue
-        text = f"{chunk.heading or ''} {chunk.text or ''}"
-        scoped.append(chunk)
-        haystacks.append(_terms(text))
-        # Only BM25 needs frequencies, and only lexical-only mode runs BM25.
-        counts.append(_term_counts(text) if lexical_only else None)
+    # Everything the scan needs about the corpus, from a process-level cache
+    # rather than from the database on every turn. See `_Corpus`.
+    corpus = _corpus_for(destination)
+    scoped, haystacks = corpus.ids, corpus.haystacks
+    counts = corpus.counts if lexical_only else [None] * len(scoped)
 
     # Group each term with the corpus spellings it may be a misspelling of, so
     # one typo cannot close the lexical tier on an answerable question.
-    query_terms = expand_terms(_terms(query), vocabulary_of(haystacks))
+    query_terms = expand_terms(_terms(query), corpus.vocabulary)
 
     if lexical_only:
         # BM25 over the whole in-scope corpus, then a relative cut. The score is
@@ -359,10 +486,10 @@ def retrieve(query, destination, top_k, min_similarity, lexical_min=None,
             return []
         cut = best * BM25_RELATIVE_CUT
         ranked = sorted(
-            ((chunk, 0.0, score) for chunk, score in zip(scoped, bm25)
+            ((chunk_id, 0.0, score) for chunk_id, score in zip(scoped, bm25)
              if score >= cut),
             key=lambda triple: -triple[2])
-        return [(chunk, similarity) for chunk, similarity, _ in ranked[:top_k]]
+        return _rows(ranked[:top_k])
 
     # A question that survives stopword stripping as ONE term is where the
     # lexical tier is weakest: "every distinctive term present" is satisfied by
@@ -383,15 +510,19 @@ def retrieve(query, destination, top_k, min_similarity, lexical_min=None,
     # 2, 7, 1 and 6.
     narrow = len(query_terms) < 2
 
+    # One matrix product for every cosine at once, in place of a Python loop
+    # over 5,889 chunks x 512 floats. Same numbers: unit-normalised rows dotted
+    # with the unit-normalised query, and a zero-norm row scores 0.0 exactly as
+    # `cosine` does.
+    similarities = corpus.similarities(query_vector)
     scored = []
-    for chunk, haystack in zip(scoped, haystacks):
-        similarity = cosine(query_vector, chunk.embedding)
+    for chunk_id, haystack, about_terms, similarity in zip(
+            scoped, haystacks, corpus.abouts, similarities):
         keyword = _score(query_terms, haystack)
         # Two tiers, either of which admits. A question with no distinctive
         # terms at all scores 0.0 here, so it can only ever enter on cosine.
         if lexical_min is not None and keyword >= lexical_min:
-            about = _score(query_terms,
-                           _terms(f"{chunk.heading or ''} {chunk.document.title or ''}"))
+            about = _score(query_terms, about_terms)
             # A title match also STANDS IN for the cosine floor, which is what
             # lets a misspelling through: the floor is there to catch chunks
             # matched by accident, and a term in the title is not an accident.
@@ -402,7 +533,7 @@ def retrieve(query, destination, top_k, min_similarity, lexical_min=None,
         if similarity < min_similarity and not lexical_hit:
             continue
         rank = similarity + KEYWORD_WEIGHT * keyword
-        scored.append((chunk, similarity, rank))
+        scored.append((chunk_id, similarity, rank))
 
     scored.sort(key=lambda triple: -triple[2])
-    return [(chunk, similarity) for chunk, similarity, _ in scored[:top_k]]
+    return _rows(scored[:top_k])

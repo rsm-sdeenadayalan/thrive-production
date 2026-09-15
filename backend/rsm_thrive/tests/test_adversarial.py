@@ -417,14 +417,17 @@ class TestATrackChangeInvalidatesTheSpread:
             to, planner.quarter_units_of(answers))
 
     def test_the_overall_preference_survives_the_switch(self, conversation):
-        """The spread is re-seeded for the new shape rather than lost: "light"
-        still means light, it just means it about different quarters."""
+        """The preference survives the switch; the spread is re-seeded for
+        the new shape rather than carried over. On the 11-month track there
+        is no spread to seed -- the load is not a choice there -- so the
+        17-month one is gone and nothing replaces it."""
         for text in ("17 month, data scientist", "skip", "light"):
             orchestrator.answer(FakeLLM([]), conversation, text, [])
         orchestrator.answer(FakeLLM([]), conversation, "11 month", [])
         answers = planner.load_session_intake(conversation)
         assert answers["workload"] == "light"
-        assert answers["quarter_units"] == planner.seeded_units("11 month", "light")
+        assert not answers.get("quarter_units")
+        assert planner.seeded_units("11 month", "light") == {}
 
     def test_the_walk_through_position_does_not_survive_it(self, conversation):
         """Found by the deep walk: a student who had reached the 17-month

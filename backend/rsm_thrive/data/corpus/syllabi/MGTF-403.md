@@ -3,7 +3,7 @@ id: "MGTF 403"
 code: "MGTF 403"
 title: "Advanced Financial Risk Management"
 department: "MGTF"
-programme: "Rady MS Finance (MFin)"
+programme: "Rady MQF (Master of Quantitative Finance)"
 schedulable: false
 is_core: false
 technical_level: 4
@@ -20,7 +20,7 @@ syllabi: ["MGTF 403 Advanced Risk Management (Valkanov) WI26 - 8am.txt"]
 ---
 # MGTF 403 — Advanced Financial Risk Management
 
-Rady MS Finance (MFin) · offered WI26 · _unit count not stated in the material supplied_
+Rady MQF (Master of Quantitative Finance) · offered WI26 · _unit count not stated in the material supplied_
 
 ## What this course covers
 

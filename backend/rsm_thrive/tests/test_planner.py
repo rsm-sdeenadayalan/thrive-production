@@ -24,9 +24,13 @@ class TestIntake:
     def test_every_question_maps_to_a_scoring_input(self):
         keys = {q["key"] for q in planner.intake_questions()}
         assert "track" in keys and "goals" in keys and "workload" in keys
-        # The brief requires the track and a per-area skill level be asked.
-        for area in planner.SKILL_AREAS:
-            assert f"skill_{area['key']}" in keys
+
+    def test_no_question_asks_a_student_to_rate_themselves(self):
+        """Removed deliberately. Nobody can rate their own machine learning
+        before they have taken any, and a low rating steered students away
+        from the courses that would fix the gap."""
+        keys = {q["key"] for q in planner.intake_questions()}
+        assert not [k for k in keys if k.startswith("skill_")]
 
     def test_track_options_are_the_two_real_tracks(self):
         track = next(q for q in planner.intake_questions() if q["key"] == "track")
@@ -66,17 +70,15 @@ class TestIntake:
 
 
 class TestSkillRatings:
-    """The skills step is answered by clicking a 1-5 rating per area."""
+    """Nothing ASKS for a rating any more, but a rating a student volunteers
+    is still read and still scored -- being asked and being told are different
+    things. See `read_skills`."""
 
-    def test_the_form_offers_a_row_per_area_pre_set_to_the_middle(self):
+    def test_the_interview_never_reaches_a_rating_form(self):
         step = planner.next_intake_step({"track": "11 month",
                                          "goals": ["data-scientist"]})
         form = planner.rating_form_for(step)
-        assert form["kind"] == "rating"
-        assert [r["key"] for r in form["rows"]] == [
-            f"skill_{a['key']}" for a in planner.SKILL_AREAS]
-        assert [p["value"] for p in form["scale"]] == [1, 2, 3, 4, 5]
-        assert form["default"] == planner.DEFAULT_SKILL_RATING == 3
+        assert form is None or form["kind"] != "rating"
 
     def test_only_the_areas_still_missing_are_asked(self):
         step = {"key": "skills", "missing": ["skill_ml"]}
@@ -511,7 +513,13 @@ class TestAShortPlanSaysSo:
     because every total summed the placeholder row's `units` alongside the real
     ones. A student could have planned a degree on a 48-unit plan that told
     them it was complete.
+
+    The fixture pins the PUBLISHED spread (14 / 14 / 14): a moderate 11-month
+    plan now holds Spring at 8 and cuts Fall as two 4-unit slots, which has
+    no 2-unit slot to leave unfilled. The defect this guards is about the
+    arithmetic of an unfillable slot, not about which spread produces one.
     """
+    PUBLISHED = {**ANSWERS, "quarter_units": {"fall": 14, "winter": 14, "spring": 14}}
 
     # Every 2-unit Fall elective, computed rather than listed: the point of the
     # fixture is that NOTHING can fill Fall's 2-unit slot, and a hardcoded pair
@@ -526,7 +534,7 @@ class TestAShortPlanSaysSo:
             and any(o.get("season") == "FA" for o in c.get("offerings") or []))
 
     def test_totals_count_only_what_is_scheduled(self):
-        plan = planner.build_plan(ANSWERS, self._all_fall_two_unit())
+        plan = planner.build_plan(self.PUBLISHED, self._all_fall_two_unit())
         scheduled = sum(row["units"] for quarter in plan["quarters"]
                         for row in quarter["courses"] if row["courseId"])
         assert plan["unfilled"], "expected an unfillable slot for this fixture"
@@ -534,13 +542,13 @@ class TestAShortPlanSaysSo:
         assert plan["totals"]["elective"] == 26
 
     def test_a_quarter_reports_the_units_it_holds(self):
-        plan = planner.build_plan(ANSWERS, self._all_fall_two_unit())
+        plan = planner.build_plan(self.PUBLISHED, self._all_fall_two_unit())
         for quarter in plan["quarters"]:
             held = sum(row["units"] for row in quarter["courses"] if row["courseId"])
             assert quarter["unitsPlanned"] == held, quarter["key"]
 
     def test_the_markdown_warns_instead_of_claiming_completeness(self):
-        body = planner.render_plan_markdown(planner.build_plan(ANSWERS, self._all_fall_two_unit()))
+        body = planner.render_plan_markdown(planner.build_plan(self.PUBLISHED, self._all_fall_two_unit()))
         assert "2 units short of the 50" in body
         assert "complete 50-unit plan" not in body
 

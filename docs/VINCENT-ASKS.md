@@ -75,9 +75,14 @@ and 9,911 live job postings.
 
 ## What we supply, so nobody waits on us
 
-- **TritonAI API key** — we hold it. It goes in the server's environment as
-  `TRITONAI_API_KEY`; it is never committed. Models in use are
-  `claude-sonnet-4-6` (chat) and `api-tgpt-embeddings` (1024-dim embeddings).
+- **TritonAI API key** — we hold it (reissued 2026-09-11). It goes in the
+  server's environment as `TRITONAI_API_KEY`; it is never committed. The model
+  in use is `claude-sonnet-5` (chat). **Embeddings no longer come from the
+  gateway at all** — the current key serves four chat models and no embedding
+  model, so embeddings run on-machine (`minishlab/potion-retrieval-32M`, 512
+  dimensions) and `THRIVE_EMBEDDINGS=local` is required. One consequence worth
+  your attention: the old key ran on campus vLLM, the new one fronts OpenAI,
+  Google and Anthropic, so chat text now leaves UCSD.
 - **The corpus and the job data** — both are reproducible on the server with
   management commands once the database exists.
 - **Everything else.** All five phases are built: backend core, appointments,
@@ -87,9 +92,10 @@ and 9,911 live job postings.
 ## Withdrawn or superseded
 
 - ~~**Shared `ai_service`**~~ — superseded 2026-08-23. The backend runs on
-  TritonAI, so no shared `ai_service` is needed. (An earlier version of this
-  doc named `claude-opus-4-6-v1`; that model does not exist on the proxy —
-  the real one is `claude-sonnet-4-6`.)
+  TritonAI, so no shared `ai_service` is needed. (Model ids in this doc have
+  been wrong twice as keys were reissued — `claude-opus-4-6-v1`, then
+  `claude-sonnet-4-6`. The id is whatever `GET /v1/models` returns for the key
+  currently in hand; as of 2026-09-11 that is `claude-sonnet-5`.)
 - ~~**Canvas API access**~~ — withdrawn 2026-08-23. Canvas integration is out
   of scope; academic data is seeded or admin-entered. Revisit only if the
   program wants live assignment sync later.

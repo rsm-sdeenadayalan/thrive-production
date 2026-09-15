@@ -32,11 +32,13 @@ and the whole thing testable. The LLM's job, if it is used at all, is to talk
 about a plan this module produced.
 """
 import json
+import collections
 import re
 from functools import lru_cache
 
 from rsm_thrive.models import Enrollment
-from rsm_thrive.services.electives import (WORKLOAD_LEVEL, catalog_version,
+from rsm_thrive.services.electives import (DEPARTMENT_LABELS, WORKLOAD_LEVEL,
+                                            catalog_version, is_msba,
                                             load_careers, load_catalog,
                                             rank_electives, resolve_role)
 
@@ -243,12 +245,47 @@ TECHNICAL_AREAS = [area["key"] for area in SKILL_AREAS if area["prereq_words"]]
 QUARTER_UNIT_MIN = 12
 QUARTER_UNIT_MAX = 18
 
-# The 17-month track's final quarter is the exception, and it has to be: the
-# plan is 50 units and the four quarters before it already carry 46 at the
-# published shape, so a 12-unit floor there would put the degree over 50. It is
-# a short finishing term by design.
+# The FINISHING quarter is the exception. Each track ends on one -- the
+# 17-month track on a second-year Fall, the 11-month track on Spring -- and
+# it is the quarter the light/moderate/heavy rule holds short (`TAIL_UNITS`),
+# so the 12-unit floor cannot apply to it. What does apply is its own core
+# load plus at least one elective: `FINAL_QUARTER_MIN` elective units.
+#
+# `FINAL_QUARTER_MAX` caps a tail whose PUBLISHED load is already short (the
+# 17-month's 4-unit Fall). The 11-month Spring publishes at 14, a full
+# quarter, and keeps the ordinary 18-unit cap so a student who wants a heavy
+# Spring in the walk-through can still have one.
 FINAL_QUARTER_MIN = 2
 FINAL_QUARTER_MAX = 8
+
+
+# Tracks where the load is a CHOICE. The 11-month track is not one: the
+# programme is compressed into four quarters and every one of them carries
+# what the plan of study publishes -- the degree has to be completed in the
+# time, so there is no light or heavy version to offer, and asking would be a
+# question with one answer. The 17-month track has the room, and keeps the
+# question: its overall spread, the finishing-quarter rule and the per-quarter
+# walk-through prompt all apply there only.
+LOAD_IS_A_CHOICE = {"11 month": False, "17 month": True}
+
+
+def load_is_a_choice(track):
+    return LOAD_IS_A_CHOICE.get(track, True)
+
+
+def tail_quarter_key(track):
+    """The finishing quarter: the LAST one on the track with elective room.
+
+    "Fall (second year)" on the 17-month track, "Spring" on the 11-month --
+    which ends before any second-year Fall. It used to be found by published
+    load ("under 12 units"), which found the 17-month tail and declared the
+    11-month track had none; a rule about the finishing quarter has to find
+    the finishing quarter on every track.
+    """
+    for quarter in reversed(TRACK_SKELETONS.get(track) or []):
+        if any(slot["kind"] == "elective" for slot in quarter["slots"]):
+            return quarter["key"]
+    return None
 
 
 def adjustable_quarters(track):
@@ -260,6 +297,7 @@ def adjustable_quarters(track):
     """
     skeleton = TRACK_SKELETONS.get(track) or []
     catalog = _catalog_by_id()
+    tail = tail_quarter_key(track)
     out = []
     for quarter in skeleton:
         electives = [slot for slot in quarter["slots"] if slot["kind"] == "elective"]
@@ -267,16 +305,16 @@ def adjustable_quarters(track):
             continue
         spent = sum(catalog[slot["course_id"]]["units"] for slot in quarter["slots"]
                     if slot["kind"] in ("core", "fixed"))
-        # A short finishing term is identified by its PUBLISHED load, not by
-        # being last. The 11-month track's Spring is also last and carries a
-        # full 14 units; only the 17-month track's Fall (second year) is the
-        # 4-unit tail the floor has to make room for.
-        last = quarter["units"] < QUARTER_UNIT_MIN
+        # The finishing quarter's floor is its core load plus one elective,
+        # not the 12-unit full-time minimum: it is the quarter the load rule
+        # holds at 4 (or 2) elective units. See `tail_quarter_key`.
+        last = quarter["key"] == tail and load_is_a_choice(track)
+        short = quarter["units"] < QUARTER_UNIT_MIN
         out.append({
             "key": quarter["key"], "label": quarter["label"],
             "default": quarter["units"],
-            "min": max(FINAL_QUARTER_MIN if last else QUARTER_UNIT_MIN, spent),
-            "max": FINAL_QUARTER_MAX if last else QUARTER_UNIT_MAX,
+            "min": spent + FINAL_QUARTER_MIN if last else max(QUARTER_UNIT_MIN, spent),
+            "max": FINAL_QUARTER_MAX if short else QUARTER_UNIT_MAX,
             # A quarter can never go below what its own core courses cost.
             "core_units": spent,
         })
@@ -314,7 +352,14 @@ def quarter_units_of(answers):
     chosen = (answers or {}).get("quarter_units") or {}
     published = {q["key"]: q["default"] for q in adjustable_quarters(track)}
     if not chosen:
-        return published
+        # No per-quarter choice, but an overall load: the same distribution
+        # the conversation seeds from that word (`seeded_units`), so a plan
+        # built straight from {track, goals, workload} -- `POST /plan`, a
+        # test, a session the orchestrator has not yet passed through -- is
+        # the plan the student would see in the chat. Before this, the
+        # 11-month "moderate" plan was the published 14/14/14 here and the
+        # held-Spring 18/16/8 there, and the two disagreed about Spring.
+        return seeded_units(track, (answers or {}).get("workload")) or published
     wanted = {key: int(units) if isinstance(units, (int, float))
               and not isinstance(units, bool) else default
               for key, default in published.items()
@@ -409,8 +454,13 @@ def load_mentioned(text):
     """
     if is_question(text):
         return None
-    match = re.search(r"\b(light|lighter|moderate|medium|normal|heavy|heavier)\b",
-                      (text or "").lower())
+    # Every single-word key in LOAD_WORDS, so "lightest" and "heaviest" read.
+    # The list was hand-typed and missed both: "the lightest possible
+    # schedule" -- about as clear a preference as a student can state --
+    # was read as no preference at all.
+    words = "|".join(sorted((w for w in LOAD_WORDS if " " not in w), key=len,
+                            reverse=True))
+    match = re.search(rf"\b({words})\b", (text or "").lower())
     return LOAD_WORDS.get(match.group(1)) if match else None
 
 
@@ -429,7 +479,7 @@ def units_for_load(track, key, load, chosen=None, pinned=None):
     happen for a distribution the published plan itself produces.
     """
     bound = LOAD_BOUNDS.get(load)
-    if bound is None:
+    if bound is None or not load_is_a_choice(track):
         return None
     quarter = next((q for q in adjustable_quarters(track) if q["key"] == key), None)
     if quarter is None:
@@ -580,6 +630,16 @@ def seeded_units(track, load):
     It is a STARTING point. The walk-through then asks about each quarter
     individually, with the student looking at the courses the answer changes.
     """
+    if not load_is_a_choice(track):
+        return {}
+    if load == "moderate":
+        # The published plan, with the finishing quarter held at 4 elective
+        # units. On the 17-month track the published plan already ends that
+        # way and this stays {}; on the 11-month track Spring publishes at
+        # 14, so moderate is a real distribution there.
+        published = {q["key"]: q["default"] for q in adjustable_quarters(track)}
+        held = _with_tail_rule(track, load, published)
+        return {} if held == published else held
     if load not in ("light", "heavy"):
         return {}
     chosen, pinned = {}, set()
@@ -600,7 +660,73 @@ def seeded_units(track, load):
         pinned.add(quarter["key"])
     if not chosen or quarter_units_problems(track, chosen):
         return {}
-    return chosen
+    return _with_tail_rule(track, load, chosen)
+
+
+# The ELECTIVE units the finishing quarter carries, by overall load: light and
+# moderate keep it at 4, heavy at 2. Elective units, because the finishing
+# quarter's core is not negotiable -- on the 17-month track the second-year
+# Fall has no core, so 4 elective units IS a 4-unit quarter; on the 11-month
+# track Spring carries MGTA 454 (4 units), so it ends at 8 (or 6 on heavy).
+#
+# Before this, light put every earlier quarter at its 12-unit floor and let
+# the finishing quarter absorb what was left -- 6 units on the 17-month, 18
+# on the 11-month -- so the lightest spread ended on the heaviest term. The
+# units it gives up land in the latest full quarters first, so light's own
+# promise ("the later quarters carry more") still holds.
+#
+# The consequence on both tracks is that light and moderate coincide -- once
+# the tail is fixed and the total is 50, there is only one way to lay the
+# rest within the 12-18 range that puts the weight late. What separates them
+# is the walk-through, where any single quarter can be moved.
+TAIL_UNITS = {"light": 4, "moderate": 4, "heavy": 2}
+
+
+def tail_target(track, load):
+    """The finishing quarter's TOTAL under `load`: its core plus `TAIL_UNITS`.
+    None where the track has no finishing quarter or the load has no rule."""
+    units = TAIL_UNITS.get(load)
+    tail = next((q for q in adjustable_quarters(track)
+                 if q["key"] == tail_quarter_key(track)), None)
+    if units is None or tail is None or not load_is_a_choice(track):
+        return None
+    return tail["core_units"] + units
+
+
+def _with_tail_rule(track, load, chosen):
+    """Hold the finishing quarter at `tail_target`, moving the difference into
+    the latest full quarters two units at a time. Returns `chosen` untouched
+    when the track has no tail, the load has no rule, or no legal spread
+    holds it."""
+    target = tail_target(track, load)
+    quarters = adjustable_quarters(track)
+    key = tail_quarter_key(track)
+    tail = next((q for q in quarters if q["key"] == key), None)
+    if target is None or tail is None or key not in chosen:
+        return chosen
+    if not (tail["min"] <= target <= tail["max"]):
+        return chosen
+    diff = chosen[key] - target
+    if diff == 0:
+        return chosen
+    trial = {**chosen, key: target}
+    step = 2 if diff > 0 else -2
+    # Latest full quarter first: the units land late on a light spread and
+    # come off late on a heavy one. Each quarter takes what it can within
+    # its own bounds before the next one is touched.
+    for quarter in reversed([q for q in quarters
+                             if q["key"] != key and q["key"] in chosen]):
+        while diff != 0:
+            moved = trial[quarter["key"]] + step
+            if not (quarter["min"] <= moved <= quarter["max"]):
+                break
+            trial[quarter["key"]] = moved
+            diff -= step
+        if diff == 0:
+            break
+    if diff != 0 or quarter_units_problems(track, trial):
+        return chosen
+    return trial
 
 
 def load_of_quarter(track, key, chosen, pinned=None):
@@ -620,9 +746,10 @@ def load_of_quarter(track, key, chosen, pinned=None):
 
 
 def quarter_units_form_for(track):
-    """The slider form: one row per adjustable quarter, seeded with the plan."""
+    """The slider form: one row per adjustable quarter, seeded with the plan.
+    None where the load is not a choice (`load_is_a_choice`)."""
     quarters = adjustable_quarters(track)
-    if not quarters:
+    if not quarters or not load_is_a_choice(track):
         return None
     fixed = fixed_quarter_units(track)
     adjustable_keys = {q["key"] for q in quarters}
@@ -746,14 +873,18 @@ def intake_questions():
          "help": "You can change your mind later — either way you can swap any "
                  "course once you see the plan.",
          "options": ROUTE_CHOICES},
-        *[{"key": f"skill_{area['key']}", "kind": "single", "required": True,
-           "prompt": f"How would you rate your {area['label']} right now?",
-           "help": "Honest answers give a better plan — this is used to keep "
-                   "courses in reach and to warn about prerequisites.",
-           "options": [{"value": lvl["value"], "label": lvl["label"],
-                        "description": lvl["help"]}
-                       for lvl in SKILL_SCALE]}
-          for area in SKILL_AREAS],
+        # NO SELF-RATING. This used to ask five "rate yourself 1-5" questions
+        # here. They are gone, deliberately: a student cannot rate their own
+        # machine learning before they have taken any, the answers gated the
+        # plan behind five sliders, and a low self-rating steered people AWAY
+        # from the courses that would fix the gap -- the opposite of advising.
+        #
+        # The scoring machinery underneath is untouched and simply runs at the
+        # neutral rating: `profile_from_intake` defaults every area to
+        # DEFAULT_SKILL_RATING, and `prerequisite_cautions` returns nothing
+        # when no rating exists. `read_skills` still reads a rating a student
+        # VOLUNTEERS ("strong in python, never done ML"), because being told is
+        # different from being asked.
         {"key": "quarter_units", "kind": "units", "required": False,
          "prompt": "How many units do you want in each quarter?",
          "help": "Starts on the published plan. Move them around if you would "
@@ -1070,12 +1201,11 @@ def _resized(skeleton, answers):
     slots are re-cut to the new budget: 4-unit slots first, with a 2-unit slot
     for a remainder that is not a multiple of four.
 
-    Untouched when the student has chosen nothing, so a plan built without this
-    question is byte-identical to what it was before the question existed.
+    Untouched when the student has chosen nothing and stated no load, so a
+    plan built without this question is byte-identical to what it was before
+    the question existed. (`quarter_units_of` supplies the load's seed when
+    only the one-word answer is known.)
     """
-    chosen = (answers or {}).get("quarter_units")
-    if not chosen:
-        return skeleton
     catalog = _catalog_by_id()
     wanted = quarter_units_of(answers)
     resized = []
@@ -1253,6 +1383,13 @@ def build_plan(answers, taken_ids=frozenset(), selections=None, skeleton=None,
     goal_tags = {tag for role in profile["career_roles"]
                  for tag in (careers.get(role, {}).get("career_tags") or [])}
 
+    # Courses the student SAID they have finished -- not the wider `taken_ids`,
+    # which also holds current enrolments. The first cut dropped every taken
+    # core row, and for a student enrolled in MGTA 451 this quarter that
+    # emptied Summer: "Summer III -- 4 units" listing nothing. A course being
+    # taken now belongs in the plan; a course already finished belongs in it
+    # too, marked done and counted in `completed`, rather than silently gone.
+    stated_done = stated_completed_ids(answers)
     used, quarters, unfilled = set(), [], []
     for quarter in skeleton:
         rows = []
@@ -1261,6 +1398,14 @@ def build_plan(answers, taken_ids=frozenset(), selections=None, skeleton=None,
                 course = catalog[slot["course_id"]]
                 used.add(course["id"])
                 is_core = slot["kind"] == "core"
+                if course["id"] in stated_done:
+                    row = _entry(course, "core" if is_core else "elective",
+                                 swappable=False, requirement="Done",
+                                 reasons=["you said you've already done this"],
+                                 note="already done — not counted again")
+                    row["completed"] = True
+                    rows.append(row)
+                    continue
                 rows.append(_entry(
                     course, "core" if is_core else "elective", swappable=False,
                     reasons=["required core course for the MSBA"] if is_core else
@@ -1326,15 +1471,18 @@ def build_plan(answers, taken_ids=frozenset(), selections=None, skeleton=None,
             # counting it here made a plan claim units it does not contain: a
             # student who had already taken both of Fall's 2-unit electives got
             # a 48-unit plan whose header said 50. See `unfilled` below.
-            "unitsPlanned": sum(r["units"] for r in rows if r["courseId"]),
+            "unitsPlanned": sum(r["units"] for r in rows
+                                if r["courseId"] and not r.get("completed")),
             "unitsExpected": quarter["units"],
             "courses": rows,
         })
 
     core_units = sum(r["units"] for q in quarters for r in q["courses"]
-                     if r["kind"] == "core" and r["courseId"])
+                     if r["kind"] == "core" and r["courseId"]
+                     and not r.get("completed"))
     elective_units = sum(r["units"] for q in quarters for r in q["courses"]
-                         if r["kind"] == "elective" and r["courseId"])
+                         if r["kind"] == "elective" and r["courseId"]
+                         and not r.get("completed"))
     # Units already on the transcript. Counted from the CATALOG rather than
     # from anything the caller says, so a course the student names but that
     # this programme does not carry cannot inflate the figure -- and every
@@ -1524,12 +1672,22 @@ def effective_skeleton(answers, taken_ids=frozenset()):
     failure `apply_swap` exists to prevent.
     """
     track = (answers or {}).get("track") or "11 month"
-    skeleton, _pinned = fixed_plan_inputs(answers, taken_ids)
+    skeleton, _pinned, _dropped = fixed_plan_inputs(answers, taken_ids)
     if skeleton is None:
         skeleton = TRACK_SKELETONS.get(track)
     if skeleton is None:
         raise ValueError(f"unknown track {track!r}")
     return _resized(skeleton, answers)
+
+
+class NotOfferedError(ValueError):
+    """The replacement exists and fits the slot's size, but not its season.
+
+    Its own class because the caller's reply differs: every other refusal is
+    final ("that slot is fixed", "you have already taken it"), while this one
+    has a useful next line -- WHERE the course is offered, and which quarter
+    of the plan that is. See `placement_note`.
+    """
 
 
 def apply_swap(answers, selections, quarter_key, slot, course_id, taken_ids=frozenset()):
@@ -1570,7 +1728,7 @@ def apply_swap(answers, selections, quarter_key, slot, course_id, taken_ids=froz
             f"{course['code']} is {course['units']} units and that slot is "
             f"{quarter['slots'][slot]['units']}")
     if not _offered_in(course, quarter["season"]):
-        raise ValueError(f"{course['code']} is not offered in {quarter['label']}")
+        raise NotOfferedError(f"{course['code']} is not offered in {quarter['label']}")
     if course_id in taken_ids:
         raise ValueError(f"you have already taken {course['code']}")
 
@@ -1639,19 +1797,72 @@ def fixed_plan_inputs(answers, taken_ids=frozenset()):
     from rsm_thrive.services import bundles
 
     if route_of(answers) != "fixed":
-        return None, None
+        return None, None, False
     goals = answers.get("goals") or []
     if not goals:
-        return None, None
+        return None, None, False
     track = answers.get("track") or "11 month"
-    skeleton, selections, _courses = bundles.skeleton_for(
-        goals[0], track, taken_ids,
+    dropped = False
+    wanted_units = quarter_units_of(
         # The load the student chose, so the bundle is placed inside the
         # quarters they actually asked for rather than inside the published
-        # ones and then re-cut. See `bundles.skeleton_for`.
-        quarter_units_of({"track": track,
-                          "quarter_units": answers.get("quarter_units")}))
-    return skeleton, selections
+        # ones and then re-cut. See `bundles.skeleton_for`. The load WORD
+        # goes too: with only "heavy" known, `quarter_units_of` seeds the
+        # spread from it, and `build_plan` will re-cut to that same seed --
+        # placing the bundle for the published spread here and re-cutting
+        # to the heavy one there produced a 52-unit plan.
+        {"track": track, "quarter_units": answers.get("quarter_units"),
+         "workload": answers.get("workload")})
+    skeleton, selections, _courses = bundles.skeleton_for(
+        goals[0], track, taken_ids, wanted_units)
+    if skeleton is None and wanted_units:
+        # THE BUNDLE OUTRANKS THE SPREAD.
+        #
+        # A light or heavy spread moves units between quarters, and a bundle
+        # whose courses are only taught in particular terms often cannot be
+        # laid into the result. When that happened the whole curated bundle
+        # was abandoned and the plan fell through to the generic ranked fill
+        # -- silently, and the student was never told their plan had stopped
+        # being the one built for their career.
+        #
+        # Measured across every role, track and load: 33 of 84 combinations
+        # lost their bundle this way. `ml-engineer` on a light spread came
+        # back with 3 of 9 electives serving the goal, against 8 of 9 on the
+        # published spread, and with none of its three CS courses.
+        #
+        # So the published spread is tried next, and only a bundle that
+        # cannot be placed there at all falls back to the ranked plan. Which
+        # of the two to give up is not a close call: the spread is a
+        # preference the student can still change one quarter at a time in
+        # the walk-through -- the load question says so in as many words --
+        # while the bundle is the entire reason the plan is about their
+        # career rather than about the catalog.
+        skeleton, selections, _courses = bundles.skeleton_for(
+            goals[0], track, taken_ids, None)
+        dropped = True
+    return skeleton, selections, bool(skeleton is not None and dropped)
+
+
+def _tail_shortfall(answers, plan):
+    """{'wanted', 'actual', 'label'} when the finishing quarter missed the
+    load's target (`tail_target`), else None."""
+    track = answers.get("track") or "11 month"
+    key = tail_quarter_key(track)
+    wanted = tail_target(track, answers.get("workload") or "moderate")
+    if key is None or wanted is None:
+        return None
+    quarter = next((q for q in plan["quarters"] if q["key"] == key), None)
+    if quarter is None or quarter["unitsPlanned"] == wanted:
+        return None
+    return {"wanted": wanted, "actual": quarter["unitsPlanned"],
+            "label": quarter["label"]}
+
+
+def stated_completed_ids(answers):
+    """Catalog ids for the codes a student said they had finished."""
+    codes = {str(c).upper() for c in (answers or {}).get("completed_codes") or []}
+    return frozenset(course["id"] for course in load_catalog()
+                     if course["code"].upper() in codes)
 
 
 def build_for(answers, taken_ids=frozenset(), selections=None, start_from=None):
@@ -1673,17 +1884,48 @@ def build_for(answers, taken_ids=frozenset(), selections=None, start_from=None):
     nothing -- the same fallback `fixed_plan_inputs` already makes for a bundle
     that cannot be scheduled around completed courses.
     """
+    # Courses the student SAID they have finished, in this conversation. They
+    # join the enrolment record here, in the one place every plan is built,
+    # rather than at the dozen call sites that pass `taken_ids` in. A student
+    # who types "I've already done MGTA 464 and 402" and is then handed a
+    # plan with both of them in it has been ignored, and was.
+    taken_ids = frozenset(taken_ids) | stated_completed_ids(answers)
     wanted = route_of(answers)
-    skeleton, pinned = fixed_plan_inputs(answers, taken_ids)
+    skeleton, pinned, spread_dropped = fixed_plan_inputs(answers, taken_ids)
     if skeleton is None:
         return _routed(build_plan(answers, taken_ids, selections,
                                   start_from=start_from), "custom", wanted)
     merged = {key: dict(value) for key, value in (pinned or {}).items()}
     for quarter_key, chosen in (selections or {}).items():
         merged.setdefault(quarter_key, {}).update(chosen)
+    if spread_dropped:
+        # And the chosen spread has to come OFF the answers too, not just out
+        # of the skeleton. `build_plan` re-cuts a skeleton to
+        # `answers["quarter_units"]`, so leaving it on put the bundle back
+        # into the very distribution it could not be placed in -- measured,
+        # `ml-engineer` on a light spread recovered only 6 of its 9 on-goal
+        # electives instead of 8. Set to the PUBLISHED spread explicitly:
+        # `quarter_units_of` seeds a missing spread from the load word, so
+        # merely removing the key would put the dropped spread straight back.
+        answers = {**answers, "quarter_units": {
+            q["key"]: q["default"]
+            for q in adjustable_quarters(answers.get("track") or "11 month")}}
     try:
-        return _routed(build_plan(answers, taken_ids, merged, skeleton=skeleton,
+        plan = _routed(build_plan(answers, taken_ids, merged, skeleton=skeleton,
                                   start_from=start_from), "fixed", wanted)
+        # The student asked for a spread this bundle could not be laid into,
+        # and the bundle won. Said out loud rather than left for them to
+        # notice the quarters are not what they chose.
+        plan["spreadDropped"] = spread_dropped
+        # Whether the finishing quarter landed where the load says it should.
+        # For some bundles it cannot: bi-analyst has 457, 402, 459 and MGTF
+        # 405 offered in the final Fall, but sending 4 of those units there
+        # leaves Spring short of its 12-unit graduate minimum, and no
+        # differentiator combination changes that. Then the tail carries 2
+        # and the plan SAYS so, rather than leaving a student who asked for a
+        # light finish to notice the number on their own.
+        plan["tailShort"] = _tail_shortfall(answers, plan)
+        return plan
     except ValueError:
         # The bundle's derived skeleton omits a quarter the student says they
         # are in, so the bundle cannot describe where they actually are.
@@ -1974,7 +2216,6 @@ def render_plan_markdown(plan):
 INTAKE_STEPS = [
     {"key": "track", "fields": ["track"]},
     {"key": "goals", "fields": ["goals"]},
-    {"key": "skills", "fields": [f"skill_{area['key']}" for area in SKILL_AREAS]},
     {"key": "quarter_units", "fields": ["quarter_units"]},
 ]
 
@@ -1993,6 +2234,16 @@ def _allowed_values():
     allowed = {}
     for question in intake_questions():
         allowed[question["key"]] = {opt["value"] for opt in question["options"]}
+    # The skill areas are NOT questions any more -- nothing asks a student to
+    # rate themselves -- but they are still valid ANSWERS, so they stay in the
+    # allowlist. `read_skills` picks a rating out of "strong in python, never
+    # done ML", and a student who volunteers that should have it used. Deriving
+    # this map from the question list alone silently dropped exactly those
+    # ratings on the floor: being asked and being told are different things,
+    # and only the asking was meant to go.
+    for area in SKILL_AREAS:
+        allowed.setdefault(f"skill_{area['key']}",
+                           {lvl["value"] for lvl in SKILL_SCALE})
     return allowed
 
 
@@ -2164,8 +2415,9 @@ MAX_STEP_ATTEMPTS = 2
 # Under-claiming never made the plan safer either. Safety here is DISCLOSURE:
 # `_stretch_notes` marks every course above the level the student gave, on the
 # row, every time. Quietly degrading the recommendation is not a substitute for
-# saying so, and it is only ever reached now when a student has declined to
-# answer -- see `orchestrator.ASK_FOR_SKILLS`.
+# saying so. Since the self-rating questions were removed this is the NORMAL
+# case rather than the exception: nothing asks for a rating, so every area sits
+# at the assumed level unless a student volunteered one.
 ASSUMED_SKILL = "working"
 
 
@@ -2282,6 +2534,13 @@ def next_intake_step(answers):
         # student was never shown.
         if step["key"] == "quarter_units" and answers.get("workload"):
             continue
+        # And on a track where the load is not a choice there is nothing to
+        # answer: the intake is complete with a track and a goal. Without
+        # this, an 11-month plan was delivered and then "walk me through it"
+        # was refused as an unfinished interview, straight to the classifier.
+        if step["key"] == "quarter_units" and not load_is_a_choice(
+                answers.get("track") or "11 month"):
+            continue
         if missing:
             return {"key": step["key"], "missing": missing}
     return None
@@ -2319,20 +2578,6 @@ def render_question(step, answers, unmatched_goal=""):
         lines += [f"I don't have a track built around **{unmatched_goal}** — the "
                   f"roles below are the ones the elective scoring knows about. "
                   f"Pick whichever comes closest and I'll work from that.", ""]
-
-    if step["key"] == "skills":
-        lines += ["To keep the plan in reach, how would you rate yourself in each "
-                  "of these right now?", ""]
-        for field in step["missing"]:
-            area = next(a for a in SKILL_AREAS if f"skill_{a['key']}" == field)
-            lines.append(f"- **{area['label']}**")
-        lines += ["",
-                  "Rate each one **1-5** ("
-                  + ", ".join(f"{lvl['value']} = {lvl['help'].lower()}"
-                              for lvl in SKILL_SCALE)
-                  + "). Use the sliders below, or just say something like "
-                    "\"python 4, sql 2\" — words work too."]
-        return "\n".join(lines)
 
     question = _question(step["missing"][0])
     lines.append(question["prompt"])
@@ -2526,6 +2771,8 @@ def rating_form_for(step, answers=None):
     `answers` is needed because the load form depends on the TRACK -- the two
     tracks have different quarters and different published defaults.
     """
+    if not step:
+        return None   # the interview is complete; nothing to ask
     if step.get("key") == "quarter_units":
         return quarter_units_form_for((answers or {}).get("track") or "11 month")
     return _rating_form_for(step)
@@ -2625,14 +2872,37 @@ def quick_replies_for(step):
     return []
 
 
+# THREE DOORS, not one. This used to open on "what are you aiming for after
+# the programme?", which assumes an answer exists -- and for a large share of
+# students in their first quarter it does not. Being asked a question you
+# cannot answer is a worse start than being shown the way in, so the two
+# paths that do not need a job title are named here rather than left to be
+# discovered by a student who happens to type "I don't know".
+#
+# The old second half of door one read "name an industry and I'll work from
+# what that field is asking for" -- the web lookup's promise, and it outlived
+# the lookup. An industry now opens a ranked list of the roles it hires MSBA
+# graduates into, which is a better answer and a different sentence.
 OPENING = (
-    "Hi — I'm the MSBA course planner. Two things and I can lay out your whole "
-    "plan of study:\n\n"
-    "1. **What are you aiming for after the programme?** A job title is "
-    "enough — \"data scientist\", \"pricing analyst\", \"product manager\" — "
-    "or name an industry and I'll work from what that field is asking for.\n"
-    "2. **Which track are you on** — the **11-month** or the **17-month**?\n\n"
-    "Both in one line is fine: _\"11 month, data scientist\"_.\n\n"
+    "Hi — I'm the MSBA course planner. I'll lay out your whole plan of "
+    "study — we can start from wherever you are:\n\n"
+    "- **You know the job.** Name it with your track and we're done in one "
+    "line: _\"11 month, data scientist\"_.\n"
+    "- **You know the field, not the job.** Say _\"healthcare\"_, "
+    "_\"fintech\"_, _\"consulting\"_ — I'll show you the roles it hires MSBA "
+    "graduates into, most in demand first, and you pick from there.\n"
+    "- **You have no idea yet.** Say so. I'll walk you through the six "
+    "industries, then the roles inside whichever one interests you.\n\n"
+    # THE TRACK IS NOT ASKED HERE. It used to be, as a standing requirement
+    # ("I'll need your track either way"), which made the opening a form with
+    # two fields before the student had said anything at all -- and it asked
+    # twice, because every curated recommendation already closes by asking for
+    # it, at the point where it is the only thing standing between the student
+    # and a plan. A question asked before it is needed is a question asked
+    # while the answer still costs the student something to give.
+    #
+    # The one-line shortcut still SHOWS a track, so the student who has both
+    # answers ready can give them together and skip a turn.
     "And if something else is on your mind first — whether a course has "
     "prerequisites, what's left in your degree, what to take next quarter — "
     "just ask. I'll answer that and we can come back to this."
@@ -2822,11 +3092,39 @@ COURSE_CODE = re.compile(r"\b([A-Z]{2,4})\s*(\d{3}[A-Z]?)\b", re.IGNORECASE)
 
 
 def mentioned_codes(text):
-    """Course codes named in a message, normalised to catalog spelling."""
+    """Course codes named in a message, normalised to catalog spelling.
+
+    Two shapes beyond the fully spelled code, because students write both:
+
+    * **A bare number after a coded course inherits its department.** "MGTA
+      464 and 402" names two courses; reading it as one dropped the second
+      and built a plan that scheduled a course the student said they had
+      finished.
+    * **A bare number that is unambiguous in the catalog stands alone.**
+      "can i swap 466 for something easier" names MGTA 466, because no other
+      department has a 466. A number two departments share stays unread
+      rather than guessed.
+    """
     known = {course["code"].upper() for course in load_catalog()}
-    found = []
-    for department, number in COURSE_CODE.findall(text or ""):
-        code = f"{department.upper()} {number.upper()}"
+    by_number = collections.defaultdict(set)
+    for code in known:
+        department, _, number = code.partition(" ")
+        by_number[number].add(department)
+    found, last_department = [], None
+    for token in re.finditer(r"\b(MGTA|MGTF|MGTP|MGT|CSE)\s*(\d{3}[A-Z]?)\b"
+                             r"|\b(\d{3}[A-Z]?)\b", text or "", re.IGNORECASE):
+        department, number, bare = token.groups()
+        if department:
+            last_department, number = department.upper(), number.upper()
+        else:
+            number = bare.upper()
+            if last_department and f"{last_department} {number}" in known:
+                department = last_department
+            elif len(by_number.get(number, ())) == 1:
+                department = next(iter(by_number[number]))
+            else:
+                continue
+        code = f"{department.upper()} {number}"
         if code in known and code not in found:
             found.append(code)
     return found
@@ -2887,6 +3185,225 @@ def render_alternatives_markdown(result):
 
 
 # ---------------------------------------------------------------------------
+# Where else a course could go
+# ---------------------------------------------------------------------------
+#
+# Two moments in a conversation turn on the same fact -- the seasons a course
+# is offered in, read against the quarters of THIS plan:
+#
+# * A student swapping a course OUT wants to know whether that is goodbye. A
+#   course offered only in Fall, dropped from Fall, is out of the plan for good;
+#   one that also runs in Winter can be picked up later. The plan cannot say
+#   which without being asked, so the swap reply says it unprompted.
+# * A student naming a course they WANT wants to know where it fits. "Offered
+#   in Winter and Spring" is the catalog's answer; "your Winter, in place of
+#   MGTA 457 or MGTA 462" is the plan's, and it is the second one they can act
+#   on.
+#
+# Both read `offerings` by SEASON only, exactly as `_offered_in` does when it
+# builds the plan, so the note never contradicts the schedule it sits under.
+
+SEASON_NAMES = {"SU": "Summer", "FA": "Fall", "WI": "Winter", "SP": "Spring"}
+_SEASON_ORDER = ("SU", "FA", "WI", "SP")
+
+
+def seasons_of(course):
+    """The seasons a course runs in, in academic order, as codes."""
+    have = {(o.get("season") or "").upper() for o in course.get("offerings") or []}
+    return [season for season in _SEASON_ORDER if season in have]
+
+
+def season_names(seasons):
+    """"Fall, Winter and Spring" -- season codes said as a list."""
+    names = [SEASON_NAMES.get(season, season) for season in seasons]
+    if not names:
+        return ""
+    if len(names) == 1:
+        return names[0]
+    return ", ".join(names[:-1]) + " and " + names[-1]
+
+
+def _term_varies(course, seasons):
+    """Does the catalog only know these seasons as "varies"?
+
+    A course listed for a season with a real term (FA26) is scheduled; one
+    listed as "varies" is a pattern, not a promise. The note hedges the
+    second, because "you could take it in Winter" is exactly the sentence a
+    student plans around.
+    """
+    terms = [(o.get("term") or "").lower()
+             for o in course.get("offerings") or []
+             if (o.get("season") or "").upper() in set(seasons)]
+    return bool(terms) and all(term == "varies" for term in terms)
+
+
+def placements_for(plan, course, exclude_key=None):
+    """The quarters of `plan` that could take `course`, and what it would displace.
+
+    A quarter qualifies when the course is offered in its season AND it holds
+    a swappable elective of the same unit size -- the same two tests
+    `apply_swap` applies, so every placement named here is one it would accept.
+    Returns [(quarter, [rows])] in plan order, skipping `exclude_key`.
+    """
+    placements = []
+    for quarter in plan["quarters"]:
+        if quarter["key"] == exclude_key:
+            continue
+        if not _offered_in(course, quarter["season"]):
+            continue
+        rows = [row for row in quarter["courses"]
+                if row["swappable"] and row["courseId"]
+                and row["courseId"] != course["id"]
+                and row["units"] == course["units"]]
+        if rows:
+            placements.append((quarter, rows))
+    return placements
+
+
+def _in_place_of(rows):
+    codes = [f"**{row['code']}**" for row in rows]
+    if len(codes) == 1:
+        return f"in place of {codes[0]}"
+    return f"in place of {', '.join(codes[:-1])} or {codes[-1]}"
+
+
+def _quarter_index(plan, key):
+    return next((i for i, q in enumerate(plan["quarters"]) if q["key"] == key), None)
+
+
+def displaced_note(plan, course, quarter_key):
+    """What swapping `course` OUT of `quarter_key` means for it -- as a callout.
+
+    Three honest outcomes, and the reply should say which:
+
+    * It fits another quarter of the plan: name the quarters, say whether each
+      is later or earlier than the one it is leaving, and give the swap that
+      would put it there.
+    * It runs in another season but nothing there can take it (no free slot of
+      its size on this load): say so, so "also offered in Winter" is not read
+      as "you can still have it".
+    * It runs only in this season: say plainly that there is no other quarter
+      for it. That is the sentence a student needs BEFORE they confirm the
+      swap, not after.
+    """
+    here = next((q for q in plan["quarters"] if q["key"] == quarter_key), None)
+    if here is None:
+        return ""
+    code = display_code(course)
+    seasons = seasons_of(course)
+    elsewhere = [season for season in seasons if season != here["season"]]
+    if not elsewhere:
+        if not seasons:
+            return (f"\n\n> **{code}** has no listed offering in the catalog, so "
+                    f"I can't say where else it could go — check with MSBA "
+                    f"advising before you count on taking it later.")
+        return (f"\n\n> **{code}** is only offered in "
+                f"**{SEASON_NAMES.get(here['season'], here['season'])}**, so "
+                f"there's no other quarter to take it in — with this swap it's "
+                f"out of your plan.")
+
+    placements = placements_for(plan, course, exclude_key=quarter_key)
+    hedge = (" The exact term varies year to year, so confirm it on the "
+             "Schedule of Classes before you count on it."
+             if _term_varies(course, elsewhere) else "")
+    if not placements:
+        where = ("that quarter has" if len(elsewhere) == 1
+                 else "none of those quarters has")
+        return (f"\n\n> **{code}** also runs in {season_names(elsewhere)}, but "
+                f"{where} no free {course['units']}-unit elective slot on your "
+                f"current load, so it's out of your plan for now.{hedge}")
+
+    current = _quarter_index(plan, quarter_key)
+    parts = []
+    for quarter, rows in placements:
+        when = ("later" if _quarter_index(plan, quarter["key"]) > current
+                else "earlier")
+        parts.append(f"**{quarter['label']}** ({when}, {_in_place_of(rows)})")
+    listed = (parts[0] if len(parts) == 1
+              else ", ".join(parts[:-1]) + " or " + parts[-1])
+    first_quarter, first_rows = placements[0]
+    return (f"\n\n> **{code}** also runs in {season_names(elsewhere)}, so you "
+            f"can still take it in {listed}. Say **swap {first_rows[0]['code']} "
+            f"for {code}** and I'll move it there.{hedge}")
+
+
+def placement_note(plan, course, taken_ids=frozenset(), *, missing_from=None):
+    """Where a course the student WANTS could go in this plan -- as a callout.
+
+    `missing_from` is the quarter they tried to put it in, when there was
+    one; the note then opens by saying it is not offered there before saying
+    where it is. Without it the note answers "I want MGTA 456" on its own.
+    """
+    code = display_code(course)
+    seasons = seasons_of(course)
+    opener = ""
+    if missing_from is not None:
+        opener = (f"**{code}** isn't offered in "
+                  f"**{SEASON_NAMES.get(missing_from['season'], missing_from['season'])}**. ")
+    if course["id"] in taken_ids:
+        return f"\n\n> {opener}You've already taken **{code}**, so it can't go back in."
+    if course["is_core"]:
+        return (f"\n\n> {opener}**{code}** is a core course — every student takes "
+                f"it, and it isn't something to swap into an elective slot.")
+    if not seasons:
+        return (f"\n\n> {opener}The catalog doesn't list when **{code}** is "
+                f"offered, so I can't place it — check with MSBA advising.")
+
+    placements = placements_for(plan, course)
+    hedge = (" The exact term varies year to year, so confirm it on the "
+             "Schedule of Classes before you count on it."
+             if _term_varies(course, seasons) else "")
+    offered = f"**{code}** is offered in {season_names(seasons)}."
+    if not placements:
+        in_plan = [q for q in plan["quarters"] if _offered_in(course, q["season"])]
+        if not in_plan:
+            return (f"\n\n> {opener}{offered} None of those falls in a quarter "
+                    f"of your plan, so there's nowhere to put it.{hedge}")
+        return (f"\n\n> {opener}{offered} In your plan that's "
+                f"{season_names([q['season'] for q in in_plan])}, but there's no "
+                f"free {course['units']}-unit elective slot in "
+                f"{'that quarter' if len(in_plan) == 1 else 'those quarters'} on "
+                f"your current load. Changing the load on one of them may open "
+                f"one.{hedge}")
+
+    parts = [f"**{quarter['label']}** ({_in_place_of(rows)})"
+             for quarter, rows in placements]
+    listed = (parts[0] if len(parts) == 1
+              else ", ".join(parts[:-1]) + " or " + parts[-1])
+    first_quarter, first_rows = placements[0]
+    return (f"\n\n> {opener}{offered} In your plan it fits in {listed}. Say "
+            f"**swap {first_rows[0]['code']} for {code}** and I'll make the "
+            f"change.{hedge}")
+
+
+# What a student says when they want a course IN, or want to know when it runs,
+# as opposed to asking a fact about it ("does 456 have prerequisites") that the
+# catalog route answers better.
+_WANTS_COURSE = re.compile(
+    r"\b(?:want|like|love|prefer|take|taking|add|put|fit|squeeze|include|get|"
+    r"try|switch|move|instead|interested|when|which quarter|what quarter|"
+    r"which term|what term|offered|offer|offers|offering|available|run|runs|"
+    r"running|schedule|scheduled|enrol|enroll|register|sign up)\b",
+    re.IGNORECASE)
+
+
+def wants_course(text):
+    """Is this turn asking to have a course, or asking when it runs?
+
+    True for "I want MGTA 456", "can I take 456?", "when is 456 offered" and a
+    bare "MGTA 456"; False for "does 456 have prerequisites", which names a
+    course but asks the catalog something this note cannot answer.
+    """
+    said = (text or "").strip()
+    if not said:
+        return False
+    if _WANTS_COURSE.search(said):
+        return True
+    # Nothing but the code(s): the shortest possible way to ask about one.
+    return COURSE_CODE.sub("", said).strip(" ?.!,;:-") == ""
+
+
+# ---------------------------------------------------------------------------
 # Walking the plan, one quarter at a time
 # ---------------------------------------------------------------------------
 
@@ -2895,12 +3412,42 @@ def render_alternatives_markdown(result):
 REVIEW_ALTERNATIVES = 3
 
 
+def _course_line(row, course):
+    """One list row: the course, what it gives you, and whose programme it is.
+
+    The brief comes from the catalog's own `skills`, so it costs nothing and
+    cannot drift from what the course record says.
+
+    A course from outside the MSBA says so ON THE ROW. Every one of these is
+    pre-approved and none of them is a mistake, but they are not the
+    programme's own courses: enrolment is by consent, and a student reading a
+    plan should not have to recognise the prefix to know that MGTF 405 will
+    need somebody's permission and MGTA 464 will not.
+    """
+    line = f"- **{row['code']}** {row['title']} ({row['units']} units)"
+    if course:
+        teaches = _teaches(course)
+        if teaches:
+            line += f" — {teaches}"
+        if not is_msba(course):
+            label = DEPARTMENT_LABELS.get(
+                course.get("department"), ("outside the MSBA",))[0]
+            line += f"\n  _{label} — outside the MSBA, enrolment by consent._"
+    return line
+
+
 def _teaches(course, limit=2):
     """A short line on what a course actually gives you."""
     skills = (course.get("skills") or [])[:limit]
     if skills:
         return "; ".join(skills)
     return (course.get("description") or "").split(".")[0]
+
+
+LOAD_FIXED_LINE = (
+    "_On the {track} track each quarter's load is what the plan of study "
+    "publishes — the programme is compressed into four quarters, so there is "
+    "no light or heavy version. You can still swap any elective._")
 
 
 def review_quarter(plan, answers, index, taken_ids=frozenset()):
@@ -2923,11 +3470,27 @@ def review_quarter(plan, answers, index, taken_ids=frozenset()):
     lines = [f"# {quarter['label']} — {quarter['unitsPlanned']} units",
              f"_Quarter {index + 1} of {len(quarters)}._", ""]
 
-    core = [row for row in quarter["courses"] if row["requirement"] == "Core"]
+    done = [row for row in quarter["courses"] if row.get("completed")]
+    if done:
+        lines += ["**Already done — you told me, so these aren't counted again:**", ""]
+        lines += [f"- **{row['code']}** {row['title']} ({row['units']} units)"
+                  for row in done]
+        lines.append("")
+    # "Core" AND "Required". Summer's MGTA 403 and 464 are stamped "Required"
+    # -- mandatory, but counting toward elective units -- and this list read
+    # only "Core", so the walk-through had never shown them: "Summer III -- 8
+    # units" followed by a single 4-unit course, every time.
+    core = [row for row in quarter["courses"]
+            if row["requirement"] in ("Core", "Required") and not row.get("completed")]
     if core:
         lines += ["**Required this quarter — these are fixed:**", ""]
-        lines += [f"- **{row['code']}** {row['title']} ({row['units']} units)"
-                  for row in core]
+        # A brief on the required courses too, not just the swappable ones.
+        # A student walking their plan is deciding whether it is right, and
+        # "MGTA 451 Business Analytics in Marketing, Finance & Operations"
+        # tells them nothing they could not read off the code. They cannot
+        # change these, but they can prepare for them.
+        for row in core:
+            lines.append(_course_line(row, catalog.get(row["courseId"])))
         lines.append("")
 
     replies = []
@@ -2938,8 +3501,8 @@ def review_quarter(plan, answers, index, taken_ids=frozenset()):
     if fixed_electives:
         lines += ["**Scheduled electives — no alternative is offered this quarter:**",
                   ""]
-        lines += [f"- **{row['code']}** {row['title']} ({row['units']} units)"
-                  for row in fixed_electives]
+        for row in fixed_electives:
+            lines.append(_course_line(row, catalog.get(row["courseId"])))
         lines.append("")
 
     for slot, row in swappable:
@@ -2947,8 +3510,24 @@ def review_quarter(plan, answers, index, taken_ids=frozenset()):
         lines += [f"## Your {row['units']}-unit elective: {row['code']} — "
                   f"{row['title']}", ""]
         if row.get("reasons"):
-            lines.append(f"Recommended because it {row['reasons'][0]}.")
+            # "Why this one:" rather than "Recommended because it ...". The
+            # reasons are a mix of verb phrases ("builds your data-engineering
+            # focus") and noun phrases ("directly relevant for Data
+            # Scientist"), and the old template only agreed with the first
+            # kind -- it rendered "Recommended because it directly relevant
+            # for Data Scientist".
+            lines.append(f"**Why this one:** {row['reasons'][0]}.")
         lines.append(f"**Teaches:** {_teaches(course)}." if course else "")
+        # The PLACED course says whose programme it is, not only the
+        # alternatives under it. The swap list carried the flag and this
+        # heading did not, which is backwards: the alternatives are courses
+        # the student might take, and this is the one they will.
+        if course and not is_msba(course):
+            label = DEPARTMENT_LABELS.get(course.get("department"),
+                                          ("outside the MSBA",))[0]
+            lines.append(f"> **{label}** — outside the MSBA's own courses, so "
+                         f"enrolment is by consent. Confirm it with MSBA "
+                         f"advising before you count on it.")
         for caution in row.get("cautions") or []:
             lines.append(f"> Heads up: it {caution}.")
         for stretch in row.get("stretch") or []:
@@ -2962,10 +3541,16 @@ def review_quarter(plan, answers, index, taken_ids=frozenset()):
             for option in options:
                 alt = catalog.get(option["courseId"])
                 shared = ", ".join(option["sharedSkills"][:1])
-                lines.append(
-                    f"- **{option['code']}** {option['title']} — teaches "
-                    f"{_teaches(alt, 1)}."
-                    + (f" Shares *{shared}* with {row['code']}." if shared else ""))
+                line = (f"- **{option['code']}** {option['title']} — teaches "
+                        f"{_teaches(alt, 1)}."
+                        + (f" Shares *{shared}* with {row['code']}."
+                           if shared else ""))
+                # Same flag the placed rows carry. A swap list is where a
+                # student is most likely to pick up an outside course without
+                # noticing, because it reads as a menu of equals.
+                if alt and not is_msba(alt):
+                    line += " _Outside the MSBA — enrolment by consent._"
+                lines.append(line)
                 # The label names the swap, not just the course. A quarter with
                 # two elective slots can offer the SAME alternative for both —
                 # Spring offered "Take MGT 451" twice — and two identical
@@ -2994,7 +3579,13 @@ def review_quarter(plan, answers, index, taken_ids=frozenset()):
     chosen = (answers or {}).get("quarter_units") or {}
     decided = set((answers or {}).get("quarter_loads") or {})
     options = load_options_for(track, quarter["key"], chosen, decided)
-    if options:
+    first_open = next((q["key"] for q in adjustable_quarters(track)), None)
+    if not load_is_a_choice(track):
+        # Said once, on the first quarter with elective room, so a student
+        # who expected the load question knows why it did not come.
+        if quarter["key"] == first_open:
+            lines += ["", LOAD_FIXED_LINE.format(track=track)]
+    elif options:
         now = load_of_quarter(track, quarter["key"], chosen, decided)
         settled = quarter["key"] in decided
         # Once they have answered for this quarter, the same words become a

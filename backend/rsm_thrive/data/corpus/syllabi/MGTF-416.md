@@ -3,7 +3,7 @@ id: "MGTF 416"
 code: "MGTF 416"
 title: "MQF Professional Seminar"
 department: "MGTF"
-programme: "Rady MS Finance (MFin)"
+programme: "Rady MQF (Master of Quantitative Finance)"
 units: 1
 schedulable: true
 is_core: false
@@ -21,7 +21,7 @@ syllabi: ["MGTF 416 Professional Seminars Finance (Melvin) WI26.txt"]
 ---
 # MGTF 416 — MQF Professional Seminar
 
-**1 units** · Rady MS Finance (MFin) · offered WI26
+**1 units** · Rady MQF (Master of Quantitative Finance) · offered WI26
 
 ## What this course covers
 

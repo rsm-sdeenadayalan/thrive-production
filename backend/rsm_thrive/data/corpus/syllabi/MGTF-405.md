@@ -3,7 +3,7 @@ id: "MGTF 405"
 code: "MGTF 405"
 title: "Business Forecasting"
 department: "MGTF"
-programme: "Rady MS Finance (MFin)"
+programme: "Rady MQF (Master of Quantitative Finance)"
 units: 4
 schedulable: true
 is_core: false
@@ -22,7 +22,7 @@ syllabi: ["MGTF 405 Business Forecasting (Timmermann) FA26.txt"]
 ---
 # MGTF 405 — Business Forecasting
 
-**4 units** · Rady MS Finance (MFin) · offered FA26, varies, varies, varies
+**4 units** · Rady MQF (Master of Quantitative Finance) · offered FA26, varies, varies, varies
 
 ## What this course covers
 

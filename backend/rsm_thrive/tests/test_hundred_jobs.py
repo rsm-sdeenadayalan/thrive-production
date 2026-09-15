@@ -153,16 +153,31 @@ def test_the_reply_never_asserts_a_job_the_student_did_not_name(said, user):
 
 @pytest.mark.parametrize("said", VAGUE)
 def test_a_bare_area_is_never_silently_turned_into_a_career(said, user):
-    """Two honest answers and one dishonest one. Asking is honest; reading it
-    as a career we curate and SAYING so is honest. Handing back a full
-    recommendation with nothing marking it as a reading is not."""
+    """Three honest answers and one dishonest one.
+
+    Naming an industry we cover and listing its roles is honest. Offering the
+    menu is honest. Reading it as a career we curate and SAYING so is honest.
+    Handing back a full recommendation with nothing marking it as a reading is
+    not -- and that is still the only thing forbidden here.
+
+    This used to require the words "what kind of work", from a follow-up that
+    belonged to the removed web lookup. A bare area now lands on the industry
+    taxonomy instead, which answers the same question with a ranked list of
+    real jobs rather than another question.
+    """
     conversation = fresh(user, said)
     reply = orchestrator.answer(
         scripted(said, model_role=f"{said} specialist coordinator"),
         conversation, said, [])
     lowered = reply.body.lower()
     if not names_courses(reply.body):
-        assert "what kind of work" in lowered, said
+        assert (reply.model_note in ("industry-menu", "industry-roles",
+                                     "no-profile")
+                or "what kind of work" in lowered), said
+        if reply.model_note == "no-profile":
+            # Saying there is no recommendation is only honest if it also says
+            # where to go next, which is advising or the industry menu.
+            assert "show me the industries" in lowered, said
         return
     assert "reading" in lowered and "meant something else" in lowered, said
 
@@ -213,7 +228,13 @@ def test_the_whole_flow_holds_together(said, user):
                  "walk me through it", "next quarter", "show me the plan"):
         last = orchestrator.answer(scripted(said), conversation, turn, [])
         assert last.body.strip(), f"{said}: empty reply to {turn!r}"
-        assert last.quick_replies == [] and last.form is None, said
+        # The industry routes answer WITH buttons -- six industries, then ten
+        # job titles -- so quick replies are expected there and nowhere else.
+        if last.model_note in ("industry-menu", "industry-roles"):
+            assert last.quick_replies, said
+        else:
+            assert last.quick_replies == [], said
+        assert last.form is None, said
         assert "None" not in last.body, f"{said}: 'None' reached the page"
 
     answers = planner.load_session_intake(conversation)

@@ -21,7 +21,7 @@ import pytest
 from django.contrib.auth.models import User
 
 from rsm_thrive.models import Conversation, PlannerSession
-from rsm_thrive.services import orchestrator, planner
+from rsm_thrive.services import electives, orchestrator, planner
 from rsm_thrive.services.llm import FakeLLM
 
 pytestmark = pytest.mark.django_db
@@ -112,6 +112,8 @@ class TestTheDegreeTotalNeverMoves:
             for quarter in planner.adjustable_quarters(track):
                 for load in ("light", "moderate", "heavy"):
                     units = planner.units_for_load(track, quarter["key"], load)
+                    if units is None:
+                        continue   # not a choice on this track
                     wanted, _ = planner.rebalanced_units(
                         track, {}, quarter["key"], units)
                     if wanted is None:
@@ -124,9 +126,11 @@ class TestTheDegreeTotalNeverMoves:
         so an odd budget leaves a hole no course in the catalog can fill."""
         for track in ("11 month", "17 month"):
             for quarter in planner.adjustable_quarters(track):
+                units = planner.units_for_load(track, quarter["key"], "heavy")
+                if units is None:
+                    continue   # not a choice on this track
                 wanted, _ = planner.rebalanced_units(
-                    track, {}, quarter["key"],
-                    planner.units_for_load(track, quarter["key"], "heavy"))
+                    track, {}, quarter["key"], units)
                 if wanted is None:
                     continue
                 assert all(value % 2 == 0 for value in wanted.values()), wanted
@@ -144,7 +148,8 @@ class TestTheDegreeTotalNeverMoves:
         cap literally offered that Fall only "light", so the heaviest thing the
         student could have was the one option they were not shown."""
         assert planner.units_for_load("17 month", "fall", "heavy") == 16
-        assert planner.units_for_load("11 month", "fall", "heavy") == 18
+        # And on the 11-month track there is no "heavy" to offer at all.
+        assert planner.units_for_load("11 month", "fall", "heavy") is None
         offered = {option["value"]: option["units"]
                    for option in planner.load_options_for("17 month", "fall-two")}
         assert offered == {"light": 2, "moderate": 4, "heavy": 6}
@@ -184,11 +189,296 @@ class TestTheDegreeTotalNeverMoves:
 # Asked once, before the plan
 # ---------------------------------------------------------------------------
 
+class TestAPlacedCourseSaysWhoseProgrammeItIs:
+    """The swap list flagged its options and the placed course did not, which
+    is backwards: the alternatives are courses a student MIGHT take, and the
+    placed one is the course they will."""
+
+    def test_an_outside_course_is_flagged_on_its_own_row(self):
+        answers = {"track": "11 month", "goals": ["bi-analyst"],
+                   "workload": "moderate"}
+        plan = planner.build_for(answers, frozenset())
+        catalog = {c["id"]: c for c in electives.load_catalog()}
+        for index, quarter in enumerate(plan["quarters"]):
+            outside = [r for r in quarter["courses"]
+                       if catalog.get(r.get("courseId"))
+                       and not r["courseId"].startswith("MGTA")]
+            if not outside:
+                continue
+            body, _replies, _last = planner.review_quarter(plan, answers, index)
+            assert "outside the MSBA" in body, \
+                f"{[r['code'] for r in outside]} shown with no flag"
+
+    def test_an_all_msba_quarter_carries_no_such_note(self):
+        answers = {"track": "11 month", "goals": ["healthcare-analyst"],
+                   "workload": "moderate"}
+        plan = planner.build_for(answers, frozenset())
+        for index, quarter in enumerate(plan["quarters"]):
+            if any(not r["courseId"].startswith("MGTA")
+                   for r in quarter["courses"] if r.get("courseId")):
+                continue
+            body, _replies, _last = planner.review_quarter(plan, answers, index)
+            assert "outside the MSBA" not in body
+
+
+class TestACourseIsOnlyEverPlacedInATermItIsTaught:
+    """The plan tells a student what to take in Fall. If the course is only
+    taught in Spring, the plan is not a plan -- and nothing downstream would
+    catch it, because the units still add to 50 and every slot is still full.
+
+    Held across the whole grid rather than spot-checked: 14 roles x 2 tracks
+    x 3 loads, every course in every quarter, plus every alternative offered
+    for a swap.
+    """
+
+    def _seasons(self, course):
+        return {o.get("season") for o in (course.get("offerings") or [])
+                if o.get("season")}
+
+    def _by_id(self):
+        return {c["id"]: c for c in electives.load_catalog()}
+
+    def _season_of(self, track):
+        return {q["key"]: q["season"] for q in planner.TRACK_SKELETONS[track]}
+
+    def test_every_catalog_course_says_when_it_runs(self):
+        """The check below is vacuous for a course with no offerings."""
+        missing = [c["code"] for c in electives.load_catalog()
+                   if not self._seasons(c)]
+        assert not missing, missing
+
+    def test_no_placement_lands_in_the_wrong_term(self):
+        catalog = self._by_id()
+        wrong = []
+        for goal in electives.load_careers():
+            for track in ("11 month", "17 month"):
+                seasons = self._season_of(track)
+                for load in ("light", "moderate", "heavy"):
+                    answers = {"track": track, "goals": [goal], "workload": load}
+                    seeded = planner.seeded_units(track, load)
+                    if seeded:
+                        answers["quarter_units"] = seeded
+                    plan = planner.build_for(answers, frozenset())
+                    for quarter in plan["quarters"]:
+                        want = seasons.get(quarter["key"])
+                        for row in quarter["courses"]:
+                            course = catalog.get(row.get("courseId"))
+                            if not course:
+                                continue
+                            if want not in self._seasons(course):
+                                wrong.append((course["code"], want, goal,
+                                              track, load))
+        assert not wrong, f"{len(wrong)} placements in the wrong term: {wrong[:3]}"
+
+    def test_no_swap_is_offered_for_a_term_it_is_not_taught_in(self):
+        catalog = self._by_id()
+        wrong = []
+        for goal in electives.load_careers():
+            for track in ("11 month", "17 month"):
+                seasons = self._season_of(track)
+                answers = {"track": track, "goals": [goal],
+                           "workload": "moderate"}
+                plan = planner.build_for(answers, frozenset())
+                for quarter in plan["quarters"]:
+                    want = seasons.get(quarter["key"])
+                    for slot, row in enumerate(quarter["courses"]):
+                        if not (row.get("swappable") and row.get("courseId")):
+                            continue
+                        for option in planner.alternatives_for(
+                                plan, answers, quarter["key"], slot,
+                                frozenset(), 4)["options"]:
+                            course = catalog.get(option["courseId"])
+                            if course and want not in self._seasons(course):
+                                wrong.append((course["code"], want, goal, track))
+                            if option["units"] != row["units"]:
+                                wrong.append((option["courseId"], "units",
+                                              goal, track))
+        assert not wrong, f"{len(wrong)} bad swap options: {wrong[:3]}"
+
+
+class TestTheFinishingQuarterIsHeldByLoad:
+    """The 17-month track ends on a second-year Fall, and the load rule holds
+    its units: 4 on light and moderate, 2 on heavy. Before this, light
+    floored every earlier quarter and let the finishing quarter absorb the
+    rest, so the lightest spread ended on the heaviest term.
+
+    The 11-month track has a finishing quarter (Spring) but no load to hold
+    it by: the programme is compressed into four quarters and every one
+    carries what the plan of study publishes. See `planner.load_is_a_choice`.
+    """
+
+    def _tail(self, track, load):
+        seeded = planner.seeded_units(track, load)
+        answers = {"track": track, "goals": ["data-scientist"], "workload": load}
+        if seeded:
+            answers["quarter_units"] = seeded
+        plan = planner.build_for(answers, frozenset())
+        return plan["quarters"][-1]["unitsPlanned"], plan
+
+    @pytest.mark.parametrize("load,units", [
+        ("light", 4), ("moderate", 4), ("heavy", 2)])
+    def test_the_17_month_tail(self, load, units):
+        tail, plan = self._tail("17 month", load)
+        assert tail == units
+        assert plan["totals"]["total"] == 50 and plan.get("route") == "fixed"
+
+    def test_the_seed_itself_holds_the_rule(self):
+        assert planner.seeded_units("17 month", "light")["fall-two"] == 4
+        assert planner.seeded_units("17 month", "heavy")["fall-two"] == 2
+
+    def test_each_track_knows_its_finishing_quarter(self):
+        assert planner.tail_quarter_key("17 month") == "fall-two"
+        assert planner.tail_quarter_key("11 month") == "spring"
+        assert planner.tail_target("17 month", "light") == 4
+        assert planner.tail_target("17 month", "heavy") == 2
+        # A finishing quarter, but nothing to hold it by.
+        assert planner.tail_target("11 month", "light") is None
+
+    def test_light_lands_the_extra_units_late(self):
+        """"The later quarters carry more" -- the two units the tail gave up
+        go to Spring, not Fall."""
+        seeded = planner.seeded_units("17 month", "light")
+        assert seeded["spring"] == 14 and seeded["fall"] == 12
+
+    def test_the_11_month_track_has_no_load_to_hold(self):
+        """Compressed into four quarters, the 11-month plan of study IS the
+        plan: light, moderate and heavy all seed nothing, Spring carries its
+        published 14 units, and no plan on this track ever reports a short
+        finishing quarter."""
+        for load in ("light", "moderate", "heavy"):
+            assert planner.seeded_units("11 month", load) == {}, load
+            tail, plan = self._tail("11 month", load)
+            assert tail == 14, load
+            assert plan["tailShort"] is None
+            assert plan["totals"]["total"] == 50 and plan.get("route") == "fixed"
+        assert not planner.load_is_a_choice("11 month")
+        assert planner.load_is_a_choice("17 month")
+
+    def test_the_11_month_spring_keeps_the_full_time_floor(self):
+        """Not a short tail: 12-18 like every other quarter, so the bundle
+        placer's flex cannot run it under the graduate minimum."""
+        spring = next(q for q in planner.adjustable_quarters("11 month")
+                      if q["key"] == "spring")
+        assert (spring["min"], spring["max"]) == (12, 18)
+        assert planner.load_options_for("11 month", "spring") == []
+        assert planner.quarter_units_form_for("11 month") is None
+
+    def test_every_role_hits_the_tail_or_says_why_not(self):
+        """The rule is held wherever the bundle allows and REPORTED where it
+        cannot be. For bi-analyst a 4-unit final Fall would leave Spring under
+        the 12-unit graduate minimum -- no differentiator combination fixes
+        that -- so the tail carries 2 and the plan says so. Silently landing
+        on 2 is the one outcome this forbids."""
+        misses = []
+        for goal in electives.load_careers():
+            for load in ("light", "moderate", "heavy"):
+                seeded = planner.seeded_units("17 month", load)
+                answers = {"track": "17 month", "goals": [goal], "workload": load}
+                if seeded:
+                    answers["quarter_units"] = seeded
+                plan = planner.build_for(answers, frozenset())
+                assert plan["totals"]["total"] == 50, (goal, load)
+                assert plan["unfilled"] == [], (goal, load)
+                tail = plan["quarters"][-1]["unitsPlanned"]
+                if tail == planner.tail_target("17 month", load):
+                    assert plan["tailShort"] is None, (goal, load)
+                else:
+                    assert plan["tailShort"] == {
+                        "wanted": planner.tail_target("17 month", load),
+                        "actual": tail,
+                        "label": plan["quarters"][-1]["label"]}, (goal, load)
+                    misses.append((goal, load))
+                # And the 11-month track, where the load is not a choice,
+                # never has a short tail to report.
+                eleven = planner.build_for(
+                    {"track": "11 month", "goals": [goal], "workload": load},
+                    frozenset())
+                assert eleven["tailShort"] is None, (goal, load)
+                assert eleven["totals"]["total"] == 50, (goal, load)
+        # Heavy's 2-unit tail is reachable by every bundle; the misses are all
+        # light/moderate bundles short of Spring-offered courses.
+        assert not [m for m in misses if m[1] == "heavy"], misses
+        assert len(misses) <= 16, misses
+
+    def test_a_short_tail_is_said_out_loud(self):
+        from django.contrib.auth.models import User
+        from rsm_thrive.models import Conversation
+        user = User.objects.create_user("tailer")
+        conversation = Conversation.objects.create(user=user, destination="courses",
+                                                   title="t")
+        for said in ("bi analyst", "17 month", "moderate"):
+            reply = orchestrator.answer(FakeLLM([]), conversation, said, [])
+        assert "carries **2 units** rather than the 4" in reply.body
+        assert "taught in one term only" in reply.body
+
+
+class TestTheBundleOutranksTheSpread:
+    """A light or heavy spread moves units between quarters, and a bundle
+    whose courses are taught in one term only often cannot be laid into the
+    result. The whole curated bundle was then abandoned for the generic
+    ranked fill -- silently.
+
+    Measured across every role, track and load before the fix: 33 of 84
+    combinations lost their bundle this way. `ml-engineer` on a light spread
+    came back with 3 of its 9 electives serving the goal, against 8 of 9 on
+    the published spread, and with none of its three CS courses.
+    """
+
+    def _plan(self, goal, track, load):
+        answers = {"track": track, "goals": [goal], "workload": load}
+        seeded = planner.seeded_units(track, load)
+        if seeded:
+            answers["quarter_units"] = seeded
+        return planner.build_for(answers, frozenset())
+
+    def test_no_role_track_load_combination_loses_its_bundle(self):
+        lost = [(g, t, l)
+                for g in electives.load_careers()
+                for t in ("11 month", "17 month")
+                for l in ("light", "moderate", "heavy")
+                if self._plan(g, t, l).get("route") != "fixed"]
+        assert not lost, f"{len(lost)} combinations fell back: {lost[:4]}"
+
+    def test_every_combination_still_closes_at_fifty_units(self):
+        for goal in electives.load_careers():
+            for track in ("11 month", "17 month"):
+                for load in ("light", "moderate", "heavy"):
+                    plan = self._plan(goal, track, load)
+                    assert plan["totals"]["total"] == 50, (goal, track, load)
+                    assert plan["unfilled"] == [], (goal, track, load)
+
+    def test_the_courses_still_serve_the_goal_on_every_load(self):
+        catalog = {c["id"]: c for c in electives.load_catalog()}
+        for goal, role in electives.load_careers().items():
+            boosts = set(role.get("boost_courses") or {})
+            for load in ("light", "moderate", "heavy"):
+                plan = self._plan(goal, "11 month", load)
+                chosen = [r["courseId"] for q in plan["quarters"]
+                          for r in q["courses"] if r["requirement"] != "Core"]
+                on_goal = sum(1 for c in chosen
+                              if catalog[c]["code"] in boosts or c in boosts)
+                assert on_goal / len(chosen) >= 0.5, \
+                    f"{goal}/{load}: only {on_goal}/{len(chosen)} on-goal"
+
+    def test_dropping_the_spread_is_reported_not_silent(self):
+        """bi-analyst on the 17-month track: a light spread wants 12 / 12 /
+        14 / 4, and the bundle's Spring-offered courses cannot fill 14 there,
+        so the bundle wins and the plan says so. Moderate places as it is."""
+        dropped = self._plan("bi-analyst", "17 month", "light")
+        kept = self._plan("bi-analyst", "17 month", "moderate")
+        assert dropped["spreadDropped"] is True
+        assert kept["spreadDropped"] is False
+
+
 class TestThePreferenceIsAskedFirst:
-    def _to_the_spread(self, conversation, opener="11 month, data scientist"):
-        """Answer the skills question so the spread question is what's next."""
-        orchestrator.answer(FakeLLM([]), conversation, opener, [])
-        return orchestrator.answer(FakeLLM([]), conversation, "skip", [])
+    def _to_the_spread(self, conversation, opener="17 month, data scientist"):
+        """A track and a goal is now all it takes.
+
+        This used to answer the self-rating question first. That question is
+        gone, so the spread is the FIRST and only thing asked -- and the extra
+        turn would now answer the spread question itself.
+        """
+        return orchestrator.answer(FakeLLM([]), conversation, opener, [])
 
     def test_it_is_asked_before_any_course_is_named(self, conversation):
         reply = self._to_the_spread(conversation)
@@ -212,15 +502,56 @@ class TestThePreferenceIsAskedFirst:
         self._to_the_spread(conversation)
         reply = orchestrator.answer(FakeLLM([]), conversation, "light", [])
         assert planner.load_session_intake(conversation)["quarter_units"] == {
-            "fall": 12, "winter": 12, "spring": 18}
-        assert "Spring 18 units" in reply.body, "and says where the weight went"
+            "fall": 12, "winter": 12, "spring": 14, "fall-two": 4}
+        # The lead reports the spread the plan ACTUALLY has, not the seed:
+        # the placer may sit a quarter two units off the seed to fit a course
+        # taught in one term only. Saying "Winter 18 units" over a table
+        # showing 16 was wrong in the first place a student looks.
+        plan = planner.build_for(planner.load_session_intake(conversation),
+                                 frozenset())
+        for quarter in plan["quarters"][1:]:
+            assert f"{quarter['label']} {quarter['unitsPlanned']} units" in reply.body
+        assert "Fall (second year) 4 units" in reply.body, \
+            "and says where the weight went"
 
     def test_heavy_front_loads_it_instead(self):
-        assert planner.seeded_units("11 month", "heavy") == {
-            "fall": 18, "winter": 12, "spring": 12}
+        assert planner.seeded_units("17 month", "heavy") == {
+            "fall": 16, "winter": 12, "spring": 12, "fall-two": 2}
 
     def test_moderate_is_the_published_plan(self):
-        assert planner.seeded_units("11 month", "moderate") == {}
+        """The published plan already ends on a 4-unit Fall, so moderate seeds
+        nothing. And on the 11-month track NO load seeds anything: the plan of
+        study is the plan."""
+        assert planner.seeded_units("17 month", "moderate") == {}
+        for load in ("light", "moderate", "heavy"):
+            assert planner.seeded_units("11 month", load) == {}
+
+    def test_the_11_month_track_is_not_asked(self, conversation):
+        """Compressed into four quarters, it has no light or heavy version to
+        offer -- so the plan arrives straight away, and says why the question
+        did not come."""
+        reply = orchestrator.answer(FakeLLM([]), conversation,
+                                    "11 month, data scientist", [])
+        assert "spread across the quarters" not in reply.body.lower()
+        assert "MGTA" in reply.body, "the plan, not a question"
+        assert "haven't asked about light or heavy" in reply.body
+        assert "compressed into four quarters" in reply.body
+        # And the intake counts as complete: the walk-through starts on the
+        # very next turn rather than being refused as an unfinished interview.
+        assert planner.next_intake_step(planner.load_session_intake(conversation)) is None
+        walk = orchestrator.answer(FakeLLM([]), conversation, "walk me through it", [])
+        assert walk.model_note == "review" and "Summer III" in walk.body
+
+    def test_a_load_said_on_the_11_month_track_is_answered_not_lost(
+            self, conversation):
+        orchestrator.answer(FakeLLM([]), conversation,
+                            "11 month, data scientist", [])
+        reply = orchestrator.answer(FakeLLM([]), conversation,
+                                    "light please, i have a part time job", [])
+        assert reply.model_note == "plan"
+        assert "there is no light or heavy version" in reply.body
+        assert planner.load_session_intake(conversation)["workload"] == "light"
+        assert "quarter_units" not in planner.load_session_intake(conversation)
 
     def test_it_acts_on_units_because_it_cannot_act_on_difficulty(self):
         """Documented rather than fixed. `rank_electives` does penalise a
@@ -277,31 +608,59 @@ class TestThePreferenceIsAskedFirst:
 # ---------------------------------------------------------------------------
 
 class TestEachQuarterIsAskedDuringTheWalkThrough:
+    """On the 17-month track, where the load is a choice. Winter is the
+    quarter under test: its published 14 can go to 12 or 16, so all three
+    words mean different numbers there."""
+
     def test_the_quarter_carries_the_question_with_real_numbers(self, conversation):
-        mid_walk(conversation)
+        mid_walk(conversation, index=1, track="17 month")
         reply = orchestrator.answer(FakeLLM([]), conversation, "next quarter", [])
-        assert "How heavy should" in reply.body
-        assert "12 units" in reply.body and "18 units" in reply.body
+        assert "How heavy should Winter be?" in reply.body
+        assert "12 units" in reply.body and "16 units" in reply.body
+
+    def test_the_11_month_walk_through_asks_no_such_thing(self, conversation):
+        """Every quarter carries the published load; the walk-through says so
+        once, on the first quarter with elective room, and offers swaps."""
+        mid_walk(conversation, index=0)
+        reply = orchestrator.answer(FakeLLM([]), conversation, "next quarter", [])
+        assert "# Fall" in reply.body
+        assert "How heavy should" not in reply.body
+        assert "no light or heavy version" in reply.body
+        again = orchestrator.answer(FakeLLM([]), conversation, "next quarter", [])
+        assert "# Winter" in again.body
+        assert "no light or heavy version" not in again.body, "said once"
+        assert "How heavy should" not in again.body
+
+    def test_a_load_word_on_the_11_month_walk_through_is_answered(
+            self, conversation):
+        mid_walk(conversation)
+        reply = orchestrator.answer(FakeLLM([]), conversation, "light", [])
+        assert "isn't a choice" in reply.body
+        assert "# Fall" in reply.body, "and the quarter is shown as it stands"
+        assert planner.load_session_intake(conversation).get("quarter_loads") is None
 
     def test_answering_moves_the_units_and_says_where_they_went(self, conversation):
-        mid_walk(conversation)
+        mid_walk(conversation, index=2, track="17 month")
         reply = orchestrator.answer(FakeLLM([]), conversation, "light", [])
         assert "is now light — 12 units" in reply.body
         assert "absorbed it" in reply.body
         answers = planner.load_session_intake(conversation)
-        assert answers["quarter_units"] == {"fall": 12, "winter": 16, "spring": 14}
-        assert answers["quarter_loads"] == {"fall": "light"}
+        # Winter 14 -> 12; the two units land in Fall, the first quarter in
+        # published order with room.
+        assert answers["quarter_units"] == {"fall": 14, "winter": 12,
+                                            "spring": 12, "fall-two": 4}
+        assert answers["quarter_loads"] == {"winter": "light"}
 
     def test_the_recommendation_moves_with_the_units(self, conversation):
-        """A quarter asked to carry 18 units instead of 14 gets another
+        """A quarter asked to carry 16 units instead of 14 gets another
         elective slot, and the scorer fills it. That is the whole reason for
         asking here rather than on a form."""
-        mid_walk(conversation)
-        before = planner.build_for(FULL, frozenset())
+        mid_walk(conversation, index=2, track="17 month")
+        before = planner.build_for({**FULL, "track": "17 month"}, frozenset())
         orchestrator.answer(FakeLLM([]), conversation, "heavy", [])
         after = planner.build_for(planner.load_session_intake(conversation),
                                   frozenset())
-        fall = lambda plan: next(q for q in plan["quarters"] if q["key"] == "fall")
+        fall = lambda plan: next(q for q in plan["quarters"] if q["key"] == "winter")
         # The direction, not exact numbers: a curated bundle may sit up to
         # `bundles.QUARTER_FLEX` off its target to be schedulable at all, and
         # the plan says so where it does. See `planner.route_line`.
@@ -316,18 +675,28 @@ class TestEachQuarterIsAskedDuringTheWalkThrough:
         assert after["totals"]["total"] == planner.TOTAL_UNITS
 
     def test_the_plan_still_totals_fifty_units(self, conversation):
-        mid_walk(conversation)
+        mid_walk(conversation, index=2, track="17 month")
         orchestrator.answer(FakeLLM([]), conversation, "heavy", [])
         plan = planner.build_for(planner.load_session_intake(conversation),
                                  frozenset())
         assert plan["totals"]["total"] == planner.TOTAL_UNITS
 
     def test_summer_says_plainly_that_it_cannot_change(self, conversation):
-        mid_walk(conversation, index=0)
+        mid_walk(conversation, index=0, track="17 month")
         reply = orchestrator.answer(FakeLLM([]), conversation, "heavy", [])
         assert "isn't adjustable" in reply.body
         assert "required courses" in reply.body
         assert planner.load_session_intake(conversation).get("quarter_units") is None
+
+    def test_summer_on_the_11_month_track_gives_the_track_reason_instead(
+            self, conversation):
+        """Not "say next quarter and I'll show you one you can change" --
+        on this track there is no such quarter."""
+        mid_walk(conversation, index=0)
+        reply = orchestrator.answer(FakeLLM([]), conversation, "heavy", [])
+        assert "isn't a choice" in reply.body
+        assert "one you can change" not in reply.body
+        assert "# Summer III" in reply.body
 
     def test_a_load_outside_the_walk_through_is_the_overall_preference(
             self, conversation):
@@ -335,39 +704,42 @@ class TestEachQuarterIsAskedDuringTheWalkThrough:
         running rather than by asking which they meant."""
         PlannerSession.objects.update_or_create(
             conversation=conversation,
-            defaults={"intake": FULL, "asked": ["workload", "plan"],
-                      "review": None})
+            defaults={"intake": {**FULL, "track": "17 month"},
+                      "asked": ["workload", "plan"], "review": None})
         orchestrator.answer(FakeLLM(["fine"]), conversation, "heavy", [])
         answers = planner.load_session_intake(conversation)
         assert answers["workload"] == "heavy"
         # It seeds the WHOLE spread, not one quarter -- which is exactly the
         # difference from the same word said mid-walk-through.
-        assert answers["quarter_units"] == {"fall": 18, "winter": 12,
-                                            "spring": 12}
+        assert answers["quarter_units"] == {"fall": 16, "winter": 12,
+                                            "spring": 12, "fall-two": 2}
         assert "quarter_loads" not in answers
 
     def test_a_second_visit_states_the_answer_rather_than_re_asking(
             self, conversation):
-        mid_walk(conversation)
+        mid_walk(conversation, index=2, track="17 month")
         first = orchestrator.answer(FakeLLM([]), conversation, "light", [])
         assert "is now light" in first.body
 
         again = orchestrator.answer(FakeLLM([]), conversation, "light", [])
         assert "is already light — 12 units" in again.body
         assert "absorbed it" not in again.body, "nothing moved the second time"
-        assert "Fall is light — 12 units**, as you asked" in again.body
-        assert "How heavy should Fall be?" not in again.body
+        assert "Winter is light — 12 units**, as you asked" in again.body
+        assert "How heavy should Winter be?" not in again.body
 
     def test_a_choice_already_made_is_never_moved_to_satisfy_a_later_one(
             self, conversation):
-        """Refused and explained, rather than done silently. All three
-        quarters light is 36 units against the 42 the degree needs."""
-        mid_walk(conversation, index=3,
-                 quarter_units={"fall": 12, "winter": 12, "spring": 18},
-                 quarter_loads={"fall": "light", "winter": "light"})
+        """Refused and explained, rather than done silently. With Fall,
+        Winter and the second Fall all decided, a lighter Spring has nowhere
+        to send its two units."""
+        mid_walk(conversation, index=3, track="17 month",
+                 quarter_units={"fall": 12, "winter": 12, "spring": 14,
+                                "fall-two": 4},
+                 quarter_loads={"fall": "light", "winter": "light",
+                                "fall-two": "moderate"})
         reply = orchestrator.answer(FakeLLM([]), conversation, "light", [])
         assert "without moving" in reply.body
-        assert "**Fall**" in reply.body and "**Winter**" in reply.body
+        assert "**Fall**" in reply.body
         answers = planner.load_session_intake(conversation)
         assert answers["quarter_units"]["fall"] == 12, "their choice survived"
 
@@ -394,7 +766,7 @@ class TestEachQuarterIsAskedDuringTheWalkThrough:
         """A quarter with two elective slots offers six swaps. A flat cap put
         all six in the line and dropped "next quarter" and the load answers off
         the end — the two things a student is most likely to want next."""
-        mid_walk(conversation, index=2)
+        mid_walk(conversation, index=2, track="17 month")
         reply = orchestrator.answer(FakeLLM([]), conversation, "next quarter", [])
         line = reply.body.split("_You can say:_")[1]
         assert "**light**" in line and "**heavy**" in line

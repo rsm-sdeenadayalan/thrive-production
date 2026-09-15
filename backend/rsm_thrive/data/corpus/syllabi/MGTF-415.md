@@ -3,7 +3,7 @@ id: "MGTF 415"
 code: "MGTF 415"
 title: "Collecting and Analyzing Financial Data"
 department: "MGTF"
-programme: "Rady MS Finance (MFin)"
+programme: "Rady MQF (Master of Quantitative Finance)"
 units: 4
 schedulable: true
 is_core: false
@@ -21,7 +21,7 @@ syllabi: ["MGTF 415 Collect-Analyze Financial Data (Reher) FA26.txt"]
 ---
 # MGTF 415 — Collecting and Analyzing Financial Data
 
-**4 units** · Rady MS Finance (MFin) · offered FA26
+**4 units** · Rady MQF (Master of Quantitative Finance) · offered FA26
 
 ## What this course covers
 

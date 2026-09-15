@@ -49,8 +49,8 @@ class TestIntakeEndpoint:
         assert starter["form"] is None
         assert "Step 1 of" not in starter["body"]
         # It names the shapes of question the router can actually route.
-        for example in ("data scientist", "prerequisites", "industry",
-                        "11-month"):
+        for example in ("data scientist", "prerequisites", "industries",
+                        "11 month"):
             assert example in starter["body"], example
 
     def test_returns_the_script_and_the_profile_track_as_a_default(self, student_client):
@@ -79,7 +79,7 @@ class TestPlanEndpoint:
         plan = _post(student_client, PLAN, {"answers": ANSWERS}).json()
         for quarter in plan["quarters"]:
             assert {r["requirement"] for r in quarter["courses"]} <= {
-                "Core", "Elective", "Required"}
+                "Core", "Elective", "Required", "Done"}
         assert any(r["requirement"] == "Core"
                    for q in plan["quarters"] for r in q["courses"])
 

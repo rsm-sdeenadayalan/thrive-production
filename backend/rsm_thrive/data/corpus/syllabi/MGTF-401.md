@@ -3,7 +3,7 @@ id: "MGTF 401"
 code: "MGTF 401"
 title: "Accounting"
 department: "MGTF"
-programme: "Rady MS Finance (MFin)"
+programme: "Rady MQF (Master of Quantitative Finance)"
 units: 4
 schedulable: true
 is_core: false
@@ -21,7 +21,7 @@ syllabi: ["MGTF 401 Financial Accounting (FLoyd) FA25.txt"]
 ---
 # MGTF 401 — Accounting
 
-**4 units** · Rady MS Finance (MFin) · offered FA25, FA26
+**4 units** · Rady MQF (Master of Quantitative Finance) · offered FA25, FA26
 
 ## What this course covers
 

@@ -165,6 +165,18 @@ if not THRIVE_BOT_CONFIG and _embed_backend in ("local", "codex"):
 THRIVE_SEARCH = os.environ.get("THRIVE_SEARCH", "duckduckgo")
 THRIVE_SEARCH_API_KEY = os.environ.get("THRIVE_SEARCH_API_KEY", "")
 TRITONAI_API_KEY = os.environ.get("TRITONAI_API_KEY", "")
-TRITONAI_MODEL = os.environ.get("TRITONAI_MODEL", "claude-sonnet-4-6")
-# Placeholder — verify via list_models at the TritonAI portal and correct.
+TRITONAI_MODEL = os.environ.get("TRITONAI_MODEL", "claude-sonnet-5")
+# Per call, and for the whole retry ladder. The SDK's own default is ten
+# minutes, which is not a timeout for somebody waiting on a chat reply, and
+# three attempts plus the 15s and 30s waits between them took a measured 149
+# seconds during one connection blip. The budget ends the ladder early rather
+# than letting it finish long after the honest answer became "I can't reach
+# the model right now".
+TRITONAI_TIMEOUT_SECONDS = float(os.environ.get("TRITONAI_TIMEOUT_SECONDS", "45"))
+TRITONAI_TURN_BUDGET_SECONDS = float(
+    os.environ.get("TRITONAI_TURN_BUDGET_SECONDS", "75"))
+# NOT A DEFAULT THAT WORKS. The key issued 2026-09-11 serves four CHAT models
+# and no embedding model at all, so any value here 404s; THRIVE_EMBEDDINGS=local
+# is what actually runs. Kept only so the `tritonai` embeddings backend has a
+# name to fail on loudly rather than a blank one to fail on obscurely.
 TRITONAI_EMBED_MODEL = os.environ.get("TRITONAI_EMBED_MODEL", "api-tgpt-embeddings")

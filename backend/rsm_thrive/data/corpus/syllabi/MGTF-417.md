@@ -3,7 +3,7 @@ id: "MGTF 417"
 code: "MGTF 417"
 title: "Professional Communication in Finance"
 department: "MGTF"
-programme: "Rady MS Finance (MFin)"
+programme: "Rady MQF (Master of Quantitative Finance)"
 schedulable: false
 is_core: false
 technical_level: 2
@@ -20,7 +20,7 @@ syllabi: ["MGTF 417 Professional Communications (Schmidt) WI26.txt"]
 ---
 # MGTF 417 — Professional Communication in Finance
 
-Rady MS Finance (MFin) · offered WI26 · _unit count not stated in the material supplied_
+Rady MQF (Master of Quantitative Finance) · offered WI26 · _unit count not stated in the material supplied_
 
 ## What this course covers
 

@@ -3,7 +3,7 @@ id: "MGTF 420"
 code: "MGTF 420"
 title: "Financial Markets and Institutions"
 department: "MGTF"
-programme: "Rady MS Finance (MFin)"
+programme: "Rady MQF (Master of Quantitative Finance)"
 schedulable: false
 is_core: false
 technical_level: 2
@@ -20,7 +20,7 @@ syllabi: ["MGTF 420 Financial Markets and Institutions (Parashar) SP26.txt"]
 ---
 # MGTF 420 — Financial Markets and Institutions
 
-Rady MS Finance (MFin) · offered SP26 · _unit count not stated in the material supplied_
+Rady MQF (Master of Quantitative Finance) · offered SP26 · _unit count not stated in the material supplied_
 
 ## What this course covers
 

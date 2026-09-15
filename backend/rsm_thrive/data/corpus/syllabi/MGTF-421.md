@@ -3,7 +3,7 @@ id: "MGTF 421"
 code: "MGTF 421"
 title: "Corporate Finance"
 department: "MGTF"
-programme: "Rady MS Finance (MFin)"
+programme: "Rady MQF (Master of Quantitative Finance)"
 schedulable: false
 is_core: false
 technical_level: 3
@@ -20,7 +20,7 @@ syllabi: ["MGTF 421 Corporate Finance (Bliss) WI26.txt"]
 ---
 # MGTF 421 — Corporate Finance
 
-Rady MS Finance (MFin) · offered WI26 · _unit count not stated in the material supplied_
+Rady MQF (Master of Quantitative Finance) · offered WI26 · _unit count not stated in the material supplied_
 
 ## What this course covers
 

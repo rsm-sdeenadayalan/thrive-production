@@ -3,7 +3,7 @@ id: "MGTF 406"
 code: "MGTF 406"
 title: "Behavioral Finance"
 department: "MGTF"
-programme: "Rady MS Finance (MFin)"
+programme: "Rady MQF (Master of Quantitative Finance)"
 units: 4
 schedulable: true
 is_core: false
@@ -22,7 +22,7 @@ syllabi: ["MGTF 406 Behavioral Finance (Engelberg) SP26.txt"]
 ---
 # MGTF 406 — Behavioral Finance
 
-**4 units** · Rady MS Finance (MFin) · offered SP26, varies, varies, varies
+**4 units** · Rady MQF (Master of Quantitative Finance) · offered SP26, varies, varies, varies
 
 ## What this course covers
 

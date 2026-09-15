@@ -3,7 +3,7 @@ id: "MGTF 422"
 code: "MGTF 422"
 title: "Derivatives and Structured Finance"
 department: "MGTF"
-programme: "Rady MS Finance (MFin)"
+programme: "Rady MQF (Master of Quantitative Finance)"
 schedulable: false
 is_core: false
 technical_level: 4
@@ -20,7 +20,7 @@ syllabi: ["MGTF 422 Derivatives and Structured Finance (Warachka) WI26.txt"]
 ---
 # MGTF 422 — Derivatives and Structured Finance
 
-Rady MS Finance (MFin) · offered WI26 · _unit count not stated in the material supplied_
+Rady MQF (Master of Quantitative Finance) · offered WI26 · _unit count not stated in the material supplied_
 
 ## What this course covers
 

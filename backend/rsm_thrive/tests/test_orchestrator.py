@@ -20,7 +20,8 @@ import pytest
 from django.contrib.auth.models import User
 
 from rsm_thrive.models import Conversation, PlannerSession
-from rsm_thrive.services import orchestrator, planner, router
+from rsm_thrive.services import (electives, orchestrator, planner,
+                                 router)
 from rsm_thrive.services.llm import FakeLLM
 
 pytestmark = pytest.mark.django_db
@@ -209,111 +210,82 @@ class TestACuratedRoleIsAnsweredDeterministically:
 
 
 class TestARoleTheCatalogDoesNotCurate:
-    def test_it_looks_the_job_up_and_matches_our_own_courses(self, conversation):
-        profile = json.dumps({
-            "known": True, "role": "esports analyst",
-            "summary": "Analyses competitive gaming performance.",
-            "skills": ["sql", "dashboards", "experiment design", "python"],
-            "tools": ["tableau"], "topics": ["forecasting"]})
-        fake = FakeLLM([classified("role", 0.9, role="esports analyst"),
-                        profile, "Here is what the catalog offers: MGTA 464..."])
-        reply = orchestrator.answer(fake, conversation,
-                                    "I want to be an esports analyst", [])
-        assert reply.route == router.ROLE
-        assert "esports analyst" in reply.body
-        assert not reply.refused
+    """The web lookup that used to answer these is gone.
 
-    def test_but_a_vague_area_is_asked_about_rather_than_guessed(self, conversation):
-        """"I want to work in esports" names no job. See
-        `TestItDoesNotInventTheJob` in test_uncurated_roles.py."""
-        profile = json.dumps({
-            "known": True, "role": "esports analyst", "summary": "…",
-            "skills": ["sql", "dashboards"], "tools": [], "topics": []})
+    It worked -- it produced a grounded, catalog-only set of courses. What it
+    could not do was tell a student which kind of answer they were looking at:
+    a curated bundle traces to the reviewed design document, a web-matched set
+    traced to whatever a model read that morning, and both arrived in the same
+    formatting. Two sources of truth in one voice is the defect that removed
+    it. Full coverage of the replacement is in `test_industry_flow.py`.
+    """
+
+    def test_it_says_it_has_no_recommendation_and_names_no_course(
+            self, conversation):
         reply = orchestrator.answer(
-            FakeLLM([classified("role", 0.9, role="esports analyst"), profile]),
-            conversation, "I want to work in esports", [])
-        assert "what kind of work" in reply.body
+            FakeLLM([json.dumps({"route": "role", "confidence": 0.9,
+                                 "role": "sommelier", "industry": "",
+                                 "quarter": ""})]),
+            conversation, "what electives suit a sommelier", [])
+        assert reply.refused and reply.model_note == "no-profile"
         assert "MGTA" not in reply.body
 
-    def test_nothing_in_the_catalog_means_a_refusal_not_a_guess(self, conversation):
-        profile = json.dumps({"known": True, "role": "sommelier",
-                              "summary": "Tastes wine.",
-                              "skills": ["viticulture", "oenology"],
-                              "tools": [], "topics": ["wine"]})
-        fake = FakeLLM([classified("role", 0.9, role="sommelier"), profile])
-        reply = orchestrator.answer(fake, conversation, "I want to be a sommelier", [])
-        assert reply.refused is True
-        assert "advising" in reply.body.lower()
-        assert "MGTA" not in reply.body
+    def test_but_a_vague_area_is_pointed_at_what_we_do_have(self, conversation):
+        """"Something in tech" is not a job, and guessing one is the thing
+        being avoided. It names an industry we rank, so it gets that ranking."""
+        reply = orchestrator.answer(FakeLLM([]), conversation,
+                                    "something in tech", [])
+        assert reply.model_note == "industry-roles"
+        assert "Product Analyst" in reply.body
 
 
-# ---------------------------------------------------------------------------
-# Route: an industry we have no bundle for
-# ---------------------------------------------------------------------------
+class TestAnIndustryIsAnsweredFromTheTaxonomy:
+    """Six industries, each with its profiles ranked by the design document.
+    Nothing here consults a model: FakeLLM([]) raises if anything does."""
 
-class TestAnIndustryFailsLoudlyOrNotAtAll:
-    """The aerospace case. It used to return something plausible and
-    unhelpful, which is worse than refusing."""
+    def test_a_covered_industry_lists_its_roles_in_rank_order(self, conversation):
+        reply = orchestrator.answer(FakeLLM([]), conversation, "banking", [])
+        assert reply.model_note == "industry-roles"
+        assert reply.body.index("Fraud Analyst") < reply.body.index("BI Analyst")
 
-    def test_no_catalog_match_names_no_course(self, conversation, monkeypatch):
-        from rsm_thrive.services import orchestrator as orch
+    def test_an_industry_we_do_not_rank_gets_the_six_we_do(self, conversation):
+        reply = orchestrator.answer(
+            FakeLLM([json.dumps({"route": "industry", "confidence": 0.9,
+                                 "role": "", "industry": "agriculture",
+                                 "quarter": ""})]),
+            conversation, "electives for the agriculture industry", [])
+        assert reply.model_note == "industry-menu"
+        assert "MGTA" not in reply.body, "no course for an industry we do not rank"
 
-        monkeypatch.setattr(orch, "recommend_for_question",
-                            lambda llm, q: (None, []))
-        reply = orch.answer(FakeLLM([classified("industry", 0.9,
-                                                industry="aerospace")]),
-                            conversation, "what should I take for aerospace", [])
-        assert reply.route == router.INDUSTRY
-        assert reply.refused is True
-        assert "MGTA" not in reply.body and "CSE" not in reply.body
-        assert "advising" in reply.body.lower()
-
-    def test_a_match_is_returned_as_the_advisor_wrote_it(self, conversation, monkeypatch):
-        from rsm_thrive.services import orchestrator as orch
-
-        monkeypatch.setattr(
-            orch, "recommend_for_question",
-            lambda llm, q: ("- **MGTA 464 — SQL** (2 units): matches sql.",
-                            ["MGTA 464"]))
-        reply = orch.answer(FakeLLM([classified("industry", 0.9)]),
-                            conversation, "courses for healthcare", [])
-        assert "MGTA 464" in reply.body and reply.refused is False
-
-
-# ---------------------------------------------------------------------------
-# Route: both
-# ---------------------------------------------------------------------------
 
 class TestACombinationKeepsTheRoleDeterministic:
-    def test_the_curated_spine_comes_first_and_whole(self, conversation, monkeypatch):
-        from rsm_thrive.services import orchestrator as orch
+    """A curated role plus an industry. The role fixes the electives; the
+    industry says who the student is competing with. The order is the point --
+    the deterministic half leads."""
 
-        monkeypatch.setattr(
-            orch, "recommend_for_question",
-            lambda llm, q: ("- **MGTA 459 — Fraud Analytics** (4 units).",
-                            ["MGTA 459"]))
-        reply = orch.answer(FakeLLM([]), conversation,
-                            "data scientist in the food industry", [])
+    def test_the_curated_spine_comes_first_and_whole(self, conversation):
+        reply = orchestrator.answer(
+            FakeLLM([]), conversation,
+            "I want to be a data scientist in fintech", [])
         assert reply.route == router.COMBINATION
-        spine = reply.body.index("MGTA 461")
-        industry = reply.body.index("MGTA 459")
-        assert spine < industry, "the deterministic half must lead"
+        assert "MGTA" in reply.body
+        # The bundle, then the ranking -- not the other way round.
+        assert reply.body.index("MGTA") < reply.body.index("Financial Services")
 
-    def test_a_field_with_no_matches_does_not_erase_the_spine(self, conversation,
-                                                              monkeypatch):
-        from rsm_thrive.services import orchestrator as orch
+    def test_it_says_where_that_role_ranks_in_that_industry(self, conversation):
+        reply = orchestrator.answer(
+            FakeLLM([]), conversation,
+            "I want to be a data scientist in fintech", [])
+        assert "#2 of 7" in reply.body, "Data Scientist is second in that table"
 
-        monkeypatch.setattr(orch, "recommend_for_question",
-                            lambda llm, q: (None, []))
-        reply = orch.answer(FakeLLM([]), conversation,
-                            "data scientist in the food industry", [])
-        assert "MGTA 461" in reply.body
-        assert "couldn't match" in reply.body
+    def test_a_role_that_industry_does_not_rank_keeps_its_spine(
+            self, conversation):
+        reply = orchestrator.answer(
+            FakeLLM([]), conversation,
+            "I want to be a decision scientist in healthcare", [])
+        assert "MGTA" in reply.body, "the role's own bundle survives"
+        assert "isn't one this industry" in reply.body
 
-
-# ---------------------------------------------------------------------------
-# Route: a factual question
-# ---------------------------------------------------------------------------
 
 class TestAFactualQuestionIsAnsweredFromTheCatalog:
     def test_the_catalog_row_is_what_the_model_is_given(self, conversation):
@@ -393,24 +365,29 @@ class TestDecliningPlainly:
 # ---------------------------------------------------------------------------
 
 class TestAPlanIsBuiltFromWhatWasTyped:
-    def test_it_asks_about_skills_then_the_spread_then_plans(self, conversation):
-        """Two questions, in that order: skills change WHICH courses are
-        picked, the spread changes where they sit."""
+    def test_it_asks_about_the_spread_and_then_plans(self, conversation):
+        """ONE question now. The self-rating question that used to come first
+        is gone -- a student cannot rate their own machine learning before
+        they have taken any, and a low rating steered them away from the very
+        courses that would fix it."""
         first = orchestrator.answer(
             FakeLLM([]), conversation,
-            "I'm on the 11 month track and I want to be a data scientist", [])
-        assert "starting from technically" in first.body
-        assert "Python" in first.body
+            "I'm on the 17 month track and I want to be a data scientist", [])
+        assert "spread across the quarters" in first.body.lower()
+        assert "starting from technically" not in first.body, \
+            "nothing asks a student to rate themselves any more"
         assert "MGTA" not in first.body, "it does not plan before it asks"
-
-        second = orchestrator.answer(FakeLLM([]), conversation,
-                                     "python 4, sql 2, no ML", [])
-        assert "spread across the quarters" in second.body.lower()
-        assert "MGTA" not in second.body
 
         reply = orchestrator.answer(FakeLLM([]), conversation, "moderate", [])
         assert reply.route == "plan"
         assert "Summer III" in reply.body and "Spring" in reply.body
+
+    def test_a_volunteered_rating_is_still_used(self, conversation):
+        """Being asked and being told are different things. Only the asking
+        went; a student who says where they are is still heard."""
+        orchestrator.answer(
+            FakeLLM([]), conversation,
+            "11 month, data scientist, python 4, sql 2, no ML", [])
         stored = planner.load_session_intake(conversation)
         assert stored["skill_python"] == 4 and stored["skill_ml"] == 1
 
@@ -432,38 +409,40 @@ class TestAPlanIsBuiltFromWhatWasTyped:
         assert reply.route == "plan"
         assert "Winter" in reply.body
 
-    def test_neither_question_is_asked_twice(self, conversation):
+    def test_the_question_is_not_asked_twice(self, conversation):
         """An interview with no exit is the thing being removed."""
         first = orchestrator.answer(
-            FakeLLM([]), conversation, "11 month, data scientist", [])
-        assert "starting from technically" in first.body
-        second = orchestrator.answer(FakeLLM([]), conversation, "skip", [])
-        assert "spread across the quarters" in second.body.lower()
-        # A reply that answers neither. The plan arrives anyway, with a note.
+            FakeLLM([]), conversation, "17 month, data scientist", [])
+        assert "spread across the quarters" in first.body.lower()
+        # A reply that does not answer it. The plan arrives anyway, with a note.
         reply = orchestrator.answer(FakeLLM([]), conversation,
                                     "actually just show me the plan", [])
         assert "MGTA" in reply.body
         assert "published plan does" in reply.body, "and says what it assumed"
-        assert "starting from technically" not in reply.body
+        assert "spread across the quarters" not in reply.body.lower()
 
-    def test_what_was_assumed_is_stated_rather_than_asked_for(self, conversation):
+    def test_the_plan_does_not_open_by_listing_its_assumptions(self, conversation):
+        """It used to, and it made sense while the interview asked: a student
+        who had answered four of five deserved to know the fifth was guessed.
+
+        Nothing asks now, so it fired on every plan and named all five areas
+        every time -- forty words above the plan saying only that a question
+        the student was never asked went unanswered."""
         orchestrator.answer(
             FakeLLM([]), conversation,
             "17 month track, aiming to be a data scientist", [])
-        orchestrator.answer(FakeLLM([]), conversation, "skip", [])
         reply = orchestrator.answer(FakeLLM([]), conversation, "moderate", [])
-        assert "assumed" in reply.body.lower()
-        assert "redo it" in reply.body.lower()
+        head = reply.body.split("plan of study")[0].lower()
+        assert "i've assumed" not in head
+        assert "since you haven't said" not in head
 
-    def test_only_the_unanswered_areas_are_assumed(self, conversation):
-        """Rating two areas and ignoring three is a real answer."""
-        orchestrator.answer(FakeLLM([]), conversation,
-                            "11 month, data scientist", [])
-        orchestrator.answer(FakeLLM([]), conversation, "python 5, sql 4", [])
-        reply = orchestrator.answer(FakeLLM([]), conversation, "moderate", [])
-        assert "Python" not in reply.body.split("plan of study")[0], \
-            "it does not claim to have assumed what was stated"
-        assert "Machine learning" in reply.body.split("plan of study")[0]
+    def test_but_a_course_above_the_assumed_level_still_says_so(self, conversation):
+        """The disclosure moved, it did not go. `_stretch_notes` marks a
+        stretch on the course's own row, where it can be acted on."""
+        for said in ("data scientist", "11 month", "moderate",
+                     "walk me through it", "next quarter", "next quarter"):
+            reply = orchestrator.answer(FakeLLM([]), conversation, said, [])
+        assert "Heads up" in reply.body
 
     def test_a_track_with_no_goal_asks_the_one_thing_it_needs(self, conversation):
         reply = orchestrator.answer(FakeLLM([]), conversation, "11 month", [])
@@ -553,8 +532,22 @@ class TestANonMsbaCourseCarriesItsEnrolmentTerms:
 
     def test_a_consent_programme_says_consent(self):
         body = orchestrator.curated_recommendation("business-data-analyst")
-        assert "MGTF courses are Rady MS Finance" in body
         assert "enrolment by consent" in body
+
+    def test_mgtf_is_named_as_the_mqf_not_the_mfin(self):
+        """Rady runs both, and MGTF is the MQF's prefix.
+
+        Its own page lists "EMBA, Full-Time MBA, FlexEvening/FlexWeekend MBA,
+        MPAc, MQF and MFin" as separate programmes; MGTF 416 is titled "MQF
+        Professional Seminar" in Rady's catalog, and the current fee pages for
+        this prefix are headed "Master of Quantitative Finance". We had it as
+        the MFin, and `import_syllabi` had already stamped that into all 23
+        MGTF syllabi, so the wrong name was sitting in the corpus looking
+        sourced.
+        """
+        label = electives.DEPARTMENT_LABELS["MGTF"][0]
+        assert "Quantitative Finance" in label
+        assert "MFin" not in label
 
     def test_every_prefix_in_every_bundle_has_stated_terms(self):
         from rsm_thrive.services.electives import DEPARTMENT_LABELS
@@ -573,13 +566,32 @@ class TestANonMsbaCourseCarriesItsEnrolmentTerms:
 # ---------------------------------------------------------------------------
 
 class TestItOpensWithQuestions:
-    def test_the_opening_asks_the_two_things_a_plan_needs(self):
-        """A surface that opens by describing its own capabilities makes the
-        student compose the first move."""
+    def test_the_opening_names_all_three_ways_in(self):
+        """It used to open on "what are you aiming for after the programme?",
+        which assumes an answer exists. For a student in their first quarter
+        it often does not, and being asked a question you cannot answer is a
+        worse start than being shown the way in."""
         body = planner.opening_prompt()["body"]
-        assert "What are you aiming for" in body
-        assert "11-month" in body and "17-month" in body
+        assert "know the job" in body, "the fast path for a settled student"
+        assert "know the field, not the job" in body, "the industry path"
+        assert "no idea yet" in body, "the path for a student with no target"
         assert "11 month, data scientist" in body, "one line is enough"
+
+    def test_the_opening_does_not_demand_the_track_up_front(self):
+        """The track is asked once the job is settled -- every curated
+        recommendation closes by asking for it -- so demanding it here made
+        the opening a two-field form and asked the same question twice."""
+        body = planner.opening_prompt()["body"]
+        assert "I'll need your track" not in body
+        # Still SHOWN, so the one-line shortcut stays discoverable.
+        assert "11 month, data scientist" in body
+
+    def test_the_opening_does_not_promise_a_web_lookup(self):
+        """It read "name an industry and I'll work from what that field is
+        asking for" -- the removed lookup's promise, outliving the lookup."""
+        body = planner.opening_prompt()["body"]
+        assert "what that field is asking for" not in body
+        assert "hires MSBA graduates into" in body
 
     def test_and_says_you_can_ask_something_else_first(self):
         body = planner.opening_prompt()["body"]
@@ -685,10 +697,18 @@ class TestPlanningOneQuarter:
                 assert row["code"] in reply.body
 
     def test_it_carries_the_load_question_for_that_quarter(self, conversation):
-        with_plan(conversation)
+        with_plan(conversation, track="17 month")
         reply = orchestrator.answer(FakeLLM([]), conversation,
                                     "what should I take in winter?", [])
         assert "How heavy should Winter be?" in reply.body
+
+    def test_but_not_on_the_11_month_track(self, conversation):
+        """Every quarter there carries the published load; nothing to ask."""
+        with_plan(conversation)
+        reply = orchestrator.answer(FakeLLM([]), conversation,
+                                    "what should I take in winter?", [])
+        assert "# Winter" in reply.body
+        assert "How heavy should" not in reply.body
 
     def test_it_offers_the_rest_and_the_whole_plan(self, conversation):
         with_plan(conversation)
@@ -760,8 +780,7 @@ class TestAnOutageSaysItIsAnOutage:
         """An exhausted FakeLLM raises on any call. Everything below happens
         anyway."""
         for said, expected in (("I want to be a data scientist", "MGTA 461"),
-                               ("11 month", "starting from technically"),
-                               ("skip", "spread across the quarters"),
+                               ("17 month", "spread across the quarters"),
                                ("moderate", "plan of study"),
                                ("walk me through it", "Summer III"),
                                ("next quarter", "Fall")):

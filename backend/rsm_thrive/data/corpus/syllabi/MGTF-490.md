@@ -3,7 +3,7 @@ id: "MGTF 490"
 code: "MGTF 490"
 title: "Capstone Applied Finance Project"
 department: "MGTF"
-programme: "Rady MS Finance (MFin)"
+programme: "Rady MQF (Master of Quantitative Finance)"
 units: 4
 schedulable: true
 is_core: false
@@ -21,7 +21,7 @@ syllabi: ["MGTF 490 Capstone Applied Finance Project (Melvin, Girand, Padernacht
 ---
 # MGTF 490 — Capstone Applied Finance Project
 
-**4 units** · Rady MS Finance (MFin) · offered FA26
+**4 units** · Rady MQF (Master of Quantitative Finance) · offered FA26
 
 ## What this course covers
 
